@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.IO.ContentFormats.DmxModel;
 using ValveResourceFormat.IO.ContentFormats.ValveMap;
@@ -336,6 +337,26 @@ public sealed class MapExtract
 #endif
 
         return stream.ToArray();
+    }
+
+    public string ToEntities()
+    {
+        var entities_json = "{}";
+        List<Entity> merge_entities = new List<Entity>();
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            var entityLumpCompiled = entityLumpName + GameFileLoader.CompiledFileSuffix;
+            FolderExtractFilter.Add(entityLumpCompiled);
+
+            using var entityLumpResource = FileLoader.LoadFile(entityLumpCompiled);
+            var entityLump = (EntityLump)entityLumpResource.DataBlock;
+            var entities = entityLump.GetEntities().ToList();
+            merge_entities.AddRange(entities);
+        }
+#pragma warning disable CA1869
+        entities_json = JsonSerializer.Serialize(merge_entities, new JsonSerializerOptions { WriteIndented = true });
+#pragma warning restore CA1869
+        return entities_json;
     }
 
     private void CreateSelectionSets(CMapSelectionSet root)

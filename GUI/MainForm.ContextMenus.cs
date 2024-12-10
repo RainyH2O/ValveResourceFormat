@@ -9,6 +9,7 @@ using GUI.Types.Exporter;
 using GUI.Types.PackageViewer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
+using ValveResourceFormat;
 
 namespace GUI
 {
@@ -462,6 +463,15 @@ namespace GUI
         private void OnOpenWelcomeScreenToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenWelcome();
+        }
+
+        private void OnExportEntitiesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var owner = ((ContextMenuStrip)((ToolStripMenuItem)sender).Owner).SourceControl;
+            if (owner is BetterTreeView tree)
+            {
+                ExportFile.ExportEntitiesFromTreeNode((IBetterBaseItem)tree.SelectedNode, tree.VrfGuiContext);
+            }
         }
     }
 }

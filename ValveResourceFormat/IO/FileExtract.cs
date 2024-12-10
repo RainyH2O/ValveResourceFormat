@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -301,6 +302,17 @@ namespace ValveResourceFormat.IO
             if (fileLoader is GameFileLoader gameFileLoader)
             {
                 gameFileLoader.EnsureStringTokenGameKeys();
+            }
+        }
+
+        public static string ExtractEntities(Resource resource, IFileLoader fileLoader)
+        {
+            switch (resource.ResourceType)
+            {
+                case ResourceType.Map:
+                    return new MapExtract(resource, fileLoader).ToEntities();
+                default:
+                    return "{}";
             }
         }
     }
