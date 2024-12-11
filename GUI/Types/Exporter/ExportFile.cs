@@ -221,5 +221,74 @@ namespace GUI.Types.Exporter
                 extractDialog?.Dispose();
             }
         }
+
+        public static void ExportEntitiesFromTreeNode(IBetterBaseItem selectedNode, VrfGuiContext vrfGuiContext)
+        {
+            if (!selectedNode.IsFolder)
+            {
+                var file = selectedNode.PackageEntry;
+                var stream = AdvancedGuiFileLoader.GetPackageEntryStream(vrfGuiContext.CurrentPackage, file);
+                string fileName = file.GetFileName();
+                if (fileName.EndsWith(GameFileLoader.CompiledFileSuffix, StringComparison.Ordinal))
+                {
+                    var exportData = new ExportData
+                    {
+                        VrfGuiContext = new VrfGuiContext(null, vrfGuiContext),
+                    };
+
+                    var resourceTemp = new Resource
+                    {
+                        FileName = fileName,
+                    };
+                    var resource = resourceTemp;
+                    string filaNameToSave;
+                    try
+                    {
+                        resource.Read(stream);
+
+                        var extension = "json";
+                        var filter = $"{extension} file|*.{extension}";
+                        var fileNameForSave = Path.GetFileNameWithoutExtension(fileName);
+
+                        if (Path.GetExtension(fileName) == ".vmap_c")
+                        {
+                            fileNameForSave += "_entities.json";
+                        }
+
+                        using var dialog = new SaveFileDialog
+                        {
+                            Title = "Choose where to save the file",
+                            FileName = fileNameForSave,
+                            InitialDirectory = Settings.Config.SaveDirectory,
+                            DefaultExt = extension,
+                            Filter = filter,
+                            AddToRecent = true,
+                        };
+
+                        var result = dialog.ShowDialog();
+
+                        if (result != DialogResult.OK)
+                        {
+                            return;
+                        }
+
+                        filaNameToSave = dialog.FileName;
+                        resourceTemp = null;
+
+                        var directory = Path.GetDirectoryName(filaNameToSave);
+                        Settings.Config.SaveDirectory = directory;
+
+                        var entitiesJson = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+                        File.WriteAllText(filaNameToSave, entitiesJson);
+                    }
+                    finally
+                    {
+                        exportData.VrfGuiContext.Dispose();
+                        resourceTemp?.Dispose();
+                        resource?.Dispose();
+                    }
+                }
+            }
+        }
     }
 }
