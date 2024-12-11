@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.IO.ContentFormats.DmxModel;
 using ValveResourceFormat.IO.ContentFormats.ValveMap;
@@ -528,6 +529,33 @@ public sealed class MapExtract
         }
 
         #endregion Mesh Size Calculation
+    }
+
+    public string ToEntities()
+    {
+        var entitiesJson = "{}";
+        var mergeEntities = new List<Entity>();
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            var entityLumpCompiled = entityLumpName + GameFileLoader.CompiledFileSuffix;
+            FolderExtractFilter.Add(entityLumpCompiled);
+
+            using var entityLumpResource = FileLoader.LoadFile(entityLumpCompiled);
+            var entityLump = (EntityLump)entityLumpResource.DataBlock;
+            var entities = entityLump.GetEntities().ToList();
+            mergeEntities.AddRange(entities);
+            foreach (var childLumpName in entityLump.GetChildEntityNames())
+            {
+                using var entityChildLumpResource = FileLoader.LoadFileCompiled(childLumpName);
+                var entityChildLump = (EntityLump)entityChildLumpResource.DataBlock;
+                var entitiesChild = entityChildLump.GetEntities().ToList();
+                mergeEntities.AddRange(entitiesChild);
+            }
+        }
+#pragma warning disable CA1869
+        entitiesJson = JsonSerializer.Serialize(mergeEntities, new JsonSerializerOptions { WriteIndented = true });
+#pragma warning restore CA1869
+        return entitiesJson;
     }
 
     private void CreateSelectionSets(CMapSelectionSet root)
