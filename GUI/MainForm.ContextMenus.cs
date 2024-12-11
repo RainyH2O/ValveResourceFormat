@@ -463,5 +463,14 @@ namespace GUI
         {
             OpenWelcome();
         }
+
+        private void OnExportEntitiesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var owner = ((ContextMenuStrip)((ToolStripMenuItem)sender).Owner).SourceControl;
+            if (owner is BetterTreeView tree)
+            {
+                ExportFile.ExportEntitiesFromTreeNode((IBetterBaseItem)tree.SelectedNode, tree.VrfGuiContext);
+            }
+        }
     }
 }
