@@ -307,5 +307,14 @@ namespace ValveResourceFormat.IO
                 gameFileLoader.EnsureStringTokenGameKeys();
             }
         }
+
+        public static string ExtractEntities(Resource resource, IFileLoader fileLoader)
+        {
+            return resource.ResourceType switch
+            {
+                ResourceType.Map => new MapExtract(resource, fileLoader).ToEntities(),
+                _ => "{}"
+            };
+        }
     }
 }
