@@ -9,6 +9,7 @@ namespace GUI.Controls
     class ControlPanelView : UserControl
     {
         protected virtual Panel ControlsPanel { get; }
+        private bool allSelected;
 
         public ControlPanelView()
         {
@@ -72,8 +73,45 @@ namespace GUI.Controls
                     changeCallback(selectionControl.CheckedListBox.CheckedItems.OfType<string>());
                 }));
             };
+            selectionControl.CheckedListBox.KeyDown += (sender, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.A)
+                {
+                    if (allSelected)
+                    {
+                        DeselectAllItems(selectionControl.CheckedListBox);
+                    }
+                    else
+                    {
+                        SelectAllItems(selectionControl.CheckedListBox);
+                    }
+                    allSelected = !allSelected;
+                    e.Handled = true;
+                }
+                else
+                {
+                    base.OnKeyDown(e);
+                }
+            };
 
             return selectionControl.CheckedListBox;
+        }
+
+        private static void SelectAllItems(CheckedListBox checkedListBox)
+        {
+            // Select all items except "S2V: Render as opaque"
+            for (var i = 0; i < checkedListBox.Items.Count - 1 ; i++)
+            {
+                checkedListBox.SetItemChecked(i, true);
+            }
+        }
+
+        private static void DeselectAllItems(CheckedListBox checkedListBox)
+        {
+            for (var i = 0; i < checkedListBox.Items.Count; i++)
+            {
+                checkedListBox.SetItemChecked(i, false);
+            }
         }
 
         public GLViewerTrackBarControl AddTrackBar(Action<int> changeCallback)

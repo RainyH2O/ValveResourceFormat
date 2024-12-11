@@ -531,6 +531,34 @@ public sealed class MapExtract
         #endregion Mesh Size Calculation
     }
 
+    public List<Entity> ToEntities()
+    {
+        var mergeEntities = new List<Entity>();
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            var entityLumpCompiled = entityLumpName + GameFileLoader.CompiledFileSuffix;
+            FolderExtractFilter.Add(entityLumpCompiled);
+
+            using var entityLumpResource = FileLoader.LoadFile(entityLumpCompiled);
+            var entityLump = (EntityLump)entityLumpResource?.DataBlock!;
+            var entities = entityLump.GetEntities().ToList();
+            mergeEntities.AddRange(entities);
+            foreach (var childLumpName in entityLump.GetChildEntityNames())
+            {
+                using var entityChildLumpResource = FileLoader.LoadFileCompiled(childLumpName);
+                var entityChildLump = (EntityLump)entityChildLumpResource?.DataBlock!;
+                var entitiesChild = entityChildLump.GetEntities().ToList();
+                mergeEntities.AddRange(entitiesChild);
+            }
+        }
+        return mergeEntities;
+    }
+
+    public static string SerializeEntities(List<Entity> entities)
+    {
+        return KVJsonSerializer.SerializeEntities(entities);
+    }
+
     private void CreateSelectionSets(CMapSelectionSet root)
     {
         S2VSelectionSet = root.Children.AddReturn(new CMapSelectionSet("Source2 Viewer"));

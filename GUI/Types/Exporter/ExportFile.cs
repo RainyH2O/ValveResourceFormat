@@ -1,4 +1,6 @@
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,6 +9,8 @@ using GUI.Types.PackageViewer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
 using ValveResourceFormat.IO;
+using ValveResourceFormat.ResourceTypes;
+using ValveResourceFormat.Serialization.KeyValues;
 using Resource = ValveResourceFormat.Resource;
 
 #nullable disable
@@ -195,7 +199,8 @@ namespace GUI.Types.Exporter
             }
         }
 
-        public static void ExtractFilesFromListViewNodes(BetterListView.SelectedListViewItemCollection items, VrfGuiContext vrfGuiContext, bool decompile)
+        public static void ExtractFilesFromListViewNodes(ListView.SelectedListViewItemCollection items,
+            VrfGuiContext vrfGuiContext, bool decompile)
         {
             var exportData = new ExportData
             {
@@ -220,6 +225,346 @@ namespace GUI.Types.Exporter
             {
                 extractDialog?.Dispose();
             }
+        }
+
+        public static void ExportEntitiesFromTreeNode(IBetterBaseItem selectedNode, VrfGuiContext vrfGuiContext)
+        {
+            if (selectedNode.IsFolder || !selectedNode.PackageEntry.GetFileName()
+                    .EndsWith(GameFileLoader.CompiledFileSuffix, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var file = selectedNode.PackageEntry;
+            var fileName = file.GetFileName();
+            using var stream = AdvancedGuiFileLoader.GetPackageEntryStream(vrfGuiContext.CurrentPackage, file);
+
+            var exportData = new ExportData { VrfGuiContext = new VrfGuiContext(null, vrfGuiContext) };
+            using var resource = new Resource { FileName = fileName };
+
+            try
+            {
+                resource.Read(stream);
+
+                var saveFileName = GetSaveFileName(fileName);
+                if (string.IsNullOrEmpty(saveFileName))
+                {
+                    return;
+                }
+
+                Settings.Config.SaveDirectory = Path.GetDirectoryName(saveFileName);
+                var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+
+                var filteredEntities = FilterEntitiesByType(entities);
+                if (filteredEntities.Count == 0)
+                {
+                    return;
+                }
+
+                var (exportType, selectedProperties, entitiesToExport) = ConfigureExport(filteredEntities, entities);
+                if (exportType == null)
+                {
+                    return;
+                }
+
+                var entitiesJson = exportType == PropertySelectionDialog.ExportType.Custom
+                    ? SerializeEntitiesWithSelectedProperties(entitiesToExport, selectedProperties)
+                    : MapExtract.SerializeEntities(entitiesToExport);
+
+                File.WriteAllText(saveFileName, entitiesJson);
+                ShowExportSuccess(entitiesToExport.Count, exportType.Value, Path.GetFileName(saveFileName));
+            }
+            finally
+            {
+                exportData.VrfGuiContext.Dispose();
+            }
+        }
+
+        public static void ExportEntitiesFromTabPage(ExportData exportData)
+        {
+            Stream stream = null;
+
+            try
+            {
+                var fileName = exportData.PackageEntry?.GetFileName() ?? exportData.VrfGuiContext.FileName;
+
+                if (!fileName.EndsWith(GameFileLoader.CompiledFileSuffix, StringComparison.Ordinal))
+                {
+                    MessageBox.Show("File does not support entity export.", "Export Failed",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                stream = exportData.PackageEntry != null
+                    ? AdvancedGuiFileLoader.GetPackageEntryStream(exportData.VrfGuiContext.CurrentPackage,
+                        exportData.PackageEntry)
+                    : File.OpenRead(fileName);
+
+                using var resource = new Resource { FileName = Path.GetFileName(fileName) };
+                resource.Read(stream);
+
+                var saveFileName = GetSaveFileName(fileName);
+                if (string.IsNullOrEmpty(saveFileName))
+                {
+                    return;
+                }
+
+                Settings.Config.SaveDirectory = Path.GetDirectoryName(saveFileName);
+                var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+
+                var filteredEntities = FilterEntitiesByType(entities);
+                if (filteredEntities.Count == 0)
+                {
+                    return;
+                }
+
+                var (exportType, selectedProperties, entitiesToExport) = ConfigureExport(filteredEntities, entities);
+                if (exportType == null)
+                {
+                    return;
+                }
+
+                var entitiesJson = exportType == PropertySelectionDialog.ExportType.Custom
+                    ? SerializeEntitiesWithSelectedProperties(entitiesToExport, selectedProperties)
+                    : MapExtract.SerializeEntities(entitiesToExport);
+
+                File.WriteAllText(saveFileName, entitiesJson);
+                ShowExportSuccess(entitiesToExport.Count, exportType.Value, Path.GetFileName(saveFileName));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed: {ex.Message}", "Export Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                stream?.Dispose();
+            }
+        }
+
+        private static string GetSaveFileName(string fileName)
+        {
+            var baseFileName = Path.GetFileNameWithoutExtension(fileName);
+            if (Path.GetExtension(fileName) == ".vmap_c")
+            {
+                baseFileName += "_entities";
+            }
+
+            using var dialog = new SaveFileDialog
+            {
+                Title = "Choose save location",
+                FileName = baseFileName + ".json",
+                InitialDirectory = Settings.Config.SaveDirectory,
+                DefaultExt = "json",
+                Filter = "JSON files|*.json",
+                AddToRecent = true
+            };
+
+            return dialog.ShowDialog() == DialogResult.OK ? dialog.FileName : "";
+        }
+
+        private static List<EntityLump.Entity> FilterEntitiesByType(List<EntityLump.Entity> entities)
+        {
+            using var filterWindow = new FilterForm(entities);
+            if (filterWindow.ShowDialog() != DialogResult.Continue)
+            {
+                return new List<EntityLump.Entity>();
+            }
+
+            var filteredEntities = filterWindow.filteredEntities;
+            if (filteredEntities?.Count > 0)
+            {
+                return filteredEntities;
+            }
+
+            MessageBox.Show("No entity types selected.", "Export Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return new List<EntityLump.Entity>();
+        }
+
+        private static (PropertySelectionDialog.ExportType?, HashSet<string>, List<EntityLump.Entity>) ConfigureExport(
+            List<EntityLump.Entity> filteredEntities, List<EntityLump.Entity> allEntities)
+        {
+            using var propertyDialog = new PropertySelectionDialog(filteredEntities);
+            if (propertyDialog.ShowDialog() != DialogResult.OK)
+            {
+                return (null, new HashSet<string>(), new List<EntityLump.Entity>());
+            }
+
+            var entitiesToExport = propertyDialog.IncludeRelatedEntities
+                ? GetEntitiesWithRelated(filteredEntities, allEntities)
+                : filteredEntities;
+
+            return (propertyDialog.SelectedExportType, propertyDialog.SelectedProperties, entitiesToExport);
+        }
+
+        private static void ShowExportSuccess(int entityCount, PropertySelectionDialog.ExportType exportType,
+            string fileName)
+        {
+            var typeText = exportType switch
+            {
+                PropertySelectionDialog.ExportType.Full => "full",
+                PropertySelectionDialog.ExportType.Custom => "custom",
+                _ => "unknown"
+            };
+
+            MessageBox.Show($"Successfully exported {entityCount} entities ({typeText}) to {fileName}",
+                "Export Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private static List<EntityLump.Entity> GetEntitiesWithRelated(List<EntityLump.Entity> filteredEntities,
+            List<EntityLump.Entity> allEntities)
+        {
+            var visitedEntities = new HashSet<EntityLump.Entity>(filteredEntities);
+            var resultEntities = new List<EntityLump.Entity>(filteredEntities);
+            var namedEntitiesLookup = CreateNamedEntitiesLookup(allEntities);
+
+            foreach (var entity in filteredEntities)
+            {
+                FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
+            }
+
+            return resultEntities;
+        }
+
+        private static Dictionary<string, List<EntityLump.Entity>> CreateNamedEntitiesLookup(
+            List<EntityLump.Entity> allEntities)
+        {
+            return allEntities
+                .Where(entity => entity.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
+                                 kvValue.Value != null)
+                .GroupBy(entity => entity.Properties.Properties["targetname"].Value!.ToString()!)
+                .ToDictionary(group => group.Key, group => group.ToList());
+        }
+
+        private static void FindRelatedEntities(EntityLump.Entity rootEntity, List<EntityLump.Entity> allEntities,
+            Dictionary<string, List<EntityLump.Entity>> namedEntitiesLookup, HashSet<EntityLump.Entity> visitedEntities,
+            List<EntityLump.Entity> resultEntities)
+        {
+            if (rootEntity.Connections?.Count > 0)
+            {
+                ProcessOutgoingConnections(rootEntity, namedEntitiesLookup, allEntities, visitedEntities,
+                    resultEntities);
+            }
+
+            if (rootEntity.Properties.Properties.TryGetValue("targetname", out var rootTargetName) &&
+                rootTargetName.Value != null)
+            {
+                ProcessIncomingConnections(rootEntity, allEntities, rootTargetName.Value.ToString()!, visitedEntities,
+                    resultEntities);
+            }
+        }
+
+        private static void ProcessOutgoingConnections(EntityLump.Entity rootEntity,
+            Dictionary<string, List<EntityLump.Entity>> namedEntitiesLookup, List<EntityLump.Entity> allEntities,
+            HashSet<EntityLump.Entity> visitedEntities, List<EntityLump.Entity> resultEntities)
+        {
+            foreach (var connection in rootEntity.Connections!)
+            {
+                if (!connection.Properties.TryGetValue("m_targetName", out var targetNameValue) ||
+                    targetNameValue.Value == null)
+                {
+                    continue;
+                }
+
+                var targetName = targetNameValue.Value.ToString()!;
+                if (!namedEntitiesLookup.TryGetValue(targetName, out var targetEntities))
+                {
+                    continue;
+                }
+
+                foreach (var entity in targetEntities.Where(e => e != rootEntity && !visitedEntities.Contains(e)))
+                {
+                    resultEntities.Add(entity);
+                    visitedEntities.Add(entity);
+                    FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
+                }
+            }
+        }
+
+        private static void ProcessIncomingConnections(EntityLump.Entity rootEntity,
+            List<EntityLump.Entity> allEntities,
+            string rootName, HashSet<EntityLump.Entity> visitedEntities, List<EntityLump.Entity> resultEntities)
+        {
+            var namedEntitiesLookup = CreateNamedEntitiesLookup(allEntities);
+
+            foreach (var entity in allEntities.Where(e =>
+                         e.Connections?.Count > 0 && e != rootEntity && !visitedEntities.Contains(e)))
+            {
+                if (entity.Connections!.Any(conn => conn.Properties.TryGetValue("m_targetName", out var targetValue) &&
+                                                    targetValue.Value?.ToString() == rootName))
+                {
+                    resultEntities.Add(entity);
+                    visitedEntities.Add(entity);
+                    FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
+                }
+            }
+        }
+
+        private static readonly HashSet<string> EssentialConnectionProperties = new()
+            { "m_outputName", "m_targetName", "m_inputName", "m_overrideParam", "m_flDelay", "m_nTimesToFire" };
+
+        private static string SerializeEntitiesWithSelectedProperties(List<EntityLump.Entity> entities,
+            HashSet<string> selectedProperties)
+        {
+            var filteredEntities = entities.Select(entity =>
+            {
+                var entityDict = new Dictionary<string, object>();
+
+                foreach (var (key, value) in entity.Properties.Properties)
+                {
+                    if (selectedProperties.Contains(key) && value.Value != null)
+                    {
+                        entityDict[key] = ConvertEntityValue(value.Value);
+                    }
+                }
+
+                if (entity.Connections?.Count > 0)
+                {
+                    var connections = entity.Connections
+                        .Select(FilterConnection)
+                        .Where(filteredConn => filteredConn.Count > 0)
+                        .Cast<object>()
+                        .ToList();
+
+                    if (connections.Count > 0)
+                    {
+                        entityDict["connections"] = connections;
+                    }
+                }
+
+                return entityDict;
+            }).Where(dict => dict.Count > 0).ToList();
+
+            return JsonSerializer.Serialize(filteredEntities, KVJsonContext.Options);
+        }
+
+        private static object ConvertEntityValue(object value)
+        {
+            return value switch
+            {
+                string str => str,
+                bool boolean => boolean,
+                Vector3 vector => new { vector.X, vector.Y, vector.Z },
+                Vector2 vector => new { vector.X, vector.Y },
+                KVObject { IsArray: true } kvArray => kvArray.Select(p => p.Value).ToArray(),
+                _ when value.GetType().IsPrimitive => value,
+                _ => value.ToString() ?? ""
+            };
+        }
+
+        private static Dictionary<string, object> FilterConnection(KVObject connection)
+        {
+            var filteredConnection = new Dictionary<string, object>();
+
+            foreach (var (key, kvValue) in connection.Properties)
+            {
+                if (EssentialConnectionProperties.Contains(key) && kvValue.Value != null)
+                {
+                    filteredConnection[key] = ConvertEntityValue(kvValue.Value);
+                }
+            }
+
+            return filteredConnection;
         }
     }
 }

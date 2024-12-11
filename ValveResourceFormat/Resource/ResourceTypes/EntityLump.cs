@@ -67,6 +67,29 @@ namespace ValveResourceFormat.ResourceTypes
                 var defaultColor = new Vector3(255f);
                 return GetVector3Property(key, defaultColor) / 255f;
             }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is not Entity other)
+                {
+                    return false;
+                }
+                if (Properties.Properties.TryGetValue("hammeruniqueid", out var thisHammerUniqueId) &&
+                    other.Properties.Properties.TryGetValue("hammeruniqueid", out var otherHammerUniqueId))
+                {
+                    return thisHammerUniqueId.Value?.Equals(otherHammerUniqueId.Value) ?? false;
+                }
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                if (Properties.Properties.TryGetValue("hammeruniqueid", out var hammerUniqueId))
+                {
+                    return hammerUniqueId.GetHashCode();
+                }
+                return base.GetHashCode();
+            }
         }
 
         public string Name => Data.GetProperty<string>("m_name");

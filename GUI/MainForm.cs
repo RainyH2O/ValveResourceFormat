@@ -488,6 +488,7 @@ namespace GUI
                 var canExport = tabName != "Console" && tabName != "Explorer";
                 exportAsIsToolStripMenuItem.Visible = canExport;
                 decompileExportToolStripMenuItem.Visible = canExport;
+                exportEntitiesToolStripMenuItem.Visible = canExport;
 
                 clearConsoleToolStripMenuItem.Visible = tabIndex == 0;
 

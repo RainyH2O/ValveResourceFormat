@@ -5,11 +5,14 @@ using GUI.Controls;
 using GUI.Forms;
 using GUI.Types.Viewers;
 using GUI.Utils;
+using ValveKeyValue;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using static GUI.Controls.SavedCameraPositionsControl;
 using static GUI.Types.Renderer.PickingTexture;
+using KVObject = ValveResourceFormat.Serialization.KeyValues.KVObject;
+using KVValue = ValveResourceFormat.Serialization.KeyValues.KVValue;
 
 #nullable disable
 
@@ -30,6 +33,9 @@ namespace GUI.Types.Renderer
         private EntityInfoForm entityInfoForm;
         private bool ignoreLayersChangeEvents = true;
         private List<Matrix4x4> CameraMatrices;
+        private List<EntityLump.Entity> entities;
+        private readonly Dictionary<string, List<KVObject>> entityInputListDict = new();
+        private EntityListForm entityListForm;
 
         public GLWorldViewer(VrfGuiContext guiContext, World world, bool isFromVmap = false)
             : base(guiContext)
@@ -55,6 +61,7 @@ namespace GUI.Types.Renderer
                 cameraComboBox?.Dispose();
                 savedCameraPositionsControl?.Dispose();
                 entityInfoForm?.Dispose();
+                entityListForm?.Dispose();
             }
         }
 
@@ -224,6 +231,36 @@ namespace GUI.Types.Renderer
                 AddCheckBox("Color Correction", postProcessRenderer.ColorCorrectionEnabled, v => postProcessRenderer.ColorCorrectionEnabled = v);
                 AddCheckBox("Experimental Lights", false, v => viewBuffer.Data.ExperimentalLightsEnabled = v);
                 AddCheckBox("Occlusion Culling", EnableOcclusionCulling, (v) => EnableOcclusionCulling = v);
+
+                if (result.Entities != null)
+                {
+                    entities = result.Entities;
+                    foreach (var entity in entities)
+                    {
+                        if (entity.Connections == null)
+                        {
+                            continue;
+                        }
+                        foreach (var entityConnection in entity.Connections)
+                        {
+                            var sourceHammerUniqueId = entity.GetProperty<string>("hammeruniqueid");
+                            var sourceName = entity.GetProperty("targetname", "");
+                            var targetName = entityConnection.GetStringProperty("m_targetName");
+                            if (string.IsNullOrEmpty(targetName))
+                            {
+                                continue;
+                            }
+                            if (!entityInputListDict.TryGetValue(targetName, out var entityInputList))
+                            {
+                                entityInputList = [];
+                                entityInputListDict[targetName] = entityInputList;
+                            }
+                            entityConnection.AddProperty("sourceHammerUniqueId", new KVValue(KVValueType.String, sourceHammerUniqueId));
+                            entityConnection.AddProperty("sourceName", new KVValue(KVValueType.String, sourceName));
+                            entityInputList.Add(entityConnection);
+                        }
+                    }
+                }
 
                 if (result.SkyboxScene != null)
                 {
@@ -396,6 +433,7 @@ namespace GUI.Types.Renderer
                 entityInfoForm = new EntityInfoForm(GuiContext.FileLoader);
                 entityInfoForm.Show();
                 entityInfoForm.EntityInfoControl.OutputsGrid.CellDoubleClick += OnEntityInfoOutputsCellDoubleClick;
+                entityInfoForm.EntityInfoControl.InputsGrid.CellDoubleClick += OnEntityInfoInputsCellDoubleClick;
                 entityInfoForm.EntityInfoControl.Disposed += OnEntityInfoFormDisposed;
             }
             entityInfoForm.EntityInfoControl.Clear();
@@ -477,37 +515,100 @@ namespace GUI.Types.Renderer
             }
 
             entityInfoForm.EntityInfoControl.ShowOutputsTabIfAnyData();
+            entityInfoForm.EntityInfoControl.ShowInputsTabIfAnyData();
             entityInfoForm.EntityInfoControl.Show();
         }
 
         private void OnEntityInfoOutputsCellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.ColumnIndex != 1)
+            if (e.RowIndex < 0)
             {
                 return;
             }
 
-            var entityName = (string)(entityInfoForm.EntityInfoControl.OutputsGrid[e.ColumnIndex, e.RowIndex].Value ?? string.Empty);
+            var outputsGrid = (DataGridView)sender;
+            var row = outputsGrid.Rows[e.RowIndex];
+            var targetEntity = row.Cells[1].Value?.ToString() ?? string.Empty;
+            var targetHammerUniqueId = row.Cells.Count > 6 ? (row.Cells[6].Value?.ToString() ?? string.Empty) : string.Empty;
 
-            if (string.IsNullOrEmpty(entityName))
+            SceneNode node = null;
+
+            if (!string.IsNullOrEmpty(targetEntity))
             {
-                return;
+                node = Scene.FindNodeByKeyValue("targetname", targetEntity);
+                if (node == null && SkyboxScene != null)
+                {
+                    node = SkyboxScene.FindNodeByKeyValue("targetname", targetEntity);
+                }
             }
 
-            var node = Scene.FindNodeByKeyValue("targetname", entityName);
-
-            if (node == null && SkyboxScene != null)
+            if (node == null && !string.IsNullOrEmpty(targetHammerUniqueId))
             {
-                node = SkyboxScene.FindNodeByKeyValue("targetname", entityName);
+                node = Scene.FindNodeByKeyValue("hammeruniqueid", targetHammerUniqueId);
+                if (node == null && SkyboxScene != null)
+                {
+                    node = SkyboxScene.FindNodeByKeyValue("hammeruniqueid", targetHammerUniqueId);
+                }
+            }
+
+            if (node == null)
+            {
+                return;
             }
 
             SelectAndFocusNode(node);
             ShowSceneNodeDetails(node);
+
+            entityInfoForm?.EntityInfoControl.SelectTableRow(entityInfoForm.EntityInfoControl.InputsGrid, row);
+        }
+
+        private void OnEntityInfoInputsCellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+            {
+                return;
+            }
+
+            var inputsGrid = (DataGridView)sender;
+            var row = inputsGrid.Rows[e.RowIndex];
+            var sourceName = row.Cells[1].Value?.ToString() ?? string.Empty;
+            var sourceHammerUniqueId = row.Cells.Count > 0 ? (row.Cells[0].Value?.ToString() ?? string.Empty) : string.Empty;
+
+            SceneNode node = null;
+
+            if (!string.IsNullOrEmpty(sourceName))
+            {
+                node = Scene.FindNodeByKeyValue("targetname", sourceName);
+                if (node == null && SkyboxScene != null)
+                {
+                    node = SkyboxScene.FindNodeByKeyValue("targetname", sourceName);
+                }
+            }
+
+            if (node == null && !string.IsNullOrEmpty(sourceHammerUniqueId))
+            {
+                node = Scene.FindNodeByKeyValue("hammeruniqueid", sourceHammerUniqueId);
+                if (node == null && SkyboxScene != null)
+                {
+                    node = SkyboxScene.FindNodeByKeyValue("hammeruniqueid", sourceHammerUniqueId);
+                }
+            }
+
+            if (node == null)
+            {
+                return;
+            }
+
+            SelectAndFocusNode(node);
+            ShowSceneNodeDetails(node);
+
+            entityInfoForm?.EntityInfoControl.SelectTableRow(entityInfoForm.EntityInfoControl.OutputsGrid, row);
         }
 
         private void OnEntityInfoFormDisposed(object sender, EventArgs e)
         {
             entityInfoForm.EntityInfoControl.OutputsGrid.CellDoubleClick -= OnEntityInfoOutputsCellDoubleClick;
+            entityInfoForm.EntityInfoControl.InputsGrid.CellDoubleClick -= OnEntityInfoInputsCellDoubleClick;
             entityInfoForm.EntityInfoControl.Disposed -= OnEntityInfoFormDisposed;
             entityInfoForm = null;
         }
@@ -662,9 +763,27 @@ namespace GUI.Types.Renderer
             {
                 foreach (var connection in sceneNode.EntityData.Connections)
                 {
+                    var targetName = connection.GetStringProperty("m_targetName");
+                    var targetEntity = entities.FirstOrDefault(e => e.GetProperty<string>("targetname") == targetName);
+                    var targetHammerUniqueId = targetEntity?.GetProperty<string>("hammeruniqueid");
+                    if (!connection.ContainsKey("targetHammerUniqueId"))
+                    {
+                        connection.AddProperty("targetHammerUniqueId", new KVValue(KVValueType.String, targetHammerUniqueId));
+                    }
                     entityInfoForm.EntityInfoControl.AddConnection(connection);
                 }
             }
+
+            var targetname = sceneNode.EntityData.GetProperty<string>("targetname");
+            if (targetname != null && entityInputListDict.TryGetValue(targetname, out var entityInputList))
+            {
+                foreach (var entityInput in entityInputList)
+                {
+                    entityInfoForm.EntityInfoControl.AddInputConnection(entityInput);
+                }
+            }
+
+            entityInfoForm.EntityInfoControl.SortConnections();
 
             var classname = sceneNode.EntityData.GetProperty<string>("classname");
             entityInfoForm.Text = $"Entity: {classname}";
@@ -726,6 +845,143 @@ namespace GUI.Types.Renderer
 
             Scene.UpdateOctrees();
             SkyboxScene?.UpdateOctrees();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.G))
+            {
+                ShowGoToDialog();
+            }
+            if (keyData == (Keys.Control | Keys.Alt | Keys.R))
+            {
+                ShowEntityListForm();
+            }
+            if (keyData == (Keys.Alt | Keys.Enter))
+            {
+                ShowSceneNodeDetails(selectedNodeRenderer.GetSelectNode());
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void ShowGoToDialog()
+        {
+            using var goToForm = new GoToForm();
+            if (goToForm.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            var inputText = goToForm.InputText;
+            switch (goToForm.SelectedGoToType)
+            {
+                case GoToForm.GoToType.Coordinate:
+                    GoToCoordinate(inputText);
+                    break;
+                case GoToForm.GoToType.EntityName:
+                    GoToEntityByName(inputText);
+                    break;
+                case GoToForm.GoToType.HammerId:
+                    GoToEntityByHammerId(inputText);
+                    break;
+            }
+        }
+
+        private void GoToCoordinate(string inputText)
+        {
+            var match = Regexes.Coord().Match(inputText);
+            if (!match.Success)
+            {
+                MessageBox.Show("Invalid coordinate format. Use: X Y Z", "Format Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var x = float.Parse(match.Groups["x"].Value, CultureInfo.InvariantCulture);
+            var y = float.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture);
+            var z = float.Parse(match.Groups["z"].Value, CultureInfo.InvariantCulture);
+            Camera.SetLocation(new Vector3(x, y, z));
+        }
+
+        private void GoToEntityByName(string entityName)
+        {
+            if (string.IsNullOrWhiteSpace(entityName))
+            {
+                MessageBox.Show("Please enter an entity name.", "Input Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var node = FindEntity("targetname", entityName);
+            if (node != null)
+            {
+                SelectAndFocusNode(node);
+            }
+            else
+            {
+                MessageBox.Show($"Entity '{entityName}' not found.", "Not Found", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+
+        private void GoToEntityByHammerId(string hammerId)
+        {
+            if (string.IsNullOrWhiteSpace(hammerId))
+            {
+                MessageBox.Show("Please enter a Hammer ID.", "Input Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var node = FindEntity("hammeruniqueid", hammerId);
+            if (node != null)
+            {
+                SelectAndFocusNode(node);
+            }
+            else
+            {
+                MessageBox.Show($"Entity with Hammer ID '{hammerId}' not found.", "Not Found", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+
+        private SceneNode FindEntity(string keyName, string value)
+        {
+            return Scene.FindNodeByKeyValue(keyName, value) ?? SkyboxScene?.FindNodeByKeyValue(keyName, value);
+        }
+
+        private void ShowEntityListForm()
+        {
+            if (entityListForm == null || entityListForm.IsDisposed)
+            {
+                entityListForm = new EntityListForm(entities);
+                entityListForm.FormClosed += (s, args) =>
+                {
+                    entityListForm.Dispose();
+                    entityListForm = null;
+                };
+                entityListForm.OnEntityClicked += (s, value) =>
+                {
+                    var entity = Scene.FindNodeByKeyValue("hammeruniqueid", value);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity);
+                    }
+                    Focus();
+                };
+                entityListForm.OnEntityDoubleClicked += (s, args) =>
+                {
+                    var entity = selectedNodeRenderer.GetSelectNode();
+                    if (entity != null)
+                    {
+                        SelectAndFocusNode(entity);
+                    }
+                    Focus();
+                };
+            }
+            entityListForm.Activate();
+            entityListForm.Show();
         }
     }
 }
