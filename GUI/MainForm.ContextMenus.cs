@@ -471,6 +471,9 @@ namespace GUI
             {
                 ExportFile.ExportEntitiesFromTreeNode((IBetterBaseItem)tree.SelectedNode, tree.VrfGuiContext);
             }
+            else if (owner is TabControl)
+            {
+            }
         }
     }
 }
