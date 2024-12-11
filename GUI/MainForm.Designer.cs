@@ -65,6 +65,7 @@ namespace GUI
             vpkContextMenu = new ContextMenuStrip(components);
             extractToolStripMenuItem = new ToolStripMenuItem();
             decompileToolStripMenuItem = new ToolStripMenuItem();
+            extractEntitiesToolStripMenuItem = new ToolStripMenuItem();
             exportEntitiesToolStripMenuItem = new ToolStripMenuItem();
             toolStripSeparator1 = new ToolStripSeparator();
             copyFileNameToolStripMenuItem = new ToolStripMenuItem();
@@ -235,7 +236,7 @@ namespace GUI
             // tabContextMenuStrip
             //
             tabContextMenuStrip.ImageScalingSize = new System.Drawing.Size(24, 24);
-            tabContextMenuStrip.Items.AddRange(new ToolStripItem[] { closeToolStripMenuItem, closeToolStripMenuItems, closeToolStripMenuItemsToRight, closeToolStripMenuItemsToLeft, exportAsIsToolStripMenuItem, decompileExportToolStripMenuItem, clearConsoleToolStripMenuItem });
+            tabContextMenuStrip.Items.AddRange(new ToolStripItem[] { closeToolStripMenuItem, closeToolStripMenuItems, closeToolStripMenuItemsToRight, closeToolStripMenuItemsToLeft, exportAsIsToolStripMenuItem, decompileExportToolStripMenuItem, exportEntitiesToolStripMenuItem, clearConsoleToolStripMenuItem });
             tabContextMenuStrip.LayoutStyle = ToolStripLayoutStyle.Table;
             tabContextMenuStrip.Name = "contextMenuStrip1";
             tabContextMenuStrip.Size = new System.Drawing.Size(234, 214);
@@ -291,6 +292,13 @@ namespace GUI
             decompileExportToolStripMenuItem.Text = "Decompile && export";
             decompileExportToolStripMenuItem.Click += DecompileToolStripMenuItem_Click;
             //
+            // exportEntitiesToolStripMenuItem
+            //
+            exportEntitiesToolStripMenuItem.Name = "exportEntitiesToolStripMenuItem";
+            exportEntitiesToolStripMenuItem.Size = new System.Drawing.Size(233, 30);
+            exportEntitiesToolStripMenuItem.Text = "Export entities";
+            exportEntitiesToolStripMenuItem.Click += OnExportEntitiesToolStripMenuItem_Click;
+            //
             // clearConsoleToolStripMenuItem
             //
             clearConsoleToolStripMenuItem.Image = (System.Drawing.Image)resources.GetObject("clearConsoleToolStripMenuItem.Image");
@@ -301,7 +309,7 @@ namespace GUI
             //
             // vpkContextMenu
             //
-            vpkContextMenu.Items.AddRange(new ToolStripItem[] { extractToolStripMenuItem, decompileToolStripMenuItem, exportEntitiesToolStripMenuItem, toolStripSeparator1, copyFileNameToolStripMenuItem, copyFileNameOnDiskToolStripMenuItem, toolStripSeparator3, openWithDefaultAppToolStripMenuItem, viewAssetInfoToolStripMenuItem, verifyPackageContentsToolStripMenuItem, recoverDeletedToolStripMenuItem });
+            vpkContextMenu.Items.AddRange(new ToolStripItem[] { extractToolStripMenuItem, decompileToolStripMenuItem, extractEntitiesToolStripMenuItem, toolStripSeparator1, copyFileNameToolStripMenuItem, copyFileNameOnDiskToolStripMenuItem, toolStripSeparator3, openWithDefaultAppToolStripMenuItem, viewAssetInfoToolStripMenuItem, verifyPackageContentsToolStripMenuItem, recoverDeletedToolStripMenuItem });
             vpkContextMenu.Name = "vpkContextMenu";
             vpkContextMenu.Size = new System.Drawing.Size(209, 192);
             //
@@ -321,12 +329,12 @@ namespace GUI
             decompileToolStripMenuItem.Text = "Decompile && export";
             decompileToolStripMenuItem.Click += DecompileToolStripMenuItem_Click;
             //
-            // exportEntitiesToolStripMenuItem
+            // extractEntitiesToolStripMenuItem
             //
-            exportEntitiesToolStripMenuItem.Name = "exportEntitiesToolStripMenuItem";
-            exportEntitiesToolStripMenuItem.Size = new System.Drawing.Size(208, 22);
-            exportEntitiesToolStripMenuItem.Text = "Export entities";
-            exportEntitiesToolStripMenuItem.Click += OnExportEntitiesToolStripMenuItem_Click;
+            extractEntitiesToolStripMenuItem.Name = "extractEntitiesToolStripMenuItem";
+            extractEntitiesToolStripMenuItem.Size = new System.Drawing.Size(208, 22);
+            extractEntitiesToolStripMenuItem.Text = "Export entities";
+            extractEntitiesToolStripMenuItem.Click += OnExportEntitiesToolStripMenuItem_Click;
             //
             // toolStripSeparator1
             //
@@ -517,6 +525,7 @@ namespace GUI
         private ToolStripSeparator toolStripSeparator3;
         private ToolStripSeparator toolStripSeparator4;
         private ToolStripMenuItem openWelcomeScreenToolStripMenuItem;
+        private ToolStripMenuItem extractEntitiesToolStripMenuItem;
         private ToolStripMenuItem exportEntitiesToolStripMenuItem;
     }
 }
