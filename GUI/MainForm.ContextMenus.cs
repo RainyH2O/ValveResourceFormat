@@ -483,6 +483,28 @@ namespace GUI
             OpenWelcome();
         }
 
+        private void OnExportEntitiesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var owner = ((ContextMenuStrip)((ToolStripMenuItem)sender).Owner).SourceControl;
+            if (owner is BetterTreeView tree)
+            {
+                ExportFile.ExportEntitiesFromTreeNode((IBetterBaseItem)tree.SelectedNode, tree.VrfGuiContext);
+            }
+            else if (owner is TabControl)
+            {
+                var tabPage = FetchToolstripTabContext(sender);
+
+                if (tabPage.Tag is not ExportData exportData)
+                {
+                    MessageBox.Show("Unable to get export data from tab.", "Export Failed", MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                ExportFile.ExportEntitiesFromTabPage(exportData);
+            }
+        }
+
 #if DEBUG
         private void OnValidateShadersToolStripMenuItem_Click(object sender, EventArgs e)
         {
