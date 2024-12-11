@@ -9,6 +9,7 @@ using ValveResourceFormat.IO.ContentFormats.ValveMap;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization;
 using ValveResourceFormat.Serialization.KeyValues;
+using ValveResourceFormat.Serialization.KeyValues.KVConverts;
 using ValveResourceFormat.Utils;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
@@ -361,7 +362,18 @@ public sealed class MapExtract
             }
         }
 #pragma warning disable CA1869
-        entitiesJson = JsonSerializer.Serialize(mergeEntities, new JsonSerializerOptions { WriteIndented = true });
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters =
+            {
+                new EntityConverter(),
+                new KVObjectConverter(),
+                new KVObjectListConverter(),
+                new KVValueConverter()
+            }
+        };
+        entitiesJson = JsonSerializer.Serialize(mergeEntities, options);
 #pragma warning restore CA1869
         return entitiesJson;
     }
