@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,6 +8,7 @@ using GUI.Types.PackageViewer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
 using ValveResourceFormat.IO;
+using ValveResourceFormat.ResourceTypes;
 using Resource = ValveResourceFormat.Resource;
 
 #nullable disable
@@ -219,6 +221,130 @@ namespace GUI.Types.Exporter
             finally
             {
                 extractDialog?.Dispose();
+            }
+        }
+
+        public static void ExportEntitiesFromTreeNode(IBetterBaseItem selectedNode, VrfGuiContext vrfGuiContext)
+        {
+            if (!selectedNode.IsFolder)
+            {
+                var file = selectedNode.PackageEntry;
+                var stream = AdvancedGuiFileLoader.GetPackageEntryStream(vrfGuiContext.CurrentPackage, file);
+                string fileName = file.GetFileName();
+                if (fileName.EndsWith(GameFileLoader.CompiledFileSuffix, StringComparison.Ordinal))
+                {
+                    var exportData = new ExportData
+                    {
+                        VrfGuiContext = new VrfGuiContext(null, vrfGuiContext),
+                    };
+
+                    var resourceTemp = new Resource
+                    {
+                        FileName = fileName,
+                    };
+                    var resource = resourceTemp;
+                    string filaNameToSave;
+                    try
+                    {
+                        resource.Read(stream);
+
+                        var extension = "json";
+                        var filter = $"{extension} file|*.{extension}";
+                        var fileNameForSave = Path.GetFileNameWithoutExtension(fileName);
+
+                        if (Path.GetExtension(fileName) == ".vmap_c")
+                        {
+                            fileNameForSave += "_entities.json";
+                        }
+
+                        using var dialog = new SaveFileDialog
+                        {
+                            Title = "Choose where to save the file",
+                            FileName = fileNameForSave,
+                            InitialDirectory = Settings.Config.SaveDirectory,
+                            DefaultExt = extension,
+                            Filter = filter,
+                            AddToRecent = true,
+                        };
+
+                        var result = dialog.ShowDialog();
+
+                        if (result != DialogResult.OK)
+                        {
+                            return;
+                        }
+
+                        filaNameToSave = dialog.FileName;
+                        resourceTemp = null;
+
+                        var directory = Path.GetDirectoryName(filaNameToSave);
+                        Settings.Config.SaveDirectory = directory;
+
+                        var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+                        using var filterWindow = new FilterForm(entities);
+                        var filterResult = filterWindow.ShowDialog();
+                        if (filterResult != DialogResult.Continue)
+                        {
+                            return;
+                        }
+
+                        var filteredEntities = filterWindow.filteredEntities;
+                        var visitedEntities = new HashSet<EntityLump.Entity>();
+                        var resultEntities = new List<EntityLump.Entity>();
+                        foreach (var filteredEntity in filteredEntities)
+                        {
+                            if (!visitedEntities.Contains(filteredEntity))
+                            {
+                                resultEntities.Add(filteredEntity);
+                                visitedEntities.Add(filteredEntity);
+                            }
+                            DfsAsocialEntities(filteredEntity, entities, visitedEntities);
+
+                            void DfsAsocialEntities(EntityLump.Entity rootEntity,
+                                List<EntityLump.Entity> originalList, HashSet<EntityLump.Entity> visitedSet)
+                            {
+                                if (rootEntity.Connections is null)
+                                {
+                                    return;
+                                }
+
+                                var entityList = originalList
+                                    .Where(item =>
+                                        item.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
+                                        kvValue.Value != null)
+                                    .ToList();
+                                foreach (var entityConnection in rootEntity.Connections)
+                                {
+                                    if (entityConnection.Properties.TryGetValue("m_targetName",
+                                            out var mTargetNameKvValue) && mTargetNameKvValue.Value != null)
+                                    {
+                                        var targetName = mTargetNameKvValue.Value.ToString();
+                                        foreach (var entity in entityList)
+                                        {
+                                            if (entity.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
+                                                kvValue.Value.ToString() == targetName &&
+                                                entity != rootEntity && !visitedSet.Contains(entity))
+                                            {
+                                                resultEntities.Add(entity);
+                                                visitedSet.Add(entity);
+                                                DfsAsocialEntities(entity, originalList, visitedSet);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        var entitiesJson = MapExtract.SerializeEntities(resultEntities);
+                        File.WriteAllText(filaNameToSave, entitiesJson);
+                    }
+                    finally
+                    {
+                        exportData.VrfGuiContext.Dispose();
+                        resourceTemp?.Dispose();
+                        resource?.Dispose();
+                    }
+                }
             }
         }
     }

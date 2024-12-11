@@ -5,11 +5,14 @@ using GUI.Controls;
 using GUI.Forms;
 using GUI.Types.Viewers;
 using GUI.Utils;
+using ValveKeyValue;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using static GUI.Controls.SavedCameraPositionsControl;
 using static GUI.Types.Renderer.PickingTexture;
+using KVObject = ValveResourceFormat.Serialization.KeyValues.KVObject;
+using KVValue = ValveResourceFormat.Serialization.KeyValues.KVValue;
 
 #nullable disable
 
@@ -29,6 +32,9 @@ namespace GUI.Types.Renderer
         private EntityInfoForm entityInfoForm;
         private bool ignoreLayersChangeEvents = true;
         private List<Matrix4x4> CameraMatrices;
+        private List<EntityLump.Entity> entities;
+        private readonly Dictionary<string, List<KVObject>> entityInputListDict = new();
+        private EntityListForm entityListForm;
 
         public GLWorldViewer(VrfGuiContext guiContext, World world)
             : base(guiContext)
@@ -53,6 +59,7 @@ namespace GUI.Types.Renderer
                 cameraComboBox?.Dispose();
                 savedCameraPositionsControl?.Dispose();
                 entityInfoForm?.Dispose();
+                entityListForm?.Dispose();
             }
         }
 
@@ -210,6 +217,36 @@ namespace GUI.Types.Renderer
                 AddCheckBox("Color Correction", postProcessRenderer.ColorCorrectionEnabled, v => postProcessRenderer.ColorCorrectionEnabled = v);
                 AddCheckBox("Experimental Lights", false, v => viewBuffer.Data.ExperimentalLightsEnabled = v);
                 AddCheckBox("Occlusion Culling", EnableOcclusionCulling, (v) => EnableOcclusionCulling = v);
+
+                if (result.Entities != null)
+                {
+                    entities = result.Entities;
+                    foreach (var entity in entities)
+                    {
+                        if (entity.Connections == null)
+                        {
+                            continue;
+                        }
+                        foreach (var entityConnection in entity.Connections)
+                        {
+                            var sourceHammerUniqueId = entity.GetProperty<string>("hammeruniqueid");
+                            var sourceName = entity.GetProperty("targetname", "");
+                            var targetName = entityConnection.GetStringProperty("m_targetName");
+                            if (string.IsNullOrEmpty(targetName))
+                            {
+                                continue;
+                            }
+                            if (!entityInputListDict.TryGetValue(targetName, out var entityInputList))
+                            {
+                                entityInputList = [];
+                                entityInputListDict[targetName] = entityInputList;
+                            }
+                            entityConnection.AddProperty("sourceHammerUniqueId", new KVValue(KVValueType.String, sourceHammerUniqueId));
+                            entityConnection.AddProperty("sourceName", new KVValue(KVValueType.String, sourceName));
+                            entityInputList.Add(entityConnection);
+                        }
+                    }
+                }
 
                 if (result.SkyboxScene != null)
                 {
@@ -382,6 +419,67 @@ namespace GUI.Types.Renderer
                 entityInfoForm.Show();
                 entityInfoForm.EntityInfoControl.OutputsGrid.CellDoubleClick += OnEntityInfoOutputsCellDoubleClick;
                 entityInfoForm.EntityInfoControl.Disposed += OnEntityInfoFormDisposed;
+                entityInfoForm.Disposed += OnEntityInfoFormDisposed;
+                entityInfoForm.OnOutputConnectionDoubleClicked += (_, args) =>
+                {
+                    var parts = args.Split('|');
+                    if (parts.Length != 9)
+                    {
+                        Log.Error(nameof(EntityInfoForm), "Invalid arguments received in OnOutputConnectionDoubleClicked");
+                        return;
+                    }
+
+                    var targetHammerUniqueId = parts[6];
+                    var entity = Scene.FindByEntityInfo(targetHammerUniqueId);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity, isInSkybox);
+                        entityInfoForm.SelectTab("Input", args);
+                    }
+
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
+
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                };
+                entityInfoForm.OnInputConnectionDoubleClicked += (_, args) =>
+                {
+                    var parts = args.Split('|');
+                    if (parts.Length != 9)
+                    {
+                        Log.Error(nameof(EntityInfoForm), "Invalid arguments received in OnInputConnectionDoubleClicked");
+                        return;
+                    }
+
+                    var sourceHammerUniqueId = parts[0];
+                    var entity = Scene.FindByEntityInfo(sourceHammerUniqueId);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity, isInSkybox);
+                        entityInfoForm.SelectTab("Output", args);
+                    }
+
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
+
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                };
             }
             entityInfoForm.EntityInfoControl.Clear();
 
@@ -452,6 +550,7 @@ namespace GUI.Types.Renderer
             }
 
             entityInfoForm.EntityInfoControl.ShowOutputsTabIfAnyData();
+            entityInfoForm.EntityInfoControl.ShowInputsTabIfAnyData();
             entityInfoForm.EntityInfoControl.Show();
         }
 
@@ -637,9 +736,27 @@ namespace GUI.Types.Renderer
             {
                 foreach (var connection in sceneNode.EntityData.Connections)
                 {
+                    var targetName = connection.GetStringProperty("m_targetName");
+                    var targetEntity = entities.FirstOrDefault(e => e.GetProperty<string>("targetname") == targetName);
+                    var targetHammerUniqueId = targetEntity?.GetProperty<string>("hammeruniqueid");
+                    if (!connection.ContainsKey("targetHammerUniqueId"))
+                    {
+                        connection.AddProperty("targetHammerUniqueId", new KVValue(KVValueType.String, targetHammerUniqueId));
+                    }
                     entityInfoForm.EntityInfoControl.AddConnection(connection);
                 }
             }
+
+            var targetname = sceneNode.EntityData.GetProperty<string>("targetname");
+            if (targetname != null && entityInputListDict.TryGetValue(targetname, out var entityInputList))
+            {
+                foreach (var entityInput in entityInputList)
+                {
+                    entityInfoForm.EntityInfoControl.AddInputConnection(entityInput);
+                }
+            }
+
+            entityInfoForm.EntityInfoControl.SortConnections();
 
             var classname = sceneNode.EntityData.GetProperty<string>("classname");
             entityInfoForm.Text = $"Entity: {classname}";
@@ -701,6 +818,79 @@ namespace GUI.Types.Renderer
 
             Scene.UpdateOctrees();
             SkyboxScene?.UpdateOctrees();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.G))
+            {
+                GoToCoordinate();
+            }
+            if (keyData == (Keys.Control | Keys.Alt | Keys.R))
+            {
+                ShowEntityListForm();
+            }
+            if (keyData == (Keys.Alt | Keys.Enter))
+            {
+                ShowSceneNodeDetails(selectedNodeRenderer.GetSelectNode(), false);
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void GoToCoordinate()
+        {
+            using var searchForm = new SearchForm();
+            var result = searchForm.ShowDialog();
+            if (result != DialogResult.OK)
+            {
+                return;
+            }
+            var searchText = searchForm.SearchText;
+            var pos = Regexes.Coord().Match(searchText);
+            float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+            float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+            float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+            Camera.SetLocation(new Vector3(x, y, z));
+        }
+
+        private void ShowEntityListForm()
+        {
+            if (entityListForm == null || entityListForm.IsDisposed)
+            {
+                entityListForm = new EntityListForm(entities);
+                entityListForm.FormClosed += (s, args) =>
+                {
+                    entityListForm.Dispose();
+                    entityListForm = null;
+                };
+                entityListForm.OnEntityClicked += (s, value) =>
+                {
+                    var entity = Scene.FindByEntityInfo(value);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity, false);
+                    }
+                    Focus();
+                };
+                entityListForm.OnEntityDoubleClicked += (s, args) =>
+                {
+                    var entity = selectedNodeRenderer.GetSelectNode();
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                    Focus();
+                };
+            }
+            entityListForm.Activate();
+            entityListForm.Show();
         }
     }
 }

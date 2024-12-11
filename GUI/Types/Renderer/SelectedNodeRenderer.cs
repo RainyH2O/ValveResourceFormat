@@ -79,6 +79,11 @@ namespace GUI.Types.Renderer
             }
         }
 
+        public SceneNode GetSelectNode()
+        {
+            return selectedNodes.FirstOrDefault()!;
+        }
+
         private void UpdateBuffer()
         {
             disableDepth = selectedNodes.Count > 1;

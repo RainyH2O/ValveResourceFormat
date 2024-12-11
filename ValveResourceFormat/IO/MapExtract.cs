@@ -3,11 +3,13 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.IO.ContentFormats.DmxModel;
 using ValveResourceFormat.IO.ContentFormats.ValveMap;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
+using ValveResourceFormat.Serialization.KeyValues.KVConverters;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
 namespace ValveResourceFormat.IO;
@@ -528,6 +530,47 @@ public sealed class MapExtract
         }
 
         #endregion Mesh Size Calculation
+    }
+
+    public List<Entity> ToEntities()
+    {
+        var mergeEntities = new List<Entity>();
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            var entityLumpCompiled = entityLumpName + GameFileLoader.CompiledFileSuffix;
+            FolderExtractFilter.Add(entityLumpCompiled);
+
+            using var entityLumpResource = FileLoader.LoadFile(entityLumpCompiled);
+            var entityLump = (EntityLump)entityLumpResource?.DataBlock!;
+            var entities = entityLump.GetEntities().ToList();
+            mergeEntities.AddRange(entities);
+            foreach (var childLumpName in entityLump.GetChildEntityNames())
+            {
+                using var entityChildLumpResource = FileLoader.LoadFileCompiled(childLumpName);
+                var entityChildLump = (EntityLump)entityChildLumpResource?.DataBlock!;
+                var entitiesChild = entityChildLump.GetEntities().ToList();
+                mergeEntities.AddRange(entitiesChild);
+            }
+        }
+        return mergeEntities;
+    }
+
+    public static String SerializeEntities(List<Entity> entities)
+    {
+#pragma warning disable CA1869
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters =
+            {
+                new EntityConverter(),
+                new KVObjectConverter(),
+                new KVObjectListConverter(),
+                new KVValueConverter()
+            }
+        };
+        return JsonSerializer.Serialize(entities, options);
+#pragma warning restore CA1869
     }
 
     private void CreateSelectionSets(CMapSelectionSet root)
