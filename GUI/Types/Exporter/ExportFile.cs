@@ -279,7 +279,13 @@ namespace GUI.Types.Exporter
                         Settings.Config.SaveDirectory = directory;
 
                         var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
-                        var entitiesJson = MapExtract.SerializeEntities(entities);
+                        using var filterWindow = new FilterForm(entities);
+                        var filterResult = filterWindow.ShowDialog();
+                        if (filterResult != DialogResult.Continue)
+                        {
+                            return;
+                        }
+                        var entitiesJson = MapExtract.SerializeEntities(filterWindow.filteredEntities);
                         File.WriteAllText(filaNameToSave, entitiesJson);
                     }
                     finally
