@@ -9,7 +9,7 @@ using ValveResourceFormat.IO.ContentFormats.ValveMap;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization;
 using ValveResourceFormat.Serialization.KeyValues;
-using ValveResourceFormat.Serialization.KeyValues.KVConverts;
+using ValveResourceFormat.Serialization.KeyValues.KVConverters;
 using ValveResourceFormat.Utils;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
@@ -340,9 +340,8 @@ public sealed class MapExtract
         return stream.ToArray();
     }
 
-    public string ToEntities()
+    public List<Entity> ToEntities()
     {
-        var entitiesJson = "{}";
         var mergeEntities = new List<Entity>();
         foreach (var entityLumpName in EntityLumpNames)
         {
@@ -361,6 +360,11 @@ public sealed class MapExtract
                 mergeEntities.AddRange(entitiesChild);
             }
         }
+        return mergeEntities;
+    }
+
+    public static String SerializeEntities(List<Entity> entities)
+    {
 #pragma warning disable CA1869
         var options = new JsonSerializerOptions
         {
@@ -373,9 +377,8 @@ public sealed class MapExtract
                 new KVValueConverter()
             }
         };
-        entitiesJson = JsonSerializer.Serialize(mergeEntities, options);
+        return JsonSerializer.Serialize(entities, options);
 #pragma warning restore CA1869
-        return entitiesJson;
     }
 
     private void CreateSelectionSets(CMapSelectionSet root)
