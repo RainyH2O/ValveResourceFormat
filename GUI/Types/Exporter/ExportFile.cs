@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,6 +8,7 @@ using GUI.Types.PackageViewer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
 using ValveResourceFormat.IO;
+using ValveResourceFormat.ResourceTypes;
 using Resource = ValveResourceFormat.Resource;
 
 namespace GUI.Types.Exporter
@@ -283,7 +285,52 @@ namespace GUI.Types.Exporter
                         {
                             return;
                         }
-                        var entitiesJson = MapExtract.SerializeEntities(filterWindow.filteredEntities);
+
+                        var filteredEntities = filterWindow.filteredEntities;
+                        var visitedEntities = new HashSet<EntityLump.Entity>();
+                        var resultEntities = new List<EntityLump.Entity>();
+                        foreach (var filteredEntity in filteredEntities)
+                        {
+                            resultEntities.Add(filteredEntity);
+                            visitedEntities.Add(filteredEntity);
+                            DfsAsocialEntities(filteredEntity, entities, visitedEntities);
+
+                            void DfsAsocialEntities(EntityLump.Entity rootEntity,
+                                List<EntityLump.Entity> originalList, HashSet<EntityLump.Entity> visitedSet)
+                            {
+                                if (rootEntity.Connections is null)
+                                {
+                                    return;
+                                }
+
+                                var entityList = originalList
+                                    .Where(item =>
+                                        item.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
+                                        kvValue.Value != null)
+                                    .ToList();
+                                foreach (var entityConnection in rootEntity.Connections)
+                                {
+                                    if (entityConnection.Properties.TryGetValue("m_targetName",
+                                            out var mTargetNameKvValue) && mTargetNameKvValue.Value != null)
+                                    {
+                                        var targetName = mTargetNameKvValue.Value.ToString();
+                                        foreach (var entity in entityList)
+                                        {
+                                            if (entity.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
+                                                kvValue.Value.ToString() == targetName &&
+                                                entity != rootEntity && !visitedSet.Contains(entity))
+                                            {
+                                                resultEntities.Add(entity);
+                                                visitedSet.Add(entity);
+                                                DfsAsocialEntities(entity, originalList, visitedSet);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        var entitiesJson = MapExtract.SerializeEntities(resultEntities);
                         File.WriteAllText(filaNameToSave, entitiesJson);
                     }
                     finally
