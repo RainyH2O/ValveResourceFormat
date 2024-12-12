@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
-namespace ValveResourceFormat.Serialization.KeyValues.KVConverts
+namespace ValveResourceFormat.Serialization.KeyValues.KVConverters
 {
     public class EntityConverter : JsonConverter<Entity>
     {

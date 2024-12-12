@@ -278,7 +278,8 @@ namespace GUI.Types.Exporter
                         var directory = Path.GetDirectoryName(filaNameToSave);
                         Settings.Config.SaveDirectory = directory;
 
-                        var entitiesJson = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+                        var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext.FileLoader);
+                        var entitiesJson = MapExtract.SerializeEntities(entities);
                         File.WriteAllText(filaNameToSave, entitiesJson);
                     }
                     finally
