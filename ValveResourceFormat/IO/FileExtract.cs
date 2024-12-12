@@ -308,12 +308,12 @@ namespace ValveResourceFormat.IO
             }
         }
 
-        public static string ExtractEntities(Resource resource, IFileLoader fileLoader)
+        public static List<EntityLump.Entity> ExtractEntities(Resource resource, IFileLoader fileLoader)
         {
             return resource.ResourceType switch
             {
                 ResourceType.Map => new MapExtract(resource, fileLoader).ToEntities(),
-                _ => "{}"
+                _ => new List<EntityLump.Entity>()
             };
         }
     }
