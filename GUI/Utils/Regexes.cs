@@ -12,5 +12,8 @@ namespace GUI.Utils
 
         [GeneratedRegex("setang(?:_exact)? (?<pitch>-?[0-9]+\\.[0-9+]+) (?<yaw>-?[0-9]+\\.[0-9+]+)", RegexOptions.CultureInvariant)]
         public static partial Regex SetAng();
+
+        [GeneratedRegex("(?<x>-?\\d+(?:\\.\\d+)?) (?<y>-?\\d+(?:\\.\\d+)?) (?<z>-?\\d+(?:\\.\\d+)?)", RegexOptions.CultureInvariant)]
+        public static partial Regex Coord();
     }
 }
