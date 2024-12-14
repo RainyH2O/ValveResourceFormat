@@ -601,5 +601,30 @@ namespace GUI.Types.Renderer
             Scene.UpdateOctrees();
             SkyboxScene?.UpdateOctrees();
         }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.G))
+            {
+                GoToCoordinate();
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void GoToCoordinate()
+        {
+            using var searchForm = new SearchForm();
+            var result = searchForm.ShowDialog();
+            if (result != DialogResult.OK)
+            {
+                return;
+            }
+            var searchText = searchForm.SearchText;
+            var pos = Regexes.Coord().Match(searchText);
+            float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+            float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+            float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+            Camera.SetLocation(new Vector3(x, y, z));
+        }
     }
 }
