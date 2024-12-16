@@ -28,6 +28,8 @@ namespace GUI.Types.Renderer
         private EntityInfoForm entityInfoForm;
         private bool ignoreLayersChangeEvents = true;
         private List<Matrix4x4> CameraMatrices;
+        private List<EntityLump.Entity> entities;
+        private EntityListForm entityListForm;
 
         public GLWorldViewer(VrfGuiContext guiContext, World world)
             : base(guiContext)
@@ -52,6 +54,7 @@ namespace GUI.Types.Renderer
                 cameraComboBox?.Dispose();
                 savedCameraPositionsControl?.Dispose();
                 entityInfoForm?.Dispose();
+                entityListForm?.Dispose();
             }
         }
 
@@ -200,6 +203,11 @@ namespace GUI.Types.Renderer
                 AddCheckBox("Color Correction", postProcessRenderer.ColorCorrectionEnabled, v => postProcessRenderer.ColorCorrectionEnabled = v);
                 AddCheckBox("Experimental Lights", false, v => viewBuffer.Data.ExperimentalLightsEnabled = v);
                 AddCheckBox("Occlusion Culling", EnableOcclusionCulling, (v) => EnableOcclusionCulling = v);
+
+                if (result.Entities != null)
+                {
+                    entities = result.Entities;
+                }
 
                 if (result.SkyboxScene != null)
                 {
@@ -616,6 +624,10 @@ namespace GUI.Types.Renderer
             {
                 GoToCoordinate();
             }
+            if (keyData == (Keys.Control | Keys.Alt | Keys.R))
+            {
+                ShowEntityListForm();
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -633,6 +645,21 @@ namespace GUI.Types.Renderer
             float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
             float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
             Camera.SetLocation(new Vector3(x, y, z));
+        }
+
+        private void ShowEntityListForm()
+        {
+            if (entityListForm == null || entityListForm.IsDisposed)
+            {
+                entityListForm = new EntityListForm(entities);
+                entityListForm.FormClosed += (s, args) =>
+                {
+                    entityListForm.Dispose();
+                    entityListForm = null;
+                };
+            }
+            entityListForm.Activate();
+            entityListForm.Show();
         }
     }
 }
