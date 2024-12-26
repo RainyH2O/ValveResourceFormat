@@ -1,12 +1,12 @@
-﻿using System.Windows.Forms;
+﻿using System.Data;
+using System.Linq;
+using System.Windows.Forms;
 using ValveResourceFormat.ResourceTypes;
 
 namespace GUI.Forms;
 
 public partial class EntityListForm : Form
 {
-    public event EventHandler<string> OnOriginDoubleClicked;
-
     private readonly Dictionary<string, int> columnsToDisplay = new()
     {
         { "classname", 150 },
@@ -16,55 +16,121 @@ public partial class EntityListForm : Form
         { "hammeruniqueid", 100 }
     };
 
+    private readonly Dictionary<string, TextBox> filterTextBoxes = new();
+
+    private DataTable dataTable;
+
     public EntityListForm(List<EntityLump.Entity> entities)
     {
         InitializeComponent();
-        SetupColumns(entities);
+        SetupColumns();
         BindData(entities);
+        AddFilterControls();
         entityDataGridView.CellDoubleClick += EntityDataGridView_CellDoubleClick;
     }
 
-    private void SetupColumns(List<EntityLump.Entity> entities)
-    {
-        if (entities == null || entities.Count == 0)
-        {
-            return;
-        }
+    public event EventHandler<string> OnOriginDoubleClicked;
 
+    private void SetupColumns()
+    {
         foreach (var kvp in columnsToDisplay)
         {
             var columnName = kvp.Key;
             var columnWidth = kvp.Value;
-            var column = new DataGridViewTextBoxColumn
+            if (entityDataGridView.Columns[columnName] == null)
             {
-                Name = columnName,
-                HeaderText = columnName,
-                Width = columnWidth
-            };
-            entityDataGridView.Columns.Add(column);
+                var column = new DataGridViewTextBoxColumn
+                {
+                    Name = columnName,
+                    DataPropertyName = columnName,
+                    HeaderText = columnName,
+                    Width = columnWidth
+                };
+                entityDataGridView.Columns.Add(column);
+            }
         }
     }
 
     private void BindData(List<EntityLump.Entity> entities)
     {
-        entityDataGridView.Rows.Clear();
+        dataTable = new DataTable();
+        foreach (var kvp in columnsToDisplay)
+        {
+            if (!dataTable.Columns.Contains(kvp.Key))
+            {
+                dataTable.Columns.Add(kvp.Key);
+            }
+        }
+
         foreach (var entity in entities)
         {
-            var row = new List<object>();
-            foreach (DataGridViewColumn column in entityDataGridView.Columns)
+            var row = dataTable.NewRow();
+            foreach (var column in columnsToDisplay.Keys)
             {
-                if (entity.Properties.ContainsKey(column.Name))
+                if (entity.Properties.ContainsKey(column))
                 {
-                    row.Add(entity.Properties.Properties[column.Name].Value);
+                    row[column] = entity.Properties.Properties[column].Value;
                 }
                 else
                 {
-                    row.Add(null);
+                    row[column] = "";
                 }
             }
 
-            entityDataGridView.Rows.Add(row.ToArray());
+            dataTable.Rows.Add(row);
         }
+
+        entityDataGridView.AutoGenerateColumns = false;
+        entityDataGridView.DataSource = dataTable;
+    }
+
+    private void AddFilterControls()
+    {
+        var tableLayoutPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = entityDataGridView.Columns.Count + 2,
+            RowCount = 1,
+            AutoSize = true
+        };
+
+        tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.RowHeadersWidth));
+        tableLayoutPanel.Controls.Add(new Label { Width = entityDataGridView.RowHeadersWidth });
+
+        for (var i = 0; i < entityDataGridView.Columns.Count; i++)
+        {
+            tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.Columns[i].Width));
+            var textBox = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+                Tag = entityDataGridView.Columns[i].Name
+            };
+            textBox.TextChanged += FilterTextBox_TextChanged;
+            tableLayoutPanel.Controls.Add(textBox);
+            filterTextBoxes[entityDataGridView.Columns[i].Name] = textBox;
+        }
+
+        tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 20));
+        tableLayoutPanel.Controls.Add(new Label { Width = 20 });
+
+        Controls.Add(tableLayoutPanel);
+    }
+
+    private void FilterTextBox_TextChanged(object sender, EventArgs e)
+    {
+        var filterExpression = string.Empty;
+        foreach (var textBox in filterTextBoxes.Values.Where(textBox => !string.IsNullOrEmpty(textBox.Text)))
+        {
+            if (!string.IsNullOrEmpty(filterExpression))
+            {
+                filterExpression += " AND ";
+            }
+
+            filterExpression += $"{textBox.Tag} LIKE '%{textBox.Text}%'";
+        }
+
+        dataTable.DefaultView.RowFilter = filterExpression;
     }
 
     private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -73,6 +139,7 @@ public partial class EntityListForm : Form
         {
             return;
         }
+
         var columnName = entityDataGridView.Columns[e.ColumnIndex].Name;
         if (columnName == "origin")
         {
