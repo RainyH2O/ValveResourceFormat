@@ -657,6 +657,14 @@ namespace GUI.Types.Renderer
                     entityListForm.Dispose();
                     entityListForm = null;
                 };
+                entityListForm.OnOriginDoubleClicked += (s, origin) =>
+                {
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                };
             }
             entityListForm.Activate();
             entityListForm.Show();
