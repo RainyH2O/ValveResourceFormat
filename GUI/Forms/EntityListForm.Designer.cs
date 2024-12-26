@@ -18,6 +18,13 @@ partial class EntityListForm
         if (disposing && (components != null))
         {
             components.Dispose();
+
+            if (dataTable != null)
+            {
+                dataTable.Dispose();
+                dataTable = null;
+            }
+            entityDataGridView.CellDoubleClick -= EntityDataGridView_CellDoubleClick;
         }
 
         base.Dispose(disposing);
@@ -34,9 +41,9 @@ partial class EntityListForm
         entityDataGridView = new System.Windows.Forms.DataGridView();
         ((System.ComponentModel.ISupportInitialize)entityDataGridView).BeginInit();
         SuspendLayout();
-        // 
+        //
         // entityDataGridView
-        // 
+        //
         entityDataGridView.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
         entityDataGridView.Dock = System.Windows.Forms.DockStyle.Fill;
         entityDataGridView.Location = new System.Drawing.Point(0, 0);
@@ -44,9 +51,9 @@ partial class EntityListForm
         entityDataGridView.Size = new System.Drawing.Size(801, 593);
         entityDataGridView.TabIndex = 0;
         entityDataGridView.Text = "entityDataGridView";
-        // 
+        //
         // EntityListForm
-        // 
+        //
         AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
         AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
         ClientSize = new System.Drawing.Size(801, 593);
