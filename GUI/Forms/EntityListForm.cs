@@ -5,6 +5,8 @@ namespace GUI.Forms;
 
 public partial class EntityListForm : Form
 {
+    public event EventHandler<string> OnOriginDoubleClicked;
+
     private readonly Dictionary<string, int> columnsToDisplay = new()
     {
         { "classname", 150 },
@@ -19,6 +21,7 @@ public partial class EntityListForm : Form
         InitializeComponent();
         SetupColumns(entities);
         BindData(entities);
+        entityDataGridView.CellDoubleClick += EntityDataGridView_CellDoubleClick;
     }
 
     private void SetupColumns(List<EntityLump.Entity> entities)
@@ -62,5 +65,24 @@ public partial class EntityListForm : Form
 
             entityDataGridView.Rows.Add(row.ToArray());
         }
+    }
+
+    private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+        {
+            return;
+        }
+        var columnName = entityDataGridView.Columns[e.ColumnIndex].Name;
+        if (columnName == "origin")
+        {
+            var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+            HandleOriginDoubleClick(cellValue);
+        }
+    }
+
+    private void HandleOriginDoubleClick(string origin)
+    {
+        OnOriginDoubleClicked?.Invoke(this, origin);
     }
 }
