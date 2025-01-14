@@ -8,6 +8,8 @@ public partial class FilterForm : Form
 {
     private readonly List<EntityLump.Entity> entities;
     public List<EntityLump.Entity> filteredEntities { get; private set; }
+    private bool allSelected;
+    private bool keyHandled;
 
     public FilterForm(List<EntityLump.Entity> entities)
     {
@@ -48,5 +50,65 @@ public partial class FilterForm : Form
 
         DialogResult = DialogResult.Continue;
         Close();
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.A)
+        {
+            if (allSelected)
+            {
+                DeselectAllItems();
+            }
+            else
+            {
+                SelectAllItems();
+            }
+            allSelected = !allSelected;
+            e.Handled = true;
+            keyHandled = true;
+        }
+        else
+        {
+            base.OnKeyDown(e);
+            keyHandled = false;
+        }
+    }
+
+    private void FilterForm_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.A)
+        {
+            SelectAllItems();
+            e.Handled = true;
+        }
+    }
+
+    private void SelectAllItems()
+    {
+        for (int i = 0; i < checkedListBoxClassNames.Items.Count; i++)
+        {
+            checkedListBoxClassNames.SetItemChecked(i, true);
+        }
+    }
+
+    private void DeselectAllItems()
+    {
+        for (int i = 0; i < checkedListBoxClassNames.Items.Count; i++)
+        {
+            checkedListBoxClassNames.SetItemChecked(i, false);
+        }
+    }
+
+    protected override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (keyHandled)
+        {
+            e.Handled = true;
+        }
+        else
+        {
+            base.OnKeyPress(e);
+        }
     }
 }

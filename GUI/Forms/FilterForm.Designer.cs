@@ -36,7 +36,7 @@ partial class FilterForm
         // 
         checkedListBoxClassNames.FormattingEnabled = true;
         checkedListBoxClassNames.Location = new System.Drawing.Point(14, 16);
-        checkedListBoxClassNames.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+        checkedListBoxClassNames.Margin = new System.Windows.Forms.Padding(4);
         checkedListBoxClassNames.Name = "checkedListBoxClassNames";
         checkedListBoxClassNames.Size = new System.Drawing.Size(337, 256);
         checkedListBoxClassNames.TabIndex = 0;
@@ -44,7 +44,7 @@ partial class FilterForm
         // buttonFilter
         // 
         buttonFilter.Location = new System.Drawing.Point(14, 287);
-        buttonFilter.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+        buttonFilter.Margin = new System.Windows.Forms.Padding(4);
         buttonFilter.Name = "buttonFilter";
         buttonFilter.Size = new System.Drawing.Size(337, 30);
         buttonFilter.TabIndex = 1;
@@ -59,8 +59,8 @@ partial class FilterForm
         ClientSize = new System.Drawing.Size(364, 330);
         Controls.Add(buttonFilter);
         Controls.Add(checkedListBoxClassNames);
-        Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
-        Name = "FilterForm";
+        KeyPreview = true;
+        Margin = new System.Windows.Forms.Padding(4);
         Text = "Filter Window";
         ResumeLayout(false);
     }
