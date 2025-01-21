@@ -598,6 +598,8 @@ namespace GUI.Types.Renderer
                 }
             }
 
+            entityInfoForm.SortConnections();
+
             var classname = sceneNode.EntityData.GetProperty<string>("classname");
             entityInfoForm.Text = $"Entity: {classname}";
         }

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows.Forms;
 using GUI.Types.Viewers;
@@ -135,6 +136,12 @@ namespace GUI.Forms
                 delay.ToString(NumberFormatInfo.InvariantInfo),
                 stimesToFire
             ]);
+        }
+
+        public void SortConnections()
+        {
+            dataGridOutputs.Sort(new MultiColumnNumericStringComparer(ListSortDirection.Ascending, [TargetEntity.Name, Delay.Name]));
+            dataGridInputs.Sort(new MultiColumnNumericStringComparer(ListSortDirection.Ascending, [SourceHammerUniqueId.Name, Delay.Name]));
         }
     }
 }
