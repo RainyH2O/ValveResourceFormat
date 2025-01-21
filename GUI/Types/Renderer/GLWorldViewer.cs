@@ -8,6 +8,7 @@ using GUI.Forms;
 using GUI.Utils;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
+using ValveResourceFormat.Serialization;
 using ValveResourceFormat.Serialization.KeyValues;
 using static GUI.Controls.SavedCameraPositionsControl;
 using static GUI.Types.Renderer.PickingTexture;
@@ -29,6 +30,7 @@ namespace GUI.Types.Renderer
         private bool ignoreLayersChangeEvents = true;
         private List<Matrix4x4> CameraMatrices;
         private List<EntityLump.Entity> entities;
+        private readonly Dictionary<string, List<KVObject>> entityInputListDict = new();
         private EntityListForm entityListForm;
 
         public GLWorldViewer(VrfGuiContext guiContext, World world)
@@ -207,6 +209,31 @@ namespace GUI.Types.Renderer
                 if (result.Entities != null)
                 {
                     entities = result.Entities;
+                    foreach (var entity in entities)
+                    {
+                        if (entity.Connections == null)
+                        {
+                            continue;
+                        }
+                        foreach (var entityConnection in entity.Connections)
+                        {
+                            var sourceHammerUniqueId = entity.GetProperty<string>("hammeruniqueid");
+                            var sourceName = entity.GetProperty("targetname", "");
+                            var targetName = entityConnection.GetStringProperty("m_targetName");
+                            if (string.IsNullOrEmpty(targetName))
+                            {
+                                continue;
+                            }
+                            if (!entityInputListDict.TryGetValue(targetName, out var entityInputList))
+                            {
+                                entityInputList = [];
+                                entityInputListDict[targetName] = entityInputList;
+                            }
+                            entityConnection.AddProperty("sourceHammerUniqueId", new KVValue(KVType.STRING, sourceHammerUniqueId));
+                            entityConnection.AddProperty("sourceName", new KVValue(KVType.STRING, sourceName));
+                            entityInputList.Add(entityConnection);
+                        }
+                    }
                 }
 
                 if (result.SkyboxScene != null)
@@ -388,6 +415,7 @@ namespace GUI.Types.Renderer
             }
 
             entityInfoForm.ShowOutputsTabIfAnyData();
+            entityInfoForm.ShowInputsTabIfAnyData();
             entityInfoForm.Show();
         }
 
@@ -558,6 +586,15 @@ namespace GUI.Types.Renderer
                 foreach (var connection in sceneNode.EntityData.Connections)
                 {
                     entityInfoForm.AddConnection(connection);
+                }
+            }
+
+            var targetname = sceneNode.EntityData.GetProperty<string>("targetname");
+            if (targetname != null && entityInputListDict.TryGetValue(targetname, out var entityInputList))
+            {
+                foreach (var entityInput in entityInputList)
+                {
+                    entityInfoForm.AddInputConnection(entityInput);
                 }
             }
 
