@@ -52,10 +52,29 @@ namespace GUI.Forms
             }
         }
 
+        public void ShowInputsTabIfAnyData()
+        {
+            if (dataGridInputs.RowCount > 0)
+            {
+                if (tabPageInputs.Parent == null)
+                {
+                    tabControl.TabPages.Add(tabPageInputs);
+                }
+            }
+            else
+            {
+                if (tabPageInputs.Parent != null)
+                {
+                    tabControl.TabPages.Remove(tabPageInputs);
+                }
+            }
+        }
+
         public void Clear()
         {
             dataGridProperties.Rows.Clear();
             dataGridOutputs.Rows.Clear();
+            dataGridInputs.Rows.Clear();
         }
 
         public void AddProperty(string name, string value)
@@ -82,6 +101,34 @@ namespace GUI.Forms
             dataGridOutputs.Rows.Add([
                 outputName,
                 targetName,
+                inputName,
+                parameter,
+                delay.ToString(NumberFormatInfo.InvariantInfo),
+                stimesToFire
+            ]);
+        }
+
+        public void AddInputConnection(KVObject connectionData)
+        {
+            var sourceHammerUniqueId = connectionData.GetStringProperty("sourceHammerUniqueId");
+            var sourceName = connectionData.GetStringProperty("sourceName");
+            var outputName = connectionData.GetStringProperty("m_outputName");
+            var inputName = connectionData.GetStringProperty("m_inputName");
+            var parameter = connectionData.GetStringProperty("m_overrideParam");
+            var delay = connectionData.GetFloatProperty("m_flDelay");
+            var timesToFire = connectionData.GetInt32Property("m_nTimesToFire");
+
+            var stimesToFire = timesToFire switch
+            {
+                1 => "Only Once",
+                >= 2 => $"Only {timesToFire} Times",
+                _ => "Infinite",
+            };
+
+            dataGridInputs.Rows.Add([
+                sourceHammerUniqueId,
+                sourceName,
+                outputName,
                 inputName,
                 parameter,
                 delay.ToString(NumberFormatInfo.InvariantInfo),
