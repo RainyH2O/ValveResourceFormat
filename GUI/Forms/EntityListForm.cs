@@ -26,10 +26,12 @@ public partial class EntityListForm : Form
         SetupColumns();
         BindData(entities);
         AddFilterControls();
+        entityDataGridView.CellClick += EntityDataGridView_CellClick;
         entityDataGridView.CellDoubleClick += EntityDataGridView_CellDoubleClick;
     }
 
-    public event EventHandler<string> OnOriginDoubleClicked;
+    public event EventHandler<string> OnEntityClicked;
+    public event EventHandler<string> OnEntityDoubleClicked;
 
     private void SetupColumns()
     {
@@ -162,23 +164,33 @@ public partial class EntityListForm : Form
         return filterValue;
     }
 
-    private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+    private void EntityDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
     {
-        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+        if (e.RowIndex < 0)
         {
             return;
         }
-
-        var columnName = entityDataGridView.Columns[e.ColumnIndex].Name;
-        if (columnName == "origin")
+        var columnIndex = entityDataGridView.Columns["hammeruniqueid"]!.Index;
+        if (columnIndex < 0)
         {
-            var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
-            HandleOriginDoubleClick(cellValue);
+            return;
         }
+        var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[columnIndex].Value?.ToString();
+        HandleEntityClick(cellValue);
     }
 
-    private void HandleOriginDoubleClick(string origin)
+    private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
     {
-        OnOriginDoubleClicked?.Invoke(this, origin);
+        HandleEntityDoubleClick();
+    }
+
+    private void HandleEntityClick(string hammerUniqueId)
+    {
+        OnEntityClicked?.Invoke(this, hammerUniqueId);
+    }
+
+    private void HandleEntityDoubleClick()
+    {
+        OnEntityDoubleClicked?.Invoke(this, null);
     }
 }
