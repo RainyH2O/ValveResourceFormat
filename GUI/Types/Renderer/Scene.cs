@@ -113,6 +113,37 @@ namespace GUI.Types.Renderer
             }
         }
 
+        public SceneNode FindByEntityInfo(string value)
+        {
+            foreach (var node in AllNodes)
+            {
+                if (node is not PhysSceneNode physNode || physNode.EntityData == null)
+                {
+                    continue;
+                }
+                var hammeruniqueid = physNode.EntityData.GetProperty("hammeruniqueid");
+                if (hammeruniqueid != null && hammeruniqueid.Value.Equals(value))
+                {
+                    return physNode;
+                }
+            }
+
+            foreach (var node in AllNodes)
+            {
+                if (node is PhysSceneNode || node.EntityData == null)
+                {
+                    continue;
+                }
+                var hammeruniqueid = node.EntityData.GetProperty("hammeruniqueid");
+                if (hammeruniqueid != null && hammeruniqueid.Value.Equals(value))
+                {
+                    return node;
+                }
+            }
+
+            return null;
+        }
+
         public void Update(float timestep)
         {
             var updateContext = new UpdateContext(timestep);
