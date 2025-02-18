@@ -29,7 +29,7 @@ public partial class EntityListForm : Form
         entityDataGridView.CellDoubleClick += EntityDataGridView_CellDoubleClick;
     }
 
-    public event EventHandler<string> OnOriginDoubleClicked;
+    public event EventHandler<string> OnEntityDoubleClicked;
 
     private void SetupColumns()
     {
@@ -164,21 +164,21 @@ public partial class EntityListForm : Form
 
     private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
     {
-        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+        if (e.RowIndex < 0)
         {
             return;
         }
-
-        var columnName = entityDataGridView.Columns[e.ColumnIndex].Name;
-        if (columnName == "origin")
+        var columnIndex = entityDataGridView.Columns["hammeruniqueid"]!.Index;
+        if (columnIndex < 0)
         {
-            var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
-            HandleOriginDoubleClick(cellValue);
+            return;
         }
+        var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[columnIndex].Value?.ToString();
+        HandleEntityDoubleClick(cellValue);
     }
 
-    private void HandleOriginDoubleClick(string origin)
+    private void HandleEntityDoubleClick(string origin)
     {
-        OnOriginDoubleClicked?.Invoke(this, origin);
+        OnEntityDoubleClicked?.Invoke(this, origin);
     }
 }
