@@ -127,10 +127,39 @@ public partial class EntityListForm : Form
                 filterExpression += " AND ";
             }
 
-            filterExpression += $"{textBox.Tag} LIKE '%{textBox.Text}%'";
+            var escapedText = EscapeFilterValue(textBox.Text);
+            filterExpression += $"{textBox.Tag} LIKE '%{escapedText}%'";
         }
 
         dataTable.DefaultView.RowFilter = filterExpression;
+    }
+
+    /// <summary>
+    /// <para>If a pattern in a LIKE clause contains any of these special characters * % [ ], those characters must be escaped in brackets [ ] like this [*], [%], [[] or []].</para>
+    /// <para>If the pattern is not in a like clause then you can pass valueIsForLIKEcomparison = false to not escape brackets.</para>
+    /// <para>Examples:</para>
+    /// <para>- strFilter = "[Something] LIKE '%" + DataTableHelper.EscapeLikeValue(filterValue) + "%'";</para>
+    /// <para></para>
+    /// <para>http://www.csharp-examples.net/dataview-rowfilter/</para>
+    /// </summary>
+    /// <param name="filterValue">LIKE filterValue. This should not be the entire filter string... just the part that is being compared.</param>
+    /// <param name="valueIsForLIKEcomparison">Whether or not the filterValue is being used in a LIKE comparison.</param>
+    /// <returns></returns>
+    private static string EscapeFilterValue(string filterValue, bool valueIsForLIKEcomparison = true)
+    {
+        const string lb = "~~LeftBracket~~";
+        const string rb = "~~RightBracket~~";
+        filterValue = filterValue.Replace("[", lb).Replace("]", rb).Replace("*", "[*]").Replace("%", "[%]").Replace("'", "''");
+        if (valueIsForLIKEcomparison)
+        {
+            filterValue = filterValue.Replace(lb, "[[]").Replace(rb, "[]]");
+        }
+        else
+        {
+            filterValue = filterValue.Replace(lb, "[").Replace(rb, "]");
+        }
+
+        return filterValue;
     }
 
     private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
