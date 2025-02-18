@@ -701,13 +701,30 @@ namespace GUI.Types.Renderer
                     entityListForm.Dispose();
                     entityListForm = null;
                 };
-                entityListForm.OnOriginDoubleClicked += (s, origin) =>
+                entityListForm.OnEntityClicked += (s, value) =>
                 {
+                    var sceneNode = Scene.FindByEntityInfo(value);
+                    selectedNodeRenderer.SelectNode(sceneNode);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(sceneNode, false);
+                    }
+                    Focus();
+                };
+                entityListForm.OnEntityDoubleClicked += (s, args) =>
+                {
+                    var sceneNode = selectedNodeRenderer.GetSelectNode();
+                    var origin = sceneNode?.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
                     var pos = Regexes.Coord().Match(origin);
                     float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
                     float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
                     float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
                     Camera.SetLocation(new Vector3(x, y, z));
+                    Focus();
                 };
             }
             entityListForm.Activate();
