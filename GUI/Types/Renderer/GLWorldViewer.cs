@@ -672,6 +672,10 @@ namespace GUI.Types.Renderer
             {
                 ShowEntityListForm();
             }
+            if (keyData == (Keys.Alt | Keys.Enter))
+            {
+                ShowSceneNodeDetails(selectedNodeRenderer.GetSelectNode(), false);
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
