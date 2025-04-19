@@ -4,12 +4,14 @@ using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Forms;
 using GUI.Utils;
+using ValveKeyValue;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
-using ValveResourceFormat.Serialization;
 using ValveResourceFormat.Serialization.KeyValues;
 using static GUI.Controls.SavedCameraPositionsControl;
 using static GUI.Types.Renderer.PickingTexture;
+using KVObject = ValveResourceFormat.Serialization.KeyValues.KVObject;
+using KVValue = ValveResourceFormat.Serialization.KeyValues.KVValue;
 
 #nullable disable
 
@@ -229,8 +231,8 @@ namespace GUI.Types.Renderer
                                 entityInputList = [];
                                 entityInputListDict[targetName] = entityInputList;
                             }
-                            entityConnection.AddProperty("sourceHammerUniqueId", new KVValue(KVType.STRING, sourceHammerUniqueId));
-                            entityConnection.AddProperty("sourceName", new KVValue(KVType.STRING, sourceName));
+                            entityConnection.AddProperty("sourceHammerUniqueId", new KVValue(KVValueType.String, sourceHammerUniqueId));
+                            entityConnection.AddProperty("sourceName", new KVValue(KVValueType.String, sourceName));
                             entityInputList.Add(entityConnection);
                         }
                     }
