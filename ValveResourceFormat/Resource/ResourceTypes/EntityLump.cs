@@ -85,7 +85,7 @@ namespace ValveResourceFormat.ResourceTypes
             {
                 if (Properties.Properties.TryGetValue("hammeruniqueid", out var hammerUniqueId))
                 {
-                    return hammerUniqueId?.GetHashCode() ?? 0;
+                    return hammerUniqueId.GetHashCode();
                 }
                 return base.GetHashCode();
             }
