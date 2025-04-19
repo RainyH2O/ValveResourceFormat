@@ -118,7 +118,7 @@ namespace GUI.Types.Renderer
                     continue;
                 }
                 var hammeruniqueid = physNode.EntityData.GetProperty("hammeruniqueid");
-                if (hammeruniqueid != null && hammeruniqueid.Value.Equals(value))
+                if (hammeruniqueid.Value.Equals(value))
                 {
                     return physNode;
                 }
@@ -131,7 +131,7 @@ namespace GUI.Types.Renderer
                     continue;
                 }
                 var hammeruniqueid = node.EntityData.GetProperty("hammeruniqueid");
-                if (hammeruniqueid != null && hammeruniqueid.Value.Equals(value))
+                if (hammeruniqueid.Value.Equals(value))
                 {
                     return node;
                 }
