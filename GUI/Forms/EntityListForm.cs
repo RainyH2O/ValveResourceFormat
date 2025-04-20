@@ -1,44 +1,39 @@
-﻿using System.Data;
+using System.Data;
 using System.Linq;
 using System.Windows.Forms;
 using ValveResourceFormat.ResourceTypes;
+using ValveResourceFormat.Serialization.KeyValues;
 
 namespace GUI.Forms;
 
 public partial class EntityListForm : Form
 {
-    private readonly Dictionary<string, int> columnsToDisplay = new()
-    {
-        { "classname", 150 },
-        { "targetname", 200 },
-        { "spawnflags", 100 },
-        { "origin", 200 },
-        { "hammeruniqueid", 100 }
-    };
+    public event EventHandler<string> OnEntityClicked;
+    public event EventHandler<string> OnEntityDoubleClicked;
 
-    private readonly Dictionary<string, TextBox> filterTextBoxes = new();
+    private readonly List<(string ColumnName, int ColumnWidth)> _columnsToDisplay =
+    [
+        ("classname", 150),
+        ("targetname", 150),
+        ("spawnflags", 100),
+        ("origin", 150),
+        ("hammeruniqueid", 100)
+    ];
 
-    private DataTable dataTable;
+    private readonly Dictionary<string, TextBox> _filterTextBoxes = new();
+    private List<EntityLump.Entity> _entities;
+    private DataTable _dataTable;
 
     public EntityListForm(List<EntityLump.Entity> entities)
     {
         InitializeComponent();
-        SetupColumns();
-        BindData(entities);
-        AddFilterControls();
-        entityDataGridView.CellClick += EntityDataGridView_CellClick;
-        entityDataGridView.CellDoubleClick += EntityDataGridView_CellDoubleClick;
+        InitDataTable(entities);
     }
 
-    public event EventHandler<string> OnEntityClicked;
-    public event EventHandler<string> OnEntityDoubleClicked;
-
-    private void SetupColumns()
+    private void InitDataTable(List<EntityLump.Entity> entities)
     {
-        foreach (var kvp in columnsToDisplay)
+        foreach (var (columnName, columnWidth) in _columnsToDisplay)
         {
-            var columnName = kvp.Key;
-            var columnWidth = kvp.Value;
             if (entityDataGridView.Columns[columnName] == null)
             {
                 var column = new DataGridViewTextBoxColumn
@@ -51,44 +46,14 @@ public partial class EntityListForm : Form
                 entityDataGridView.Columns.Add(column);
             }
         }
+
+        AddFilterRowControls();
+        BindData(entities);
     }
 
-    private void BindData(List<EntityLump.Entity> entities)
+    private void AddFilterRowControls()
     {
-        dataTable = new DataTable();
-        foreach (var kvp in columnsToDisplay)
-        {
-            if (!dataTable.Columns.Contains(kvp.Key))
-            {
-                dataTable.Columns.Add(kvp.Key);
-            }
-        }
-
-        foreach (var entity in entities)
-        {
-            var row = dataTable.NewRow();
-            foreach (var column in columnsToDisplay.Keys)
-            {
-                if (entity.Properties.ContainsKey(column))
-                {
-                    row[column] = entity.Properties.Properties[column].Value;
-                }
-                else
-                {
-                    row[column] = "";
-                }
-            }
-
-            dataTable.Rows.Add(row);
-        }
-
-        entityDataGridView.AutoGenerateColumns = false;
-        entityDataGridView.DataSource = dataTable;
-    }
-
-    private void AddFilterControls()
-    {
-        var tableLayoutPanel = new TableLayoutPanel
+        var filterRowPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             ColumnCount = entityDataGridView.Columns.Count + 2,
@@ -96,12 +61,12 @@ public partial class EntityListForm : Form
             AutoSize = true
         };
 
-        tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.RowHeadersWidth));
-        tableLayoutPanel.Controls.Add(new Label { Width = entityDataGridView.RowHeadersWidth });
+        filterRowPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.RowHeadersWidth));
+        filterRowPanel.Controls.Add(new Label { Width = entityDataGridView.RowHeadersWidth });
 
         for (var i = 0; i < entityDataGridView.Columns.Count; i++)
         {
-            tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.Columns[i].Width));
+            filterRowPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, entityDataGridView.Columns[i].Width));
             var textBox = new TextBox
             {
                 Dock = DockStyle.Fill,
@@ -109,20 +74,54 @@ public partial class EntityListForm : Form
                 Tag = entityDataGridView.Columns[i].Name
             };
             textBox.TextChanged += FilterTextBox_TextChanged;
-            tableLayoutPanel.Controls.Add(textBox);
-            filterTextBoxes[entityDataGridView.Columns[i].Name] = textBox;
+            filterRowPanel.Controls.Add(textBox);
+            _filterTextBoxes[entityDataGridView.Columns[i].Name] = textBox;
         }
 
-        tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 20));
-        tableLayoutPanel.Controls.Add(new Label { Width = 20 });
+        filterRowPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 20));
+        filterRowPanel.Controls.Add(new Label { Width = 20 });
 
-        Controls.Add(tableLayoutPanel);
+        Controls.Add(filterRowPanel);
+    }
+
+    private void BindData(List<EntityLump.Entity> entities)
+    {
+        _entities = entities;
+        _dataTable = new DataTable();
+        foreach (var (columnName, _) in _columnsToDisplay)
+        {
+            if (!_dataTable.Columns.Contains(columnName))
+            {
+                _dataTable.Columns.Add(columnName);
+            }
+        }
+
+        foreach (var entity in _entities)
+        {
+            var row = _dataTable.NewRow();
+            foreach (var (columnName, _) in _columnsToDisplay)
+            {
+                if (entity.ContainsKey(columnName))
+                {
+                    row[columnName] = entity.GetProperty(columnName).Value;
+                }
+                else
+                {
+                    row[columnName] = "";
+                }
+            }
+
+            _dataTable.Rows.Add(row);
+        }
+
+        entityDataGridView.AutoGenerateColumns = false;
+        entityDataGridView.DataSource = _dataTable;
     }
 
     private void FilterTextBox_TextChanged(object sender, EventArgs e)
     {
         var filterExpression = string.Empty;
-        foreach (var textBox in filterTextBoxes.Values.Where(textBox => !string.IsNullOrEmpty(textBox.Text)))
+        foreach (var textBox in _filterTextBoxes.Values.Where(textBox => !string.IsNullOrEmpty(textBox.Text)))
         {
             if (!string.IsNullOrEmpty(filterExpression))
             {
@@ -133,7 +132,7 @@ public partial class EntityListForm : Form
             filterExpression += $"{textBox.Tag} LIKE '%{escapedText}%'";
         }
 
-        dataTable.DefaultView.RowFilter = filterExpression;
+        _dataTable.DefaultView.RowFilter = filterExpression;
     }
 
     /// <summary>
@@ -151,7 +150,8 @@ public partial class EntityListForm : Form
     {
         const string lb = "~~LeftBracket~~";
         const string rb = "~~RightBracket~~";
-        filterValue = filterValue.Replace("[", lb).Replace("]", rb).Replace("*", "[*]").Replace("%", "[%]").Replace("'", "''");
+        filterValue = filterValue.Replace("[", lb).Replace("]", rb).Replace("*", "[*]").Replace("%", "[%]")
+            .Replace("'", "''");
         if (valueIsForLIKEcomparison)
         {
             filterValue = filterValue.Replace(lb, "[[]").Replace(rb, "[]]");
@@ -170,27 +170,372 @@ public partial class EntityListForm : Form
         {
             return;
         }
+
         var columnIndex = entityDataGridView.Columns["hammeruniqueid"]!.Index;
         if (columnIndex < 0)
         {
             return;
         }
-        var cellValue = entityDataGridView.Rows[e.RowIndex].Cells[columnIndex].Value?.ToString();
-        HandleEntityClick(cellValue);
+
+        var hammerUniqueId = entityDataGridView.Rows[e.RowIndex].Cells[columnIndex].Value?.ToString();
+        OnEntityClicked?.Invoke(this, hammerUniqueId!);
     }
 
     private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
     {
-        HandleEntityDoubleClick();
-    }
-
-    private void HandleEntityClick(string hammerUniqueId)
-    {
-        OnEntityClicked?.Invoke(this, hammerUniqueId);
-    }
-
-    private void HandleEntityDoubleClick()
-    {
         OnEntityDoubleClicked?.Invoke(this, null);
+    }
+
+    private void FilterPanelTextBox_TextChanged(object sender, EventArgs e)
+    {
+        var keyFilter = string.Empty;
+        var valueFilter = string.Empty;
+        var isExactMatch = false;
+        var outputFilter = string.Empty;
+        var targetFilter = string.Empty;
+        var inputFilter = string.Empty;
+
+        GetControlsValue(ref keyFilter, ref valueFilter, ref isExactMatch, ref outputFilter, ref targetFilter,
+            ref inputFilter);
+
+        UpdateTableColumns(keyFilter, valueFilter, outputFilter, targetFilter, inputFilter);
+
+        var filteredEntities =
+            FilterEntities(keyFilter, valueFilter, isExactMatch, outputFilter, targetFilter, inputFilter);
+
+        UpdateDataTable(filteredEntities, keyFilter, valueFilter, isExactMatch, outputFilter, targetFilter,
+            inputFilter);
+    }
+
+    private void GetControlsValue(ref string keyFilter, ref string valueFilter, ref bool isExactMatch,
+        ref string outputFilter, ref string targetFilter, ref string inputFilter)
+    {
+        foreach (var control in tableLayoutPanel.Controls)
+        {
+            if (control is not TableLayoutPanel panel)
+            {
+                continue;
+            }
+
+            foreach (var filterPanel in panel.Controls)
+            {
+                if (filterPanel is not TableLayoutPanel filter)
+                {
+                    continue;
+                }
+
+                foreach (var filterControl in filter.Controls)
+                {
+                    switch (filterControl)
+                    {
+                        case TextBox textBox when textBox.Tag?.ToString() == "Key":
+                            keyFilter = textBox.Text;
+                            break;
+                        case TextBox textBox when textBox.Tag?.ToString() == "Value":
+                            valueFilter = textBox.Text;
+                            break;
+                        case CheckBox { Text: "Exact" } checkBox:
+                            isExactMatch = checkBox.Checked;
+                            break;
+                        case TextBox textBox when textBox.Tag?.ToString() == "Output":
+                            outputFilter = textBox.Text;
+                            break;
+                        case TextBox textBox when textBox.Tag?.ToString() == "Target":
+                            targetFilter = textBox.Text;
+                            break;
+                        case TextBox textBox when textBox.Tag?.ToString() == "Input":
+                            inputFilter = textBox.Text;
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
+    private void UpdateTableColumns(string keyFilter, string valueFilter, string outputFilter, string targetFilter,
+        string inputFilter)
+    {
+        if (string.IsNullOrEmpty(inputFilter))
+        {
+            var inputIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Input");
+            if (inputIndex != -1)
+            {
+                _columnsToDisplay.RemoveAt(inputIndex);
+                ProcessUpdateColumn();
+            }
+        }
+        else
+        {
+            var inputIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Input");
+            if (inputIndex == -1)
+            {
+                _columnsToDisplay.Insert(2, ("Input", 150));
+                ProcessUpdateColumn();
+            }
+        }
+
+        if (string.IsNullOrEmpty(targetFilter))
+        {
+            var targetIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Target");
+            if (targetIndex != -1)
+            {
+                _columnsToDisplay.RemoveAt(targetIndex);
+                ProcessUpdateColumn();
+            }
+        }
+        else
+        {
+            var targetIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Target");
+            if (targetIndex == -1)
+            {
+                _columnsToDisplay.Insert(2, ("Target", 150));
+                ProcessUpdateColumn();
+            }
+        }
+
+        if (string.IsNullOrEmpty(outputFilter))
+        {
+            var outputIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Output");
+            if (outputIndex != -1)
+            {
+                _columnsToDisplay.RemoveAt(outputIndex);
+                ProcessUpdateColumn();
+            }
+        }
+        else
+        {
+            var outputIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Output");
+            if (outputIndex == -1)
+            {
+                _columnsToDisplay.Insert(2, ("Output", 150));
+                ProcessUpdateColumn();
+            }
+        }
+
+        if (string.IsNullOrEmpty(valueFilter))
+        {
+            var valueIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Value");
+            if (valueIndex != -1)
+            {
+                _columnsToDisplay.RemoveAt(valueIndex);
+                ProcessUpdateColumn();
+            }
+        }
+        else
+        {
+            var valueIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Value");
+            if (valueIndex == -1)
+            {
+                _columnsToDisplay.Insert(2, ("Value", 150));
+                ProcessUpdateColumn();
+            }
+        }
+
+        if (string.IsNullOrEmpty(keyFilter))
+        {
+            var keyIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Key");
+            if (keyIndex != -1)
+            {
+                _columnsToDisplay.RemoveAt(keyIndex);
+                ProcessUpdateColumn();
+            }
+        }
+        else
+        {
+            var keyIndex = _columnsToDisplay.FindIndex(x => x.ColumnName == "Key");
+            if (keyIndex == -1)
+            {
+                _columnsToDisplay.Insert(2, ("Key", 150));
+                ProcessUpdateColumn();
+            }
+        }
+    }
+
+    private void ProcessUpdateColumn()
+    {
+        entityDataGridView.Columns.Clear();
+        foreach (var (columnName, columnWidth) in _columnsToDisplay)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                Name = columnName,
+                DataPropertyName = columnName,
+                HeaderText = columnName,
+                Width = columnWidth
+            };
+            entityDataGridView.Columns.Add(column);
+        }
+
+        foreach (var (columnName, _) in _columnsToDisplay)
+        {
+            if (!_dataTable.Columns.Contains(columnName))
+            {
+                _dataTable.Columns.Add(columnName);
+            }
+        }
+    }
+
+    private List<EntityLump.Entity> FilterEntities(string keyFilter, string valueFilter, bool isExactMatch,
+        string outputFilter, string targetFilter, string inputFilter)
+    {
+        var filteredEntities = _entities.AsEnumerable();
+
+        // Filter by key
+        if (!string.IsNullOrEmpty(keyFilter))
+        {
+            filteredEntities = filteredEntities.Where(entity =>
+            {
+                return isExactMatch
+                    ? entity.ContainsKey(keyFilter)
+                    : entity.Properties.Properties.Any(p =>
+                        p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+
+        // Filter by value
+        if (!string.IsNullOrEmpty(valueFilter))
+        {
+            filteredEntities = filteredEntities.Where(entity =>
+            {
+                return isExactMatch
+                    ? entity.Properties.Properties.Any(p =>
+                        p.Value.Value.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase))
+                    : entity.Properties.Properties.Any(p =>
+                        p.Value.Value.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+
+        // Filter by output
+        if (!string.IsNullOrEmpty(outputFilter))
+        {
+            filteredEntities = filteredEntities.Where(entity =>
+            {
+                return entity.Connections?.Any(c =>
+                    c.GetStringProperty("m_outputName")
+                        .Contains(outputFilter, StringComparison.OrdinalIgnoreCase)) == true;
+            });
+        }
+
+        // Filter by target
+        if (!string.IsNullOrEmpty(targetFilter))
+        {
+            filteredEntities = filteredEntities.Where(entity =>
+            {
+                return entity.Connections?.Any(c =>
+                    c.GetStringProperty("m_targetName")
+                        .Contains(targetFilter, StringComparison.OrdinalIgnoreCase)) == true;
+            });
+        }
+
+        // Filter by input
+        if (!string.IsNullOrEmpty(inputFilter))
+        {
+            filteredEntities = filteredEntities.Where(entity =>
+            {
+                return entity.Connections?.Any(c =>
+                           c.GetStringProperty("m_inputName")
+                               .Contains(inputFilter, StringComparison.OrdinalIgnoreCase)) ==
+                       true;
+            });
+        }
+
+        return filteredEntities.ToList();
+    }
+
+    private void UpdateDataTable(List<EntityLump.Entity> filteredEntities, string keyFilter, string valueFilter,
+        bool isExactMatch, string outputFilter, string targetFilter, string inputFilter)
+    {
+        // Clear existing data
+        _dataTable.Clear();
+
+        // Bind filtered entities to dataTable
+        foreach (var entity in filteredEntities)
+        {
+            var row = _dataTable.NewRow();
+            foreach (var (columnName, _) in _columnsToDisplay)
+            {
+                if (columnName == "Key")
+                {
+                    var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
+                        isExactMatch
+                            ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
+                            : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+                    if (matchedProperty.Key != null)
+                    {
+                        row[columnName] = matchedProperty.Key;
+                    }
+                    else
+                    {
+                        row[columnName] = "";
+                    }
+                }
+                else if (columnName == "Value")
+                {
+                    var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
+                        isExactMatch
+                            ? p.Value.Value.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
+                            : p.Value.Value.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                    if (matchedProperty.Value.Value != null)
+                    {
+                        row[columnName] = matchedProperty.Value.Value.ToString();
+                    }
+                    else
+                    {
+                        row[columnName] = "";
+                    }
+                }
+                else if (columnName == "Output")
+                {
+                    var matchedProperty = entity.Connections.FirstOrDefault(c =>
+                        c.GetStringProperty("m_outputName").Contains(outputFilter, StringComparison.OrdinalIgnoreCase));
+                    if (matchedProperty != null)
+                    {
+                        row[columnName] = matchedProperty.GetStringProperty("m_outputName");
+                    }
+                    else
+                    {
+                        row[columnName] = "";
+                    }
+                }
+                else if (columnName == "Target")
+                {
+                    var matchedProperty = entity.Connections.FirstOrDefault(c =>
+                        c.GetStringProperty("m_targetName").Contains(targetFilter, StringComparison.OrdinalIgnoreCase));
+                    if (matchedProperty != null)
+                    {
+                        row[columnName] = matchedProperty.GetStringProperty("m_targetName");
+                    }
+                    else
+                    {
+                        row[columnName] = "";
+                    }
+                }
+                else if (columnName == "Input")
+                {
+                    var matchedProperty = entity.Connections.FirstOrDefault(c =>
+                        c.GetStringProperty("m_inputName").Contains(inputFilter, StringComparison.OrdinalIgnoreCase));
+                    if (matchedProperty != null)
+                    {
+                        row[columnName] = matchedProperty.GetStringProperty("m_inputName");
+                    }
+                    else
+                    {
+                        row[columnName] = "";
+                    }
+                }
+                else if (entity.ContainsKey(columnName))
+                {
+                    row[columnName] = entity.GetProperty(columnName).Value;
+                }
+                else
+                {
+                    row[columnName] = "";
+                }
+            }
+
+            _dataTable.Rows.Add(row);
+        }
+
+        entityDataGridView.DataSource = _dataTable;
     }
 }
