@@ -6,7 +6,7 @@ namespace GUI.Utils
 {
     internal class MultiColumnNumericStringComparer(ListSortDirection direction, string[] columnNames) : IComparer
     {
-        public int Compare(object x, object y)
+        public int Compare(object? x, object? y)
         {
             if (x is not DataGridViewRow row1 || y is not DataGridViewRow row2)
             {

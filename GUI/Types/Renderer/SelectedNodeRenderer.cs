@@ -76,7 +76,7 @@ namespace GUI.Types.Renderer
 
         public SceneNode GetSelectNode()
         {
-            return selectedNodes.FirstOrDefault();
+            return selectedNodes.FirstOrDefault()!;
         }
 
         private void UpdateBuffer()

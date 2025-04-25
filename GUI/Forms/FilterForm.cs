@@ -7,7 +7,7 @@ namespace GUI.Forms;
 public partial class FilterForm : Form
 {
     private readonly List<EntityLump.Entity> entities;
-    public List<EntityLump.Entity> filteredEntities { get; private set; }
+    public List<EntityLump.Entity>? filteredEntities { get; private set; }
     private bool allSelected;
     private bool keyHandled;
 
@@ -22,13 +22,13 @@ public partial class FilterForm : Form
     {
         var classNames = entities
             .Where(entity => entity.Properties.Properties.ContainsKey("classname"))
-            .Select(entity => entity.Properties.Properties["classname"].Value.ToString())
+            .Select(entity => entity.Properties.Properties["classname"].Value?.ToString())
             .Distinct()
             .ToList();
         classNames.Sort();
 
         checkedListBoxClassNames.Items.Clear();
-        checkedListBoxClassNames.Items.AddRange(classNames.ToArray());
+        checkedListBoxClassNames.Items.AddRange(classNames.ToArray()!);
         checkedListBoxClassNames.CheckOnClick = true;
     }
 
@@ -39,13 +39,13 @@ public partial class FilterForm : Form
         {
             if (checkedListBoxClassNames.GetItemChecked(i))
             {
-                selectedClassNames.Add(checkedListBoxClassNames.Items[i].ToString());
+                selectedClassNames.Add(checkedListBoxClassNames.Items[i].ToString()!);
             }
         }
 
         filteredEntities = entities
             .Where(entity => entity.Properties.Properties.ContainsKey("classname") &&
-                             selectedClassNames.Contains(entity.Properties.Properties["classname"].Value.ToString()))
+                             selectedClassNames.Contains(entity.Properties.Properties["classname"].Value?.ToString()!))
             .ToList();
 
         DialogResult = DialogResult.Continue;
