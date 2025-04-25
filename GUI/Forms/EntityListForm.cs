@@ -8,8 +8,8 @@ namespace GUI.Forms;
 
 public partial class EntityListForm : Form
 {
-    public event EventHandler<string> OnEntityClicked;
-    public event EventHandler<string> OnEntityDoubleClicked;
+    public event EventHandler<string>? OnEntityClicked;
+    public event EventHandler<string>? OnEntityDoubleClicked;
 
     private readonly List<(string ColumnName, int ColumnWidth)> _columnsToDisplay =
     [
@@ -21,16 +21,16 @@ public partial class EntityListForm : Form
     ];
 
     private readonly Dictionary<string, TextBox> _filterTextBoxes = new();
-    private List<EntityLump.Entity> _entities;
-    private DataTable _dataTable;
+    private List<EntityLump.Entity>? _entities;
+    private DataTable? _dataTable;
 
-    public EntityListForm(List<EntityLump.Entity> entities)
+    public EntityListForm(List<EntityLump.Entity>? entities)
     {
         InitializeComponent();
         InitDataTable(entities);
     }
 
-    private void InitDataTable(List<EntityLump.Entity> entities)
+    private void InitDataTable(List<EntityLump.Entity>? entities)
     {
         foreach (var (columnName, columnWidth) in _columnsToDisplay)
         {
@@ -84,7 +84,7 @@ public partial class EntityListForm : Form
         Controls.Add(filterRowPanel);
     }
 
-    private void BindData(List<EntityLump.Entity> entities)
+    private void BindData(List<EntityLump.Entity>? entities)
     {
         _entities = entities;
         _dataTable = new DataTable();
@@ -96,7 +96,7 @@ public partial class EntityListForm : Form
             }
         }
 
-        foreach (var entity in _entities)
+        foreach (var entity in _entities!)
         {
             var row = _dataTable.NewRow();
             foreach (var (columnName, _) in _columnsToDisplay)
@@ -118,7 +118,7 @@ public partial class EntityListForm : Form
         entityDataGridView.DataSource = _dataTable;
     }
 
-    private void FilterTextBox_TextChanged(object sender, EventArgs e)
+    private void FilterTextBox_TextChanged(object? sender, EventArgs e)
     {
         var filterExpression = string.Empty;
         foreach (var textBox in _filterTextBoxes.Values.Where(textBox => !string.IsNullOrEmpty(textBox.Text)))
@@ -132,7 +132,7 @@ public partial class EntityListForm : Form
             filterExpression += $"{textBox.Tag} LIKE '%{escapedText}%'";
         }
 
-        _dataTable.DefaultView.RowFilter = filterExpression;
+        _dataTable!.DefaultView.RowFilter = filterExpression;
     }
 
     /// <summary>
@@ -183,7 +183,7 @@ public partial class EntityListForm : Form
 
     private void EntityDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
     {
-        OnEntityDoubleClicked?.Invoke(this, null);
+        OnEntityDoubleClicked?.Invoke(this, "");
     }
 
     private void FilterPanelTextBox_TextChanged(object sender, EventArgs e)
@@ -368,7 +368,7 @@ public partial class EntityListForm : Form
 
         foreach (var (columnName, _) in _columnsToDisplay)
         {
-            if (!_dataTable.Columns.Contains(columnName))
+            if (!_dataTable!.Columns.Contains(columnName))
             {
                 _dataTable.Columns.Add(columnName);
             }
@@ -378,7 +378,7 @@ public partial class EntityListForm : Form
     private List<EntityLump.Entity> FilterEntities(string keyFilter, string valueFilter, bool isExactMatch,
         string outputFilter, string targetFilter, string inputFilter)
     {
-        var filteredEntities = _entities.AsEnumerable();
+        var filteredEntities = _entities!.AsEnumerable();
 
         // Filter by key
         if (!string.IsNullOrEmpty(keyFilter))
@@ -399,9 +399,9 @@ public partial class EntityListForm : Form
             {
                 return isExactMatch
                     ? entity.Properties.Properties.Any(p =>
-                        p.Value.Value.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase))
+                        p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase))
                     : entity.Properties.Properties.Any(p =>
-                        p.Value.Value.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                        p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
             });
         }
 
@@ -446,12 +446,12 @@ public partial class EntityListForm : Form
         bool isExactMatch, string outputFilter, string targetFilter, string inputFilter)
     {
         // Clear existing data
-        _dataTable.Clear();
+        _dataTable?.Clear();
 
         // Bind filtered entities to dataTable
         foreach (var entity in filteredEntities)
         {
-            var row = _dataTable.NewRow();
+            var row = _dataTable?.NewRow();
             foreach (var (columnName, _) in _columnsToDisplay)
             {
                 if (columnName == "Key")
@@ -462,26 +462,26 @@ public partial class EntityListForm : Form
                             : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
                     if (matchedProperty.Key != null)
                     {
-                        row[columnName] = matchedProperty.Key;
+                        row![columnName] = matchedProperty.Key;
                     }
                     else
                     {
-                        row[columnName] = "";
+                        row![columnName] = "";
                     }
                 }
                 else if (columnName == "Value")
                 {
                     var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
                         isExactMatch
-                            ? p.Value.Value.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                            : p.Value.Value.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                            ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
+                            : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
                     if (matchedProperty.Value.Value != null)
                     {
-                        row[columnName] = matchedProperty.Value.Value.ToString();
+                        row![columnName] = matchedProperty.Value.Value.ToString();
                     }
                     else
                     {
-                        row[columnName] = "";
+                        row![columnName] = "";
                     }
                 }
                 else if (columnName == "Output")
@@ -490,11 +490,11 @@ public partial class EntityListForm : Form
                         c.GetStringProperty("m_outputName").Contains(outputFilter, StringComparison.OrdinalIgnoreCase));
                     if (matchedProperty != null)
                     {
-                        row[columnName] = matchedProperty.GetStringProperty("m_outputName");
+                        row![columnName] = matchedProperty.GetStringProperty("m_outputName");
                     }
                     else
                     {
-                        row[columnName] = "";
+                        row![columnName] = "";
                     }
                 }
                 else if (columnName == "Target")
@@ -503,11 +503,11 @@ public partial class EntityListForm : Form
                         c.GetStringProperty("m_targetName").Contains(targetFilter, StringComparison.OrdinalIgnoreCase));
                     if (matchedProperty != null)
                     {
-                        row[columnName] = matchedProperty.GetStringProperty("m_targetName");
+                        row![columnName] = matchedProperty.GetStringProperty("m_targetName");
                     }
                     else
                     {
-                        row[columnName] = "";
+                        row![columnName] = "";
                     }
                 }
                 else if (columnName == "Input")
@@ -516,24 +516,24 @@ public partial class EntityListForm : Form
                         c.GetStringProperty("m_inputName").Contains(inputFilter, StringComparison.OrdinalIgnoreCase));
                     if (matchedProperty != null)
                     {
-                        row[columnName] = matchedProperty.GetStringProperty("m_inputName");
+                        row![columnName] = matchedProperty.GetStringProperty("m_inputName");
                     }
                     else
                     {
-                        row[columnName] = "";
+                        row![columnName] = "";
                     }
                 }
                 else if (entity.ContainsKey(columnName))
                 {
-                    row[columnName] = entity.GetProperty(columnName).Value;
+                    row![columnName] = entity.GetProperty(columnName).Value;
                 }
                 else
                 {
-                    row[columnName] = "";
+                    row![columnName] = "";
                 }
             }
 
-            _dataTable.Rows.Add(row);
+            _dataTable?.Rows.Add(row!);
         }
 
         entityDataGridView.DataSource = _dataTable;

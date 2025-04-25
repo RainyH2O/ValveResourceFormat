@@ -541,13 +541,13 @@ public sealed class MapExtract
             FolderExtractFilter.Add(entityLumpCompiled);
 
             using var entityLumpResource = FileLoader.LoadFile(entityLumpCompiled);
-            var entityLump = (EntityLump)entityLumpResource.DataBlock;
+            var entityLump = (EntityLump)entityLumpResource?.DataBlock!;
             var entities = entityLump.GetEntities().ToList();
             mergeEntities.AddRange(entities);
             foreach (var childLumpName in entityLump.GetChildEntityNames())
             {
                 using var entityChildLumpResource = FileLoader.LoadFileCompiled(childLumpName);
-                var entityChildLump = (EntityLump)entityChildLumpResource.DataBlock;
+                var entityChildLump = (EntityLump)entityChildLumpResource?.DataBlock!;
                 var entitiesChild = entityChildLump.GetEntities().ToList();
                 mergeEntities.AddRange(entitiesChild);
             }
