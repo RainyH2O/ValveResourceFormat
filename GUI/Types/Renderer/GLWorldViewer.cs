@@ -347,6 +347,66 @@ namespace GUI.Types.Renderer
             {
                 entityInfoForm = new EntityInfoForm(GuiContext.FileLoader);
                 entityInfoForm.Disposed += OnEntityInfoFormDisposed;
+                entityInfoForm.OnOutputConnectionDoubleClicked += (_, args) =>
+                {
+                    var parts = args.Split('|');
+                    if (parts.Length != 9)
+                    {
+                        Log.Error(nameof(EntityInfoForm), "Invalid arguments received in OnOutputConnectionDoubleClicked");
+                        return;
+                    }
+
+                    var targetHammerUniqueId = parts[6];
+                    var entity = Scene.FindByEntityInfo(targetHammerUniqueId);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity, isInSkybox);
+                        entityInfoForm.SelectTab("Input", args);
+                    }
+
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
+
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                };
+                entityInfoForm.OnInputConnectionDoubleClicked += (_, args) =>
+                {
+                    var parts = args.Split('|');
+                    if (parts.Length != 9)
+                    {
+                        Log.Error(nameof(EntityInfoForm), "Invalid arguments received in OnInputConnectionDoubleClicked");
+                        return;
+                    }
+
+                    var sourceHammerUniqueId = parts[0];
+                    var entity = Scene.FindByEntityInfo(sourceHammerUniqueId);
+                    selectedNodeRenderer.SelectNode(entity);
+                    if (entityInfoForm != null)
+                    {
+                        ShowSceneNodeDetails(entity, isInSkybox);
+                        entityInfoForm.SelectTab("Output", args);
+                    }
+
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
+                    if (origin == null)
+                    {
+                        return;
+                    }
+
+                    var pos = Regexes.Coord().Match(origin);
+                    float.TryParse(pos.Groups["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var x);
+                    float.TryParse(pos.Groups["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var y);
+                    float.TryParse(pos.Groups["z"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var z);
+                    Camera.SetLocation(new Vector3(x, y, z));
+                };
             }
             entityInfoForm.Clear();
 
@@ -574,6 +634,13 @@ namespace GUI.Types.Renderer
             {
                 foreach (var connection in sceneNode.EntityData.Connections)
                 {
+                    var targetName = connection.GetStringProperty("m_targetName");
+                    var targetEntity = entities.FirstOrDefault(e => e.GetProperty<string>("targetname") == targetName);
+                    var targetHammerUniqueId = targetEntity?.GetProperty<string>("hammeruniqueid");
+                    if (!connection.ContainsKey("targetHammerUniqueId"))
+                    {
+                        connection.AddProperty("targetHammerUniqueId", new KVValue(KVValueType.String, targetHammerUniqueId));
+                    }
                     entityInfoForm.AddConnection(connection);
                 }
             }
@@ -696,18 +763,18 @@ namespace GUI.Types.Renderer
                 };
                 entityListForm.OnEntityClicked += (s, value) =>
                 {
-                    var sceneNode = Scene.FindByEntityInfo(value);
-                    selectedNodeRenderer.SelectNode(sceneNode);
+                    var entity = Scene.FindByEntityInfo(value);
+                    selectedNodeRenderer.SelectNode(entity);
                     if (entityInfoForm != null)
                     {
-                        ShowSceneNodeDetails(sceneNode, false);
+                        ShowSceneNodeDetails(entity, false);
                     }
                     Focus();
                 };
                 entityListForm.OnEntityDoubleClicked += (s, args) =>
                 {
-                    var sceneNode = selectedNodeRenderer.GetSelectNode();
-                    var origin = sceneNode?.EntityData.GetProperty("origin").Value.ToString();
+                    var entity = selectedNodeRenderer.GetSelectNode();
+                    var origin = entity.EntityData.GetProperty("origin").Value.ToString();
                     if (origin == null)
                     {
                         return;
