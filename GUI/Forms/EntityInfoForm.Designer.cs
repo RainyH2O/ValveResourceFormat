@@ -46,6 +46,7 @@ namespace GUI.Forms
             Parameter = new DataGridViewTextBoxColumn();
             Delay = new DataGridViewTextBoxColumn();
             timesToFire = new DataGridViewTextBoxColumn();
+            TargetHammerUniqueId = new DataGridViewTextBoxColumn();
             dataGridInputs = new DataGridView();
             SourceHammerUniqueId = new DataGridViewTextBoxColumn();
             SourceName = new DataGridViewTextBoxColumn();
@@ -148,7 +149,7 @@ namespace GUI.Forms
             dataGridOutputs.AllowUserToAddRows = false;
             dataGridOutputs.AllowUserToDeleteRows = false;
             dataGridOutputs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { Output, TargetEntity, TargetInput, Parameter, Delay, timesToFire });
+            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { Output, TargetEntity, TargetInput, Parameter, Delay, timesToFire, TargetHammerUniqueId });
             dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle2.BackColor = System.Drawing.SystemColors.Window;
             dataGridViewCellStyle2.Font = new System.Drawing.Font("Cascadia Mono", 10F);
@@ -164,6 +165,7 @@ namespace GUI.Forms
             dataGridOutputs.RowHeadersVisible = false;
             dataGridOutputs.Size = new System.Drawing.Size(786, 416);
             dataGridOutputs.TabIndex = 0;
+            dataGridOutputs.CellDoubleClick += DataGridOutputs_CellDoubleClick;
             //
             // dataGridInputs
             //
@@ -186,6 +188,7 @@ namespace GUI.Forms
             dataGridInputs.RowHeadersVisible = false;
             dataGridInputs.Size = new System.Drawing.Size(786, 416);
             dataGridInputs.TabIndex = 0;
+            dataGridInputs.CellDoubleClick += DataGridInputs_CellDoubleClick;
             //
             // Output
             //
@@ -222,6 +225,12 @@ namespace GUI.Forms
             timesToFire.HeaderText = "Times To Fire";
             timesToFire.Name = "timesToFire";
             timesToFire.ReadOnly = true;
+            //
+            // TargetHammerUniqueId
+            //
+            TargetHammerUniqueId.HeaderText = "Target Id";
+            TargetHammerUniqueId.Name = "TargetHammerUniqueId";
+            TargetHammerUniqueId.ReadOnly = true;
             //
             // SourceHammerUniqueId
             //
@@ -300,6 +309,7 @@ namespace GUI.Forms
         private DataGridViewTextBoxColumn Parameter;
         private DataGridViewTextBoxColumn Delay;
         private DataGridViewTextBoxColumn timesToFire;
+        private DataGridViewTextBoxColumn TargetHammerUniqueId;
         private TabPage tabPageInputs;
         private DataGridView dataGridInputs;
         private DataGridViewTextBoxColumn SourceHammerUniqueId;
