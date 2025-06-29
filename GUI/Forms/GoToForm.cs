@@ -8,24 +8,26 @@ internal partial class GoToForm : Form
 {
     public enum GoToType
     {
-        Coordinate,
         EntityName,
+        Coordinate,
         HammerId
     }
 
-    private class GoToTypeItem(string name, GoToType type, string example)
-    {
-        public string Name { get; } = name;
-        public GoToType Type { get; } = type;
-        public string Example { get; } = example;
-    }
+    // Remember last selected type for user convenience
+    private static GoToType lastSelectedType;
 
     private static readonly GoToTypeItem[] GoToTypes =
     [
-        new("Coordinate", GoToType.Coordinate, "e.g. 100 200 300"),
         new("Entity Name", GoToType.EntityName, "e.g. player_spawn_01"),
+        new("Coordinate", GoToType.Coordinate, "e.g. 100 200 300"),
         new("Hammer ID", GoToType.HammerId, "e.g. 123456")
     ];
+
+    public GoToForm()
+    {
+        InitializeComponent();
+        InitializeComboBox();
+    }
 
     /// <summary>
     ///     Gets whatever text was entered by the user in the input textbox.
@@ -43,18 +45,15 @@ internal partial class GoToForm : Form
         get => ((GoToTypeItem)typeComboBox.SelectedItem).Type;
     }
 
-    public GoToForm()
-    {
-        InitializeComponent();
-        InitializeComboBox();
-    }
-
     private void InitializeComboBox()
     {
         typeComboBox.ValueMember = nameof(GoToTypeItem.Type);
         typeComboBox.DisplayMember = nameof(GoToTypeItem.Name);
         typeComboBox.Items.AddRange(GoToTypes);
-        typeComboBox.SelectedIndex = 0;
+
+        // Set default selection to last used type
+        var lastSelectedIndex = Array.FindIndex(GoToTypes, item => item.Type == lastSelectedType);
+        typeComboBox.SelectedIndex = lastSelectedIndex >= 0 ? lastSelectedIndex : 0;
     }
 
     /// <summary>
@@ -76,6 +75,12 @@ internal partial class GoToForm : Form
     private void TypeComboBox_SelectedIndexChanged(object sender, EventArgs e)
     {
         UpdateExampleText();
+
+        // Save selection immediately when user changes it
+        if (typeComboBox.SelectedItem is GoToTypeItem selectedItem)
+        {
+            lastSelectedType = selectedItem.Type;
+        }
     }
 
     private void UpdateExampleText()
@@ -84,5 +89,12 @@ internal partial class GoToForm : Form
         {
             exampleLabel.Text = selectedItem.Example;
         }
+    }
+
+    private class GoToTypeItem(string name, GoToType type, string example)
+    {
+        public string Name { get; } = name;
+        public GoToType Type { get; } = type;
+        public string Example { get; } = example;
     }
 }

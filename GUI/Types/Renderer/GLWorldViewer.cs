@@ -665,7 +665,7 @@ namespace GUI.Types.Renderer
 
             if (sceneNode.EntityData != null)
             {
-                // Perhaps this needs to check for correct classname?
+                // Perhaps this needs to check for the correct classname?
                 var particle = sceneNode.EntityData.GetProperty<string>("effect_name");
 
                 if (particle != null)
@@ -722,7 +722,7 @@ namespace GUI.Types.Renderer
                     }
                 }
 
-                // Set same material group
+                // Set the same material group
                 if (glModelViewer.materialGroupListBox != null && worldModel.ActiveMaterialGroup != null)
                 {
                     var skinId = glModelViewer.materialGroupListBox.FindStringExact(worldModel.ActiveMaterialGroup);
@@ -876,32 +876,16 @@ namespace GUI.Types.Renderer
             var inputText = goToForm.InputText;
             switch (goToForm.SelectedGoToType)
             {
-                case GoToForm.GoToType.Coordinate:
-                    GoToCoordinate(inputText);
-                    break;
                 case GoToForm.GoToType.EntityName:
                     GoToEntityByName(inputText);
+                    break;
+                case GoToForm.GoToType.Coordinate:
+                    GoToCoordinate(inputText);
                     break;
                 case GoToForm.GoToType.HammerId:
                     GoToEntityByHammerId(inputText);
                     break;
             }
-        }
-
-        private void GoToCoordinate(string inputText)
-        {
-            var match = Regexes.Coord().Match(inputText);
-            if (!match.Success)
-            {
-                MessageBox.Show("Invalid coordinate format. Use: X Y Z", "Format Error", MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            var x = float.Parse(match.Groups["x"].Value, CultureInfo.InvariantCulture);
-            var y = float.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture);
-            var z = float.Parse(match.Groups["z"].Value, CultureInfo.InvariantCulture);
-            Camera.SetLocation(new Vector3(x, y, z));
         }
 
         private void GoToEntityByName(string entityName)
@@ -921,7 +905,7 @@ namespace GUI.Types.Renderer
                 return;
             }
 
-            // If smart match fails, check for multiple partial matches
+            // If a smart match fails, check for multiple partial matches
             var partialMatches = FindEntitiesPartial("targetname", entityName);
             if (partialMatches.Count > 1)
             {
@@ -932,6 +916,22 @@ namespace GUI.Types.Renderer
                 MessageBox.Show($"Entity '{entityName}' not found.", "Not Found", MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
+        }
+
+        private void GoToCoordinate(string inputText)
+        {
+            var match = Regexes.Coord().Match(inputText);
+            if (!match.Success)
+            {
+                MessageBox.Show("Invalid coordinate format. Use: X Y Z", "Format Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var x = float.Parse(match.Groups["x"].Value, CultureInfo.InvariantCulture);
+            var y = float.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture);
+            var z = float.Parse(match.Groups["z"].Value, CultureInfo.InvariantCulture);
+            Camera.SetLocation(new Vector3(x, y, z));
         }
 
         private void GoToEntityByHammerId(string hammerId)
