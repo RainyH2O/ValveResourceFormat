@@ -58,7 +58,7 @@ internal partial class GoToForm : Form
     }
 
     /// <summary>
-    ///     On form load, setup the initial state and set the textbox as the focused control.
+    ///     On form load, set up the initial state and set the textbox as the focused control.
     /// </summary>
     /// <param name="sender">Object which raised event.</param>
     /// <param name="e">Event data.</param>

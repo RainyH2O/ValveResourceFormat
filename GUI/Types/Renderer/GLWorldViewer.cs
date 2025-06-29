@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
@@ -912,10 +913,19 @@ namespace GUI.Types.Renderer
                 return;
             }
 
-            var node = FindEntity("targetname", entityName);
+            // Use smart matching
+            var node = FindEntitySmart("targetname", entityName);
             if (node != null)
             {
                 SelectAndFocusNode(node);
+                return;
+            }
+
+            // If smart match fails, check for multiple partial matches
+            var partialMatches = FindEntitiesPartial("targetname", entityName);
+            if (partialMatches.Count > 1)
+            {
+                ShowEntitySelectionDialog(partialMatches, entityName);
             }
             else
             {
@@ -948,6 +958,102 @@ namespace GUI.Types.Renderer
         private SceneNode FindEntity(string keyName, string value)
         {
             return Scene.FindNodeByKeyValue(keyName, value) ?? SkyboxScene?.FindNodeByKeyValue(keyName, value);
+        }
+
+        private SceneNode FindEntitySmart(string keyName, string value)
+        {
+            return Scene.FindNodeByKeyValueSmart(keyName, value) ??
+                   SkyboxScene?.FindNodeByKeyValueSmart(keyName, value);
+        }
+
+        private List<SceneNode> FindEntitiesPartial(string keyName, string value)
+        {
+            var matches = new List<SceneNode>();
+            matches.AddRange(Scene.FindNodesByKeyValuePartial(keyName, value));
+            if (SkyboxScene != null)
+            {
+                matches.AddRange(SkyboxScene.FindNodesByKeyValuePartial(keyName, value));
+            }
+
+            return matches;
+        }
+
+        private void ShowEntitySelectionDialog(List<SceneNode> matches, string searchTerm)
+        {
+            using var selectionForm = new Form
+            {
+                Text = "Select Entity",
+                Size = new Size(400, 300),
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            var listBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                DisplayMember = "Text"
+            };
+
+            // Create display items
+            var items = matches.Select(node =>
+            {
+                var targetname = node.EntityData?.GetProperty<string>("targetname") ?? "Unknown";
+                var classname = node.EntityData?.GetProperty<string>("classname") ?? "Unknown";
+                return new
+                {
+                    Text = $"{targetname} ({classname})",
+                    Node = node
+                };
+            }).ToList();
+
+            listBox.DataSource = items;
+
+            var buttonPanel = new Panel
+            {
+                Height = 40,
+                Dock = DockStyle.Bottom
+            };
+
+            var okButton = new Button
+            {
+                Text = "OK",
+                DialogResult = DialogResult.OK,
+                Location = new Point(10, 8),
+                Size = new Size(80, 25)
+            };
+
+            var cancelButton = new Button
+            {
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(100, 8),
+                Size = new Size(80, 25)
+            };
+
+            buttonPanel.Controls.Add(okButton);
+            buttonPanel.Controls.Add(cancelButton);
+
+            selectionForm.Controls.Add(listBox);
+            selectionForm.Controls.Add(buttonPanel);
+            selectionForm.AcceptButton = okButton;
+            selectionForm.CancelButton = cancelButton;
+
+            // Double click to select
+            listBox.DoubleClick += (s, e) =>
+            {
+                selectionForm.DialogResult = DialogResult.OK;
+                selectionForm.Close();
+            };
+
+            if (selectionForm.ShowDialog() == DialogResult.OK && listBox.SelectedValue != null)
+            {
+                var selectedItem = (dynamic)listBox.SelectedItem;
+                if (selectedItem?.Node != null)
+                {
+                    SelectAndFocusNode(selectedItem.Node);
+                }
+            }
         }
 
         private void ShowEntityListForm()
