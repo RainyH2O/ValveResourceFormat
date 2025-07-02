@@ -24,7 +24,6 @@ public partial class EntityListForm : Form
 
     private readonly Dictionary<string, TextBox> _filterTextBoxes = new();
 
-    // Custom export properties configuration
     private HashSet<string> _customExportProperties = new();
     private DataTable? _dataTable;
     private List<EntityLump.Entity>? _entities;
@@ -145,25 +144,8 @@ public partial class EntityListForm : Form
     }
 
     /// <summary>
-    ///     <para>
-    ///         If a pattern in a LIKE clause contains any of these special characters * % [ ], those characters must be
-    ///         escaped in brackets [ ] like this [*], [%], [[] or []].
-    ///     </para>
-    ///     <para>
-    ///         If the pattern is not in a like clause then you can pass valueIsForLIKEcomparison = false to not escape
-    ///         brackets.
-    ///     </para>
-    ///     <para>Examples:</para>
-    ///     <para>- strFilter = "[Something] LIKE '%" + DataTableHelper.EscapeLikeValue(filterValue) + "%'";</para>
-    ///     <para></para>
-    ///     <para>http://www.csharp-examples.net/dataview-rowfilter/</para>
+    ///     Escapes special characters for LIKE clause in DataView filter
     /// </summary>
-    /// <param name="filterValue">
-    ///     LIKE filterValue. This should not be the entire filter string... just the part that is being
-    ///     compared.
-    /// </param>
-    /// <param name="valueIsForLIKEcomparison">Whether or not the filterValue is being used in a LIKE comparison.</param>
-    /// <returns></returns>
     private static string EscapeFilterValue(string filterValue, bool valueIsForLIKEcomparison = true)
     {
         const string lb = "~~LeftBracket~~";
@@ -304,55 +286,61 @@ public partial class EntityListForm : Form
     {
         var filteredEntities = _entities!.AsEnumerable();
 
-        // Filter by key-value pair
         if (!string.IsNullOrEmpty(keyFilter) && !string.IsNullOrEmpty(valueFilter))
         {
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return entity.Properties.Properties.Any(p =>
+                return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                 {
-                    var keyMatches = isExactMatch
-                        ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                        : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                    if (!keyMatches)
+                    return entity.Properties.Properties.Any(p =>
                     {
-                        return false;
-                    }
+                        var keyMatches = isExactMatch
+                            ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                            : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                    var valueMatches = isExactMatch
-                        ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                        : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                        if (!keyMatches)
+                        {
+                            return false;
+                        }
 
-                    return valueMatches;
+                        return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                        {
+                            return isExactMatch
+                                ? p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase)
+                                : p.Value.Value!.ToString()!.Contains(valueTerm, StringComparison.OrdinalIgnoreCase);
+                        });
+                    });
                 });
             });
         }
         else if (!string.IsNullOrEmpty(keyFilter))
         {
-            // Filter by key
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return isExactMatch
-                    ? entity.ContainsKey(keyFilter)
-                    : entity.Properties.Properties.Any(p =>
-                        p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+                return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
+                {
+                    return isExactMatch
+                        ? entity.ContainsKey(keyTerm)
+                        : entity.Properties.Properties.Any(p =>
+                            p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase));
+                });
             });
         }
         else if (!string.IsNullOrEmpty(valueFilter))
         {
-            // Filter by value
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return isExactMatch
-                    ? entity.Properties.Properties.Any(p =>
-                        p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase))
-                    : entity.Properties.Properties.Any(p =>
-                        p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                {
+                    return isExactMatch
+                        ? entity.Properties.Properties.Any(p =>
+                            p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase))
+                        : entity.Properties.Properties.Any(p =>
+                            p.Value.Value!.ToString()!.Contains(valueTerm, StringComparison.OrdinalIgnoreCase));
+                });
             });
         }
 
-        // Filter by connection (Output-Target-Input relationship)
         var hasConnectionFilter = !string.IsNullOrEmpty(outputFilter) || !string.IsNullOrEmpty(targetFilter) ||
                                   !string.IsNullOrEmpty(inputFilter);
         if (hasConnectionFilter)
@@ -367,16 +355,19 @@ public partial class EntityListForm : Form
                 return entity.Connections.Any(connection =>
                 {
                     var outputMatches = string.IsNullOrEmpty(outputFilter) ||
-                                        connection.GetStringProperty("m_outputName").Contains(outputFilter,
-                                            StringComparison.OrdinalIgnoreCase);
+                                        FilterExpressionParser.MatchesExpression(outputFilter, outputTerm =>
+                                            connection.GetStringProperty("m_outputName").Contains(outputTerm,
+                                                StringComparison.OrdinalIgnoreCase));
 
                     var targetMatches = string.IsNullOrEmpty(targetFilter) ||
-                                        connection.GetStringProperty("m_targetName").Contains(targetFilter,
-                                            StringComparison.OrdinalIgnoreCase);
+                                        FilterExpressionParser.MatchesExpression(targetFilter, targetTerm =>
+                                            connection.GetStringProperty("m_targetName").Contains(targetTerm,
+                                                StringComparison.OrdinalIgnoreCase));
 
                     var inputMatches = string.IsNullOrEmpty(inputFilter) ||
-                                       connection.GetStringProperty("m_inputName").Contains(inputFilter,
-                                           StringComparison.OrdinalIgnoreCase);
+                                       FilterExpressionParser.MatchesExpression(inputFilter, inputTerm =>
+                                           connection.GetStringProperty("m_inputName").Contains(inputTerm,
+                                               StringComparison.OrdinalIgnoreCase));
 
                     return outputMatches && targetMatches && inputMatches;
                 });
@@ -389,10 +380,8 @@ public partial class EntityListForm : Form
     private void UpdateDataTable(List<EntityLump.Entity> filteredEntities, string keyFilter, string valueFilter,
         bool isExactMatch, string outputFilter, string targetFilter, string inputFilter)
     {
-        // Clear existing data
         _dataTable?.Clear();
 
-        // Bind filtered entities to dataTable
         foreach (var entity in filteredEntities)
         {
             var row = _dataTable?.NewRow();
@@ -404,29 +393,36 @@ public partial class EntityListForm : Form
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
                         {
-                            var keyMatches = isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                            if (!keyMatches)
+                            return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                             {
-                                return false;
-                            }
+                                var keyMatches = isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                            var valueMatches = isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                                if (!keyMatches)
+                                {
+                                    return false;
+                                }
 
-                            return valueMatches;
+                                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                {
+                                    return isExactMatch
+                                        ? p.Value.Value!.ToString()!.Equals(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase)
+                                        : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase);
+                                });
+                            });
                         });
                         row![columnName] = matchedProperty.Key ?? "";
                     }
                     else if (!string.IsNullOrEmpty(keyFilter))
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
-                            isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+                            FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
+                                isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase)));
                         row![columnName] = matchedProperty.Key ?? "";
                     }
                     else
@@ -440,29 +436,37 @@ public partial class EntityListForm : Form
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
                         {
-                            var keyMatches = isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                            if (!keyMatches)
+                            return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                             {
-                                return false;
-                            }
+                                var keyMatches = isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                            var valueMatches = isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                                if (!keyMatches)
+                                {
+                                    return false;
+                                }
 
-                            return valueMatches;
+                                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                {
+                                    return isExactMatch
+                                        ? p.Value.Value!.ToString()!.Equals(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase)
+                                        : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase);
+                                });
+                            });
                         });
                         row![columnName] = matchedProperty.Value.Value?.ToString() ?? "";
                     }
                     else if (!string.IsNullOrEmpty(valueFilter))
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
-                            isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                            FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                isExactMatch
+                                    ? p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                        StringComparison.OrdinalIgnoreCase)));
                         row![columnName] = matchedProperty.Value.Value?.ToString() ?? "";
                     }
                     else
@@ -512,16 +516,19 @@ public partial class EntityListForm : Form
         return entity.Connections.FirstOrDefault(connection =>
         {
             var outputMatches = string.IsNullOrEmpty(outputFilter) ||
-                                connection.GetStringProperty("m_outputName")
-                                    .Contains(outputFilter, StringComparison.OrdinalIgnoreCase);
+                                FilterExpressionParser.MatchesExpression(outputFilter, outputTerm =>
+                                    connection.GetStringProperty("m_outputName")
+                                        .Contains(outputTerm, StringComparison.OrdinalIgnoreCase));
 
             var targetMatches = string.IsNullOrEmpty(targetFilter) ||
-                                connection.GetStringProperty("m_targetName")
-                                    .Contains(targetFilter, StringComparison.OrdinalIgnoreCase);
+                                FilterExpressionParser.MatchesExpression(targetFilter, targetTerm =>
+                                    connection.GetStringProperty("m_targetName")
+                                        .Contains(targetTerm, StringComparison.OrdinalIgnoreCase));
 
             var inputMatches = string.IsNullOrEmpty(inputFilter) ||
-                               connection.GetStringProperty("m_inputName")
-                                   .Contains(inputFilter, StringComparison.OrdinalIgnoreCase);
+                               FilterExpressionParser.MatchesExpression(inputFilter, inputTerm =>
+                                   connection.GetStringProperty("m_inputName")
+                                       .Contains(inputTerm, StringComparison.OrdinalIgnoreCase));
 
             return outputMatches && targetMatches && inputMatches;
         });
@@ -802,4 +809,67 @@ public partial class EntityListForm : Form
     }
 
 
+}
+
+/// <summary>
+///     Filter expression parser supporting AND/OR/NOT logic
+///     Syntax: comma(,)=OR, plus(+)=AND, exclamation(!)=NOT
+/// </summary>
+public static class FilterExpressionParser
+{
+    public static bool MatchesExpression(string expression, Func<string, bool> valueMatchFunc)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return true;
+        }
+
+        var orParts = expression.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var orPart in orParts)
+        {
+            if (EvaluateAndExpression(orPart.Trim(), valueMatchFunc))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool EvaluateAndExpression(string andExpression, Func<string, bool> valueMatchFunc)
+    {
+        var andParts = andExpression.Split('+', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var andPart in andParts)
+        {
+            var part = andPart.Trim();
+            var shouldMatch = true;
+
+            if (part.StartsWith('!'))
+            {
+                shouldMatch = false;
+                part = part.Substring(1).Trim();
+            }
+
+            if (string.IsNullOrEmpty(part))
+            {
+                continue;
+            }
+
+            var matches = valueMatchFunc(part);
+
+            if (!shouldMatch)
+            {
+                matches = !matches;
+            }
+
+            if (!matches)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
