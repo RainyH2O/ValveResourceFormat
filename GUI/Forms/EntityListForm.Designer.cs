@@ -51,6 +51,7 @@ partial class EntityListForm
         targetTextBox = new System.Windows.Forms.TextBox();
         inputTextBox = new System.Windows.Forms.TextBox();
         exportButton = new System.Windows.Forms.Button();
+        syntaxHelpLabel = new System.Windows.Forms.Label();
         ((System.ComponentModel.ISupportInitialize)entityDataGridView).BeginInit();
         tableLayoutPanel.SuspendLayout();
         filtersPanel.SuspendLayout();
@@ -94,12 +95,14 @@ partial class EntityListForm
         filtersPanel.Controls.Add(filterLabel, 0, 0);
         filtersPanel.Controls.Add(keyValueFilter, 0, 1);
         filtersPanel.Controls.Add(entityIOFilter, 0, 2);
+        filtersPanel.Controls.Add(syntaxHelpLabel, 0, 3);
         filtersPanel.Location = new System.Drawing.Point(3, 469);
         filtersPanel.Name = "filtersPanel";
-        filtersPanel.RowCount = 3;
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 40F));
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 40F));
+        filtersPanel.RowCount = 4;
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 15F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 35F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 35F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 15F));
         filtersPanel.Size = new System.Drawing.Size(320, 89);
         filtersPanel.TabIndex = 0;
         //
@@ -238,6 +241,18 @@ partial class EntityListForm
         exportButton.UseVisualStyleBackColor = true;
         exportButton.Click += ExportButton_Click;
         //
+        // syntaxHelpLabel
+        //
+        syntaxHelpLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+        syntaxHelpLabel.Font = new System.Drawing.Font("Microsoft Sans Serif", 7F, System.Drawing.FontStyle.Italic);
+        syntaxHelpLabel.ForeColor = System.Drawing.SystemColors.GrayText;
+        syntaxHelpLabel.Location = new System.Drawing.Point(3, 87);
+        syntaxHelpLabel.Name = "syntaxHelpLabel";
+        syntaxHelpLabel.Size = new System.Drawing.Size(312, 13);
+        syntaxHelpLabel.TabIndex = 2;
+        syntaxHelpLabel.Text = "Syntax: comma(,)=OR, plus(+)=AND, exclamation(!)=NOT. Ex: key1,key2+!key3";
+        syntaxHelpLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        //
         // EntityListForm
         //
         AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
@@ -273,4 +288,5 @@ partial class EntityListForm
     private System.Windows.Forms.TextBox inputTextBox;
     private System.Windows.Forms.TableLayoutPanel entityIOFilter;
     private System.Windows.Forms.Button exportButton;
+    private System.Windows.Forms.Label syntaxHelpLabel;
 }
