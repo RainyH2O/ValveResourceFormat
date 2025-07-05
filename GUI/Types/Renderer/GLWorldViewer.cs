@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
@@ -664,7 +665,7 @@ namespace GUI.Types.Renderer
 
             if (sceneNode.EntityData != null)
             {
-                // Perhaps this needs to check for correct classname?
+                // Perhaps this needs to check for the correct classname?
                 var particle = sceneNode.EntityData.GetProperty<string>("effect_name");
 
                 if (particle != null)
@@ -721,7 +722,7 @@ namespace GUI.Types.Renderer
                     }
                 }
 
-                // Set same material group
+                // Set the same material group
                 if (glModelViewer.materialGroupListBox != null && worldModel.ActiveMaterialGroup != null)
                 {
                     var skinId = glModelViewer.materialGroupListBox.FindStringExact(worldModel.ActiveMaterialGroup);
@@ -875,15 +876,45 @@ namespace GUI.Types.Renderer
             var inputText = goToForm.InputText;
             switch (goToForm.SelectedGoToType)
             {
-                case GoToForm.GoToType.Coordinate:
-                    GoToCoordinate(inputText);
-                    break;
                 case GoToForm.GoToType.EntityName:
                     GoToEntityByName(inputText);
+                    break;
+                case GoToForm.GoToType.Coordinate:
+                    GoToCoordinate(inputText);
                     break;
                 case GoToForm.GoToType.HammerId:
                     GoToEntityByHammerId(inputText);
                     break;
+            }
+        }
+
+        private void GoToEntityByName(string entityName)
+        {
+            if (string.IsNullOrWhiteSpace(entityName))
+            {
+                MessageBox.Show("Please enter an entity name.", "Input Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Use smart matching
+            var node = FindEntitySmart("targetname", entityName);
+            if (node != null)
+            {
+                SelectAndFocusNode(node);
+                return;
+            }
+
+            // If a smart match fails, check for multiple partial matches
+            var partialMatches = FindEntitiesPartial("targetname", entityName);
+            if (partialMatches.Count > 1)
+            {
+                ShowEntitySelectionDialog(partialMatches, entityName);
+            }
+            else
+            {
+                MessageBox.Show($"Entity '{entityName}' not found.", "Not Found", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
         }
 
@@ -901,27 +932,6 @@ namespace GUI.Types.Renderer
             var y = float.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture);
             var z = float.Parse(match.Groups["z"].Value, CultureInfo.InvariantCulture);
             Camera.SetLocation(new Vector3(x, y, z));
-        }
-
-        private void GoToEntityByName(string entityName)
-        {
-            if (string.IsNullOrWhiteSpace(entityName))
-            {
-                MessageBox.Show("Please enter an entity name.", "Input Error", MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            var node = FindEntity("targetname", entityName);
-            if (node != null)
-            {
-                SelectAndFocusNode(node);
-            }
-            else
-            {
-                MessageBox.Show($"Entity '{entityName}' not found.", "Not Found", MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-            }
         }
 
         private void GoToEntityByHammerId(string hammerId)
@@ -948,6 +958,102 @@ namespace GUI.Types.Renderer
         private SceneNode FindEntity(string keyName, string value)
         {
             return Scene.FindNodeByKeyValue(keyName, value) ?? SkyboxScene?.FindNodeByKeyValue(keyName, value);
+        }
+
+        private SceneNode FindEntitySmart(string keyName, string value)
+        {
+            return Scene.FindNodeByKeyValueSmart(keyName, value) ??
+                   SkyboxScene?.FindNodeByKeyValueSmart(keyName, value);
+        }
+
+        private List<SceneNode> FindEntitiesPartial(string keyName, string value)
+        {
+            var matches = new List<SceneNode>();
+            matches.AddRange(Scene.FindNodesByKeyValuePartial(keyName, value));
+            if (SkyboxScene != null)
+            {
+                matches.AddRange(SkyboxScene.FindNodesByKeyValuePartial(keyName, value));
+            }
+
+            return matches;
+        }
+
+        private void ShowEntitySelectionDialog(List<SceneNode> matches, string searchTerm)
+        {
+            using var selectionForm = new Form
+            {
+                Text = "Select Entity",
+                Size = new Size(400, 300),
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            var listBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                DisplayMember = "Text"
+            };
+
+            // Create display items
+            var items = matches.Select(node =>
+            {
+                var targetname = node.EntityData?.GetProperty<string>("targetname") ?? "Unknown";
+                var classname = node.EntityData?.GetProperty<string>("classname") ?? "Unknown";
+                return new
+                {
+                    Text = $"{targetname} ({classname})",
+                    Node = node
+                };
+            }).ToList();
+
+            listBox.DataSource = items;
+
+            var buttonPanel = new Panel
+            {
+                Height = 40,
+                Dock = DockStyle.Bottom
+            };
+
+            var okButton = new Button
+            {
+                Text = "OK",
+                DialogResult = DialogResult.OK,
+                Location = new Point(10, 8),
+                Size = new Size(80, 25)
+            };
+
+            var cancelButton = new Button
+            {
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(100, 8),
+                Size = new Size(80, 25)
+            };
+
+            buttonPanel.Controls.Add(okButton);
+            buttonPanel.Controls.Add(cancelButton);
+
+            selectionForm.Controls.Add(listBox);
+            selectionForm.Controls.Add(buttonPanel);
+            selectionForm.AcceptButton = okButton;
+            selectionForm.CancelButton = cancelButton;
+
+            // Double click to select
+            listBox.DoubleClick += (s, e) =>
+            {
+                selectionForm.DialogResult = DialogResult.OK;
+                selectionForm.Close();
+            };
+
+            if (selectionForm.ShowDialog() == DialogResult.OK && listBox.SelectedValue != null)
+            {
+                var selectedItem = (dynamic)listBox.SelectedItem;
+                if (selectedItem?.Node != null)
+                {
+                    SelectAndFocusNode(selectedItem.Node);
+                }
+            }
         }
 
         private void ShowEntityListForm()

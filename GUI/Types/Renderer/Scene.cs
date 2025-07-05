@@ -142,6 +142,51 @@ namespace GUI.Types.Renderer
             return staticNodes.Find(IsMatchingEntity) ?? dynamicNodes.Find(IsMatchingEntity);
         }
 
+        public List<SceneNode> FindNodesByKeyValuePartial(string keyToFind, string valueToFind)
+        {
+            var matches = new List<SceneNode>();
+
+            bool IsPartialMatchingEntity(SceneNode node)
+            {
+                if (node.EntityData == null)
+                {
+                    return false;
+                }
+
+                return node.EntityData.Properties.Properties.TryGetValue(keyToFind, out var value)
+                       && value.Value is string outString
+                       && outString.Contains(valueToFind, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Collect all matching nodes
+            matches.AddRange(staticNodes.Where(IsPartialMatchingEntity));
+            matches.AddRange(dynamicNodes.Where(IsPartialMatchingEntity));
+
+            return matches;
+        }
+
+        public SceneNode FindNodeByKeyValueSmart(string keyToFind, string valueToFind)
+        {
+            // Try exact match first
+            var exactMatch = FindNodeByKeyValue(keyToFind, valueToFind);
+            if (exactMatch != null)
+            {
+                return exactMatch;
+            }
+
+            // If exact match fails, try partial match
+            var partialMatches = FindNodesByKeyValuePartial(keyToFind, valueToFind);
+
+            // If only one partial match, return it
+            if (partialMatches.Count == 1)
+            {
+                return partialMatches[0];
+            }
+
+            // Return null for multiple matches or no matches, let caller handle
+            return null;
+        }
+
         public void Update(Scene.UpdateContext updateContext)
         {
             foreach (var node in staticNodes)
