@@ -66,7 +66,7 @@ partial class EntityListForm
         entityDataGridView.Location = new System.Drawing.Point(3, 3);
         entityDataGridView.Name = "entityDataGridView";
         entityDataGridView.ReadOnly = true;
-        entityDataGridView.Size = new System.Drawing.Size(678, 460);
+        entityDataGridView.Size = new System.Drawing.Size(678, 424);
         entityDataGridView.TabIndex = 0;
         entityDataGridView.Text = "entityDataGridView";
         entityDataGridView.CellClick += EntityDataGridView_CellClick;
@@ -84,7 +84,7 @@ partial class EntityListForm
         tableLayoutPanel.RowCount = 2;
         tableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
         tableLayoutPanel.RowStyles.Add(new System.Windows.Forms.RowStyle());
-        tableLayoutPanel.Size = new System.Drawing.Size(684, 561);
+        tableLayoutPanel.Size = new System.Drawing.Size(684, 540);
         tableLayoutPanel.TabIndex = 1;
         //
         // filtersPanel
@@ -96,14 +96,14 @@ partial class EntityListForm
         filtersPanel.Controls.Add(keyValueFilter, 0, 1);
         filtersPanel.Controls.Add(entityIOFilter, 0, 2);
         filtersPanel.Controls.Add(syntaxHelpLabel, 0, 3);
-        filtersPanel.Location = new System.Drawing.Point(3, 469);
+        filtersPanel.Location = new System.Drawing.Point(3, 433);
         filtersPanel.Name = "filtersPanel";
         filtersPanel.RowCount = 4;
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 15F));
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 35F));
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 35F));
-        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 15F));
-        filtersPanel.Size = new System.Drawing.Size(320, 89);
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 12F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 32F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 32F));
+        filtersPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 24F));
+        filtersPanel.Size = new System.Drawing.Size(320, 110);
         filtersPanel.TabIndex = 0;
         //
         // filterLabel
@@ -111,7 +111,7 @@ partial class EntityListForm
         filterLabel.Dock = System.Windows.Forms.DockStyle.Fill;
         filterLabel.Location = new System.Drawing.Point(3, 0);
         filterLabel.Name = "filterLabel";
-        filterLabel.Size = new System.Drawing.Size(312, 17);
+        filterLabel.Size = new System.Drawing.Size(312, 13);
         filterLabel.TabIndex = 0;
         filterLabel.Text = "Filters";
         filterLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -128,11 +128,11 @@ partial class EntityListForm
         keyValueFilter.Controls.Add(valueTextBox, 2, 0);
         keyValueFilter.Controls.Add(exactMatchCheckBox, 3, 0);
         keyValueFilter.Dock = System.Windows.Forms.DockStyle.Fill;
-        keyValueFilter.Location = new System.Drawing.Point(3, 20);
+        keyValueFilter.Location = new System.Drawing.Point(3, 16);
         keyValueFilter.Name = "keyValueFilter";
         keyValueFilter.RowCount = 1;
         keyValueFilter.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-        keyValueFilter.Size = new System.Drawing.Size(312, 28);
+        keyValueFilter.Size = new System.Drawing.Size(312, 35);
         keyValueFilter.TabIndex = 1;
         keyValueFilter.Tag = "keyValueFilter";
         //
@@ -188,12 +188,12 @@ partial class EntityListForm
         entityIOFilter.Controls.Add(targetTextBox, 1, 0);
         entityIOFilter.Controls.Add(inputTextBox, 2, 0);
         entityIOFilter.Dock = System.Windows.Forms.DockStyle.Fill;
-        entityIOFilter.Location = new System.Drawing.Point(3, 54);
+        entityIOFilter.Location = new System.Drawing.Point(3, 56);
         entityIOFilter.Name = "entityIOFilter";
         entityIOFilter.RowCount = 2;
         entityIOFilter.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
         entityIOFilter.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
-        entityIOFilter.Size = new System.Drawing.Size(312, 30);
+        entityIOFilter.Size = new System.Drawing.Size(312, 35);
         entityIOFilter.TabIndex = 1;
         entityIOFilter.Tag = "entityIOFilter";
         //
@@ -233,7 +233,7 @@ partial class EntityListForm
         // exportButton
         //
         exportButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        exportButton.Location = new System.Drawing.Point(590, 525);
+        exportButton.Location = new System.Drawing.Point(590, 500);
         exportButton.Name = "exportButton";
         exportButton.Size = new System.Drawing.Size(80, 25);
         exportButton.TabIndex = 2;
@@ -246,9 +246,9 @@ partial class EntityListForm
         syntaxHelpLabel.Dock = System.Windows.Forms.DockStyle.Fill;
         syntaxHelpLabel.Font = new System.Drawing.Font("Microsoft Sans Serif", 7F, System.Drawing.FontStyle.Italic);
         syntaxHelpLabel.ForeColor = System.Drawing.SystemColors.GrayText;
-        syntaxHelpLabel.Location = new System.Drawing.Point(3, 87);
+        syntaxHelpLabel.Location = new System.Drawing.Point(3, 83);
         syntaxHelpLabel.Name = "syntaxHelpLabel";
-        syntaxHelpLabel.Size = new System.Drawing.Size(312, 13);
+        syntaxHelpLabel.Size = new System.Drawing.Size(312, 26);
         syntaxHelpLabel.TabIndex = 2;
         syntaxHelpLabel.Text = "Syntax: comma(,)=OR, plus(+)=AND, exclamation(!)=NOT. Ex: key1,key2+!key3";
         syntaxHelpLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -257,7 +257,7 @@ partial class EntityListForm
         //
         AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
         AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        ClientSize = new System.Drawing.Size(684, 561);
+        ClientSize = new System.Drawing.Size(684, 540);
         Controls.Add(exportButton);
         Controls.Add(tableLayoutPanel);
         Name = "EntityListForm";
