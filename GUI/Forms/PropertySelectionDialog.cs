@@ -90,7 +90,7 @@ public class PropertySelectionDialog : Form
 
         Text = "Export Configuration";
         Width = 920;
-        Height = 680;
+        Height = 600;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
@@ -155,24 +155,24 @@ public class PropertySelectionDialog : Form
         _includePropertyRelatedCheckBox = CreateComponent(new CheckBox
         {
             Text = "Include related entities (properties)",
-            Left = 10, Top = 485, Width = 400
+            Left = 10, Top = 480, Width = 400
         });
 
         _includeConnectionRelatedCheckBox = CreateComponent(new CheckBox
         {
             Text = "Include related entities (connections)",
-            Left = 10, Top = 505, Width = 400
+            Left = 10, Top = 500, Width = 400
         });
 
         _okButton = CreateComponent(new Button
         {
-            Text = "Export", Left = 740, Top = 540, Width = 75, Height = 30,
+            Text = "Export", Left = 740, Top = 525, Width = 75, Height = 30,
             DialogResult = DialogResult.OK
         });
 
         _cancelButton = CreateComponent(new Button
         {
-            Text = "Cancel", Left = 820, Top = 540, Width = 75, Height = 30,
+            Text = "Cancel", Left = 820, Top = 525, Width = 75, Height = 30,
             DialogResult = DialogResult.Cancel
         });
     }
