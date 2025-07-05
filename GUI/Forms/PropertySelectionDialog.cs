@@ -678,7 +678,9 @@ public class PropertySelectionDialog : Form
                 var targetName = connection.GetStringProperty("m_targetName");
                 if (!string.IsNullOrEmpty(targetName))
                 {
-                    foreach (var target in namedEntitiesLookup[targetName].Where(t => !processed.Contains(t)))
+                    // Use flexible entity lookup
+                    var targetEntities = FindEntitiesByName(namedEntitiesLookup, targetName);
+                    foreach (var target in targetEntities.Where(t => !processed.Contains(t)))
                     {
                         queue.Enqueue(target);
                     }
@@ -710,11 +712,62 @@ public class PropertySelectionDialog : Form
                 continue;
             }
 
-            foreach (var referenced in namedEntitiesLookup[referencedName].Where(r => !processed.Contains(r)))
+            // Use flexible entity lookup
+            var referencedEntities = FindEntitiesByName(namedEntitiesLookup, referencedName);
+            foreach (var referenced in referencedEntities.Where(r => !processed.Contains(r)))
             {
                 queue.Enqueue(referenced);
             }
         }
+    }
+
+    /// <summary>
+    ///     Find entities by name with fuzzy matching support
+    /// </summary>
+    private static IEnumerable<EntityLump.Entity> FindEntitiesByName(
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        string targetName)
+    {
+        if (string.IsNullOrEmpty(targetName))
+        {
+            return Enumerable.Empty<EntityLump.Entity>();
+        }
+
+        // Try exact match first
+        var exactMatches = namedEntitiesLookup[targetName];
+        if (exactMatches.Any())
+        {
+            return exactMatches;
+        }
+
+        // Fallback to fuzzy matching for names with suffixes like "&0000"
+        var fuzzyMatches = new List<EntityLump.Entity>();
+        foreach (var group in namedEntitiesLookup)
+        {
+            var entityName = group.Key;
+
+            // Check if starts with target name followed by separator
+            if (entityName.Length >= targetName.Length &&
+                entityName.StartsWith(targetName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (entityName.Length == targetName.Length)
+                {
+                    fuzzyMatches.AddRange(group);
+                }
+                else
+                {
+                    var nextChar = entityName[targetName.Length];
+                    // Check for separators: &, _, ., #, digits
+                    if (nextChar == '&' || nextChar == '_' || nextChar == '.' || nextChar == '#' ||
+                        char.IsDigit(nextChar))
+                    {
+                        fuzzyMatches.AddRange(group);
+                    }
+                }
+            }
+        }
+
+        return fuzzyMatches;
     }
 
     public static HashSet<string> GetSmartPropertiesFromEntities(List<EntityLump.Entity> entities)
@@ -806,5 +859,18 @@ public class PropertySelectionDialog : Form
         }
 
         return filteredConnection;
+    }
+
+    /// <summary>
+    ///     Test fuzzy entity name matching functionality
+    /// </summary>
+    public static int TestFuzzyEntityMatching(List<EntityLump.Entity> entities, string targetName)
+    {
+        var namedEntitiesLookup = entities
+            .Where(e => !string.IsNullOrEmpty(e.GetProperty<string>("targetname", "")))
+            .ToLookup(e => e.GetProperty<string>("targetname", ""));
+
+        var matches = FindEntitiesByName(namedEntitiesLookup, targetName);
+        return matches.Count();
     }
 }
