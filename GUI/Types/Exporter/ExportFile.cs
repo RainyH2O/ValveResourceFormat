@@ -1,6 +1,4 @@
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -10,7 +8,6 @@ using GUI.Utils;
 using SteamDatabase.ValvePak;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
-using ValveResourceFormat.Serialization.KeyValues;
 using Resource = ValveResourceFormat.Resource;
 
 #nullable disable
@@ -261,18 +258,14 @@ namespace GUI.Types.Exporter
                     return;
                 }
 
-                var (exportType, selectedProperties, entitiesToExport) = ConfigureExport(filteredEntities, entities);
-                if (exportType == null)
+                var (entitiesJson, entityCount) = ConfigureExportAndGetJson(filteredEntities, entities);
+                if (string.IsNullOrEmpty(entitiesJson))
                 {
                     return;
                 }
 
-                var entitiesJson = exportType == PropertySelectionDialog.ExportType.Custom
-                    ? SerializeEntitiesWithSelectedProperties(entitiesToExport, selectedProperties)
-                    : MapExtract.SerializeEntities(entitiesToExport);
-
                 File.WriteAllText(saveFileName, entitiesJson);
-                ShowExportSuccess(entitiesToExport.Count, exportType.Value, Path.GetFileName(saveFileName));
+                ShowExportSuccess(entityCount, Path.GetFileName(saveFileName));
             }
             finally
             {
@@ -318,18 +311,14 @@ namespace GUI.Types.Exporter
                     return;
                 }
 
-                var (exportType, selectedProperties, entitiesToExport) = ConfigureExport(filteredEntities, entities);
-                if (exportType == null)
+                var (entitiesJson, entityCount) = ConfigureExportAndGetJson(filteredEntities, entities);
+                if (string.IsNullOrEmpty(entitiesJson))
                 {
                     return;
                 }
 
-                var entitiesJson = exportType == PropertySelectionDialog.ExportType.Custom
-                    ? SerializeEntitiesWithSelectedProperties(entitiesToExport, selectedProperties)
-                    : MapExtract.SerializeEntities(entitiesToExport);
-
                 File.WriteAllText(saveFileName, entitiesJson);
-                ShowExportSuccess(entitiesToExport.Count, exportType.Value, Path.GetFileName(saveFileName));
+                ShowExportSuccess(entityCount, Path.GetFileName(saveFileName));
             }
             catch (Exception ex)
             {
@@ -381,190 +370,22 @@ namespace GUI.Types.Exporter
             return new List<EntityLump.Entity>();
         }
 
-        private static (PropertySelectionDialog.ExportType?, HashSet<string>, List<EntityLump.Entity>) ConfigureExport(
+        private static (string, int) ConfigureExportAndGetJson(
             List<EntityLump.Entity> filteredEntities, List<EntityLump.Entity> allEntities)
         {
-            using var propertyDialog = new PropertySelectionDialog(filteredEntities);
+            using var propertyDialog = new PropertySelectionDialog(filteredEntities, null, allEntities);
             if (propertyDialog.ShowDialog() != DialogResult.OK)
             {
-                return (null, new HashSet<string>(), new List<EntityLump.Entity>());
+                return (string.Empty, 0);
             }
 
-            var entitiesToExport = propertyDialog.IncludeRelatedEntities
-                ? GetEntitiesWithRelated(filteredEntities, allEntities)
-                : filteredEntities;
-
-            return (propertyDialog.SelectedExportType, propertyDialog.SelectedProperties, entitiesToExport);
+            return (propertyDialog.ExportedJson, propertyDialog.FinalEntityList.Count);
         }
 
-        private static void ShowExportSuccess(int entityCount, PropertySelectionDialog.ExportType exportType,
-            string fileName)
+        private static void ShowExportSuccess(int entityCount, string fileName)
         {
-            var typeText = exportType switch
-            {
-                PropertySelectionDialog.ExportType.Full => "full",
-                PropertySelectionDialog.ExportType.Custom => "custom",
-                _ => "unknown"
-            };
-
-            MessageBox.Show($"Successfully exported {entityCount} entities ({typeText}) to {fileName}",
+            MessageBox.Show($"Successfully exported {entityCount} entities to {fileName}",
                 "Export Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private static List<EntityLump.Entity> GetEntitiesWithRelated(List<EntityLump.Entity> filteredEntities,
-            List<EntityLump.Entity> allEntities)
-        {
-            var visitedEntities = new HashSet<EntityLump.Entity>(filteredEntities);
-            var resultEntities = new List<EntityLump.Entity>(filteredEntities);
-            var namedEntitiesLookup = CreateNamedEntitiesLookup(allEntities);
-
-            foreach (var entity in filteredEntities)
-            {
-                FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
-            }
-
-            return resultEntities;
-        }
-
-        private static Dictionary<string, List<EntityLump.Entity>> CreateNamedEntitiesLookup(
-            List<EntityLump.Entity> allEntities)
-        {
-            return allEntities
-                .Where(entity => entity.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
-                                 kvValue.Value != null)
-                .GroupBy(entity => entity.Properties.Properties["targetname"].Value!.ToString()!)
-                .ToDictionary(group => group.Key, group => group.ToList());
-        }
-
-        private static void FindRelatedEntities(EntityLump.Entity rootEntity, List<EntityLump.Entity> allEntities,
-            Dictionary<string, List<EntityLump.Entity>> namedEntitiesLookup, HashSet<EntityLump.Entity> visitedEntities,
-            List<EntityLump.Entity> resultEntities)
-        {
-            if (rootEntity.Connections?.Count > 0)
-            {
-                ProcessOutgoingConnections(rootEntity, namedEntitiesLookup, allEntities, visitedEntities,
-                    resultEntities);
-            }
-
-            if (rootEntity.Properties.Properties.TryGetValue("targetname", out var rootTargetName) &&
-                rootTargetName.Value != null)
-            {
-                ProcessIncomingConnections(rootEntity, allEntities, rootTargetName.Value.ToString()!, visitedEntities,
-                    resultEntities);
-            }
-        }
-
-        private static void ProcessOutgoingConnections(EntityLump.Entity rootEntity,
-            Dictionary<string, List<EntityLump.Entity>> namedEntitiesLookup, List<EntityLump.Entity> allEntities,
-            HashSet<EntityLump.Entity> visitedEntities, List<EntityLump.Entity> resultEntities)
-        {
-            foreach (var connection in rootEntity.Connections!)
-            {
-                if (!connection.Properties.TryGetValue("m_targetName", out var targetNameValue) ||
-                    targetNameValue.Value == null)
-                {
-                    continue;
-                }
-
-                var targetName = targetNameValue.Value.ToString()!;
-                if (!namedEntitiesLookup.TryGetValue(targetName, out var targetEntities))
-                {
-                    continue;
-                }
-
-                foreach (var entity in targetEntities.Where(e => e != rootEntity && !visitedEntities.Contains(e)))
-                {
-                    resultEntities.Add(entity);
-                    visitedEntities.Add(entity);
-                    FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
-                }
-            }
-        }
-
-        private static void ProcessIncomingConnections(EntityLump.Entity rootEntity,
-            List<EntityLump.Entity> allEntities,
-            string rootName, HashSet<EntityLump.Entity> visitedEntities, List<EntityLump.Entity> resultEntities)
-        {
-            var namedEntitiesLookup = CreateNamedEntitiesLookup(allEntities);
-
-            foreach (var entity in allEntities.Where(e =>
-                         e.Connections?.Count > 0 && e != rootEntity && !visitedEntities.Contains(e)))
-            {
-                if (entity.Connections!.Any(conn => conn.Properties.TryGetValue("m_targetName", out var targetValue) &&
-                                                    targetValue.Value?.ToString() == rootName))
-                {
-                    resultEntities.Add(entity);
-                    visitedEntities.Add(entity);
-                    FindRelatedEntities(entity, allEntities, namedEntitiesLookup, visitedEntities, resultEntities);
-                }
-            }
-        }
-
-        private static readonly HashSet<string> EssentialConnectionProperties = new()
-            { "m_outputName", "m_targetName", "m_inputName", "m_overrideParam", "m_flDelay", "m_nTimesToFire" };
-
-        private static string SerializeEntitiesWithSelectedProperties(List<EntityLump.Entity> entities,
-            HashSet<string> selectedProperties)
-        {
-            var filteredEntities = entities.Select(entity =>
-            {
-                var entityDict = new Dictionary<string, object>();
-
-                foreach (var (key, value) in entity.Properties.Properties)
-                {
-                    if (selectedProperties.Contains(key) && value.Value != null)
-                    {
-                        entityDict[key] = ConvertEntityValue(value.Value);
-                    }
-                }
-
-                if (entity.Connections?.Count > 0)
-                {
-                    var connections = entity.Connections
-                        .Select(FilterConnection)
-                        .Where(filteredConn => filteredConn.Count > 0)
-                        .Cast<object>()
-                        .ToList();
-
-                    if (connections.Count > 0)
-                    {
-                        entityDict["connections"] = connections;
-                    }
-                }
-
-                return entityDict;
-            }).Where(dict => dict.Count > 0).ToList();
-
-            return JsonSerializer.Serialize(filteredEntities, KVJsonContext.Options);
-        }
-
-        private static object ConvertEntityValue(object value)
-        {
-            return value switch
-            {
-                string str => str,
-                bool boolean => boolean,
-                Vector3 vector => new { vector.X, vector.Y, vector.Z },
-                Vector2 vector => new { vector.X, vector.Y },
-                KVObject { IsArray: true } kvArray => kvArray.Select(p => p.Value).ToArray(),
-                _ when value.GetType().IsPrimitive => value,
-                _ => value.ToString() ?? ""
-            };
-        }
-
-        private static Dictionary<string, object> FilterConnection(KVObject connection)
-        {
-            var filteredConnection = new Dictionary<string, object>();
-
-            foreach (var (key, kvValue) in connection.Properties)
-            {
-                if (EssentialConnectionProperties.Contains(key) && kvValue.Value != null)
-                {
-                    filteredConnection[key] = ConvertEntityValue(kvValue.Value);
-                }
-            }
-
-            return filteredConnection;
         }
     }
 }

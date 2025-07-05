@@ -1,48 +1,20 @@
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Text.Json;
 using System.Windows.Forms;
+using GUI.Utils;
+using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
+using ValveResourceFormat.Serialization.KeyValues;
 
 namespace GUI.Forms;
 
 public class PropertySelectionDialog : Form
 {
-    public enum ExportType
-    {
-        Full,
-        Minimal,
-        Custom
-    }
-
-    // Static readonly arrays for entity property mappings
-    private static readonly string[] LightProperties =
-        ["color", "brightness", "range", "intensity", "castshadows", "innerangle", "outerangle"];
-
-    private static readonly string[] TriggerProperties = ["filtername", "wait", "startdisabled", "damage", "model"];
-
-    private static readonly string[] FuncProperties =
-        ["model", "speed", "health", "startdisabled", "movedir", "sounds"];
-
-    private static readonly string[] DoorProperties = ["speed", "health", "locked", "message"];
-    private static readonly string[] InfoProperties = ["enabled", "radius", "model"];
-    private static readonly string[] EnvProperties = ["message", "health", "model", "scale"];
-    private static readonly string[] PropProperties = ["model", "skin", "health", "solid"];
-    private static readonly string[] NpcProperties = ["model", "health", "squadname", "spawnequipment"];
-    private static readonly string[] WeaponProperties = ["model", "respawntime", "autorespawn"];
-    private static readonly string[] SoundProperties = ["soundname", "volume", "radius", "looped"];
-    private static readonly string[] LogicProperties = ["startdisabled", "initialstate", "threshold"];
-    private static readonly string[] MathProperties = ["startdisabled", "min", "max", "startvalue"];
-    private static readonly string[] FilterProperties = ["filtername", "negated"];
-    private static readonly string[] TemplateProperties = ["template01", "template02", "template03", "template04"];
-    private static readonly string[] WorldspawnProperties = ["message", "skyname", "chaptertitle", "gametitle"];
-    private static readonly string[] PlayerProperties = ["model", "health"];
-    private static readonly string[] GameTextProperties = ["message", "x", "y", "holdtime"];
-    private static readonly string[] EnvMessageProperties = ["message", "messagevolume"];
+    private readonly List<EntityLump.Entity> _allEntities;
     private readonly HashSet<string> _customExportProperties = new();
-
-    private readonly List<EntityLump.Entity> _entities;
-    private readonly bool _useCustomProperties;
+    private readonly List<EntityLump.Entity> _filteredEntities;
     private Button _addAllButton = null!;
     private Button _addButton = null!;
     private Button _addSmartButton = null!;
@@ -50,24 +22,21 @@ public class PropertySelectionDialog : Form
     private Button _cancelButton = null!;
     private Button _collapseAllButton = null!;
     private Button _expandAllButton = null!;
-    private CheckBox _includeRelatedCheckBox = null!;
+    private CheckBox _includeConnectionRelatedCheckBox = null!;
+    private CheckBox _includePropertyRelatedCheckBox = null!;
     private Button _okButton = null!;
     private Button _removeButton = null!;
-
-    // UI controls
     private TextBox _searchTextBox = null!;
     private ListBox _selectedListBox = null!;
-
-    // Component management
     private Container? components;
 
-    public PropertySelectionDialog(List<EntityLump.Entity> entities,
+    public PropertySelectionDialog(List<EntityLump.Entity> filteredEntities,
         HashSet<string>? preSelectedProperties = null,
-        bool useCustomProperties = false)
+        List<EntityLump.Entity>? allEntities = null)
     {
-        _entities = entities;
+        _filteredEntities = filteredEntities;
+        _allEntities = allEntities ?? filteredEntities;
         _customExportProperties = preSelectedProperties ?? new HashSet<string>();
-        _useCustomProperties = useCustomProperties;
 
         InitializeComponent();
         InitializeDialog();
@@ -75,19 +44,22 @@ public class PropertySelectionDialog : Form
         PopulateControls();
     }
 
-    public ExportType SelectedExportType { get; private set; }
     public bool IncludeRelatedEntities { get; private set; }
+    public bool IncludeConnectionRelatedEntities { get; private set; }
+    public bool IncludePropertyRelatedEntities { get; private set; }
     public HashSet<string> SelectedProperties { get; } = new();
+    public List<EntityLump.Entity> FinalEntityList { get; private set; } = new();
+    public string ExportedJson { get; private set; } = string.Empty;
 
     protected override void Dispose(bool disposing)
     {
         if (disposing && components != null)
         {
-            // Explicit disposal for each component to satisfy code analysis
             DisposeComponent(_searchTextBox);
             DisposeComponent(_availableTreeView);
             DisposeComponent(_selectedListBox);
-            DisposeComponent(_includeRelatedCheckBox);
+            DisposeComponent(_includeConnectionRelatedCheckBox);
+            DisposeComponent(_includePropertyRelatedCheckBox);
             DisposeComponent(_addButton);
             DisposeComponent(_removeButton);
             DisposeComponent(_addAllButton);
@@ -118,7 +90,7 @@ public class PropertySelectionDialog : Form
 
         Text = "Export Configuration";
         Width = 920;
-        Height = 650;
+        Height = 600;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
@@ -180,21 +152,27 @@ public class PropertySelectionDialog : Form
             BackColor = Color.LightGreen, UseVisualStyleBackColor = false
         });
 
-        _includeRelatedCheckBox = CreateComponent(new CheckBox
+        _includePropertyRelatedCheckBox = CreateComponent(new CheckBox
         {
-            Text = "Include related entities (connected via inputs/outputs)",
-            Left = 10, Top = 485, Width = 500
+            Text = "Include related entities (properties)",
+            Left = 10, Top = 480, Width = 400
+        });
+
+        _includeConnectionRelatedCheckBox = CreateComponent(new CheckBox
+        {
+            Text = "Include related entities (connections)",
+            Left = 10, Top = 500, Width = 400
         });
 
         _okButton = CreateComponent(new Button
         {
-            Text = "Export", Left = 740, Top = 520, Width = 75, Height = 30,
+            Text = "Export", Left = 740, Top = 525, Width = 75, Height = 30,
             DialogResult = DialogResult.OK
         });
 
         _cancelButton = CreateComponent(new Button
         {
-            Text = "Cancel", Left = 820, Top = 520, Width = 75, Height = 30,
+            Text = "Cancel", Left = 820, Top = 525, Width = 75, Height = 30,
             DialogResult = DialogResult.Cancel
         });
     }
@@ -215,7 +193,8 @@ public class PropertySelectionDialog : Form
 
         Controls.AddRange(searchLabel, _searchTextBox, _expandAllButton, _collapseAllButton, availableLabel,
             _availableTreeView, selectedLabel, _selectedListBox, _addButton, _removeButton, _addAllButton,
-            _addSmartButton, _includeRelatedCheckBox, _okButton, _cancelButton);
+            _addSmartButton, _includePropertyRelatedCheckBox, _includeConnectionRelatedCheckBox, _okButton,
+            _cancelButton);
     }
 
     private void SetupTooltips()
@@ -238,8 +217,8 @@ public class PropertySelectionDialog : Form
         _collapseAllButton.Click += (s, e) => _availableTreeView.CollapseAll();
         _addButton.Click += (s, e) => AddSelectedProperties(_availableTreeView, _selectedListBox);
         _removeButton.Click += (s, e) => RemoveSelectedProperties(_selectedListBox);
-        _addAllButton.Click += (s, e) => AddAllAvailableProperties(_entities, _selectedListBox);
-        _addSmartButton.Click += (s, e) => AddSmartDefaultProperties(_entities, _selectedListBox);
+        _addAllButton.Click += (s, e) => AddAllAvailableProperties(_filteredEntities, _selectedListBox);
+        _addSmartButton.Click += (s, e) => AddSmartDefaultProperties(_filteredEntities, _selectedListBox);
         _availableTreeView.NodeMouseClick += OnTreeViewNodeMouseClick;
 
         _okButton.Click += OkButton_Click;
@@ -247,8 +226,8 @@ public class PropertySelectionDialog : Form
 
     private void PopulateControls()
     {
-        PopulateAvailablePropertiesTree(_availableTreeView, _entities);
-        InitializeSelectedProperties(_selectedListBox, _entities);
+        PopulateAvailablePropertiesTree(_availableTreeView, _filteredEntities);
+        InitializeSelectedProperties(_selectedListBox, _filteredEntities);
     }
 
     private void OkButton_Click(object? sender, EventArgs e)
@@ -266,9 +245,21 @@ public class PropertySelectionDialog : Form
             SelectedProperties.Add(property);
         }
 
-        var totalAvailableProperties = GetAllAvailableProperties(_entities).Count;
-        SelectedExportType = SelectedProperties.Count == totalAvailableProperties ? ExportType.Full : ExportType.Custom;
-        IncludeRelatedEntities = _includeRelatedCheckBox.Checked;
+        IncludePropertyRelatedEntities = _includePropertyRelatedCheckBox.Checked;
+        IncludeConnectionRelatedEntities = _includeConnectionRelatedCheckBox.Checked;
+        IncludeRelatedEntities = IncludePropertyRelatedEntities || IncludeConnectionRelatedEntities;
+
+        FinalEntityList = IncludeRelatedEntities
+            ? GetEntitiesWithRelated(_filteredEntities, _allEntities, IncludePropertyRelatedEntities,
+                IncludeConnectionRelatedEntities)
+            : new List<EntityLump.Entity>(_filteredEntities);
+
+        var totalAvailableProperties = GetAllAvailableProperties(_filteredEntities).Count;
+        var isFullExport = SelectedProperties.Count == totalAvailableProperties;
+
+        ExportedJson = isFullExport
+            ? SerializeEntitiesFull(FinalEntityList)
+            : SerializeEntitiesWithSelectedProperties(FinalEntityList, SelectedProperties);
 
         DialogResult = DialogResult.OK;
         Close();
@@ -281,7 +272,6 @@ public class PropertySelectionDialog : Form
             return;
         }
 
-        // Skip clicks on checkbox area
         var checkBoxWidth = 16;
         var nodeX = e.Node.Bounds.X - checkBoxWidth;
         if (e.X <= nodeX + checkBoxWidth)
@@ -289,12 +279,10 @@ public class PropertySelectionDialog : Form
             return;
         }
 
-        // Property node - toggle checkbox
         if (e.Node.Parent != null && e.Node.Tag is string)
         {
             e.Node.Checked = !e.Node.Checked;
         }
-        // Class node - toggle all child properties
         else if (e.Node.Parent == null)
         {
             var newState = !e.Node.Checked;
@@ -351,28 +339,18 @@ public class PropertySelectionDialog : Form
     private void InitializeSelectedProperties(ListBox listBox, List<EntityLump.Entity> entities)
     {
         listBox.Items.Clear();
-        var allProperties = new HashSet<string>();
 
-        foreach (var entity in entities)
+        if (_customExportProperties.Count > 0)
         {
-            var classname = entity.GetProperty<string>("classname", "");
-            var smartProperties = GetAdditionalPropertiesForClassname(classname);
-            allProperties.UnionWith(smartProperties);
-        }
-
-        allProperties.Add("classname");
-        allProperties.Add("targetname");
-
-        foreach (var property in allProperties.OrderBy(x => x))
-        {
-            listBox.Items.Add(property);
-        }
-
-        // Use custom configuration if available
-        if (_useCustomProperties && _customExportProperties.Count > 0)
-        {
-            listBox.Items.Clear();
             foreach (var property in _customExportProperties.OrderBy(x => x))
+            {
+                listBox.Items.Add(property);
+            }
+        }
+        else
+        {
+            var smartProperties = GetSmartPropertiesFromEntities(entities);
+            foreach (var property in smartProperties.OrderBy(x => x))
             {
                 listBox.Items.Add(property);
             }
@@ -385,58 +363,62 @@ public class PropertySelectionDialog : Form
 
         if (string.IsNullOrWhiteSpace(searchText))
         {
-            foreach (TreeNode classnameNode in treeView.Nodes)
-            {
-                classnameNode.BackColor = Color.White;
-                classnameNode.ForeColor = Color.Black;
-                foreach (TreeNode propertyNode in classnameNode.Nodes)
-                {
-                    propertyNode.BackColor = Color.White;
-                    propertyNode.ForeColor = Color.Black;
-                }
-            }
-
+            ResetTreeNodeColors(treeView.Nodes);
             treeView.EndUpdate();
             return;
         }
 
-        foreach (TreeNode classnameNode in treeView.Nodes)
+        FilterTreeNodes(treeView.Nodes, searchText);
+        treeView.EndUpdate();
+    }
+
+    private static void ResetTreeNodeColors(TreeNodeCollection nodes)
+    {
+        foreach (TreeNode node in nodes)
         {
-            var hasMatchingProperty = false;
-            var classnameMatches = classnameNode.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            node.BackColor = Color.White;
+            node.ForeColor = Color.Black;
 
-            foreach (TreeNode propertyNode in classnameNode.Nodes)
+            if (node.Nodes.Count > 0)
             {
-                var propertyMatches = propertyNode.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+                ResetTreeNodeColors(node.Nodes);
+            }
+        }
+    }
 
-                if (propertyMatches || classnameMatches)
-                {
-                    propertyNode.BackColor = Color.LightYellow;
-                    propertyNode.ForeColor = Color.Black;
-                    hasMatchingProperty = true;
-                }
-                else
-                {
-                    propertyNode.BackColor = Color.White;
-                    propertyNode.ForeColor = Color.Gray;
-                }
+    private static bool FilterTreeNodes(TreeNodeCollection nodes, string searchText)
+    {
+        var hasMatchingChild = false;
+
+        foreach (TreeNode node in nodes)
+        {
+            var nodeMatches = node.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            var childrenMatch = false;
+
+            if (node.Nodes.Count > 0)
+            {
+                childrenMatch = FilterTreeNodes(node.Nodes, searchText);
             }
 
-            if (hasMatchingProperty || classnameMatches)
+            if (nodeMatches || childrenMatch)
             {
-                classnameNode.BackColor = classnameMatches ? Color.LightBlue : Color.White;
-                classnameNode.ForeColor = Color.Black;
-                classnameNode.Expand();
+                node.BackColor = nodeMatches ? Color.LightYellow : Color.White;
+                node.ForeColor = Color.Black;
+                node.Expand();
+                hasMatchingChild = true;
             }
             else
             {
-                classnameNode.BackColor = Color.White;
-                classnameNode.ForeColor = Color.Gray;
-                classnameNode.Collapse();
+                node.BackColor = Color.White;
+                node.ForeColor = Color.Gray;
+                if (node.Level < 2)
+                {
+                    node.Collapse();
+                }
             }
         }
 
-        treeView.EndUpdate();
+        return hasMatchingChild;
     }
 
     private static void UpdateListBoxProperties(ListBox listBox, IEnumerable<string> properties,
@@ -515,15 +497,7 @@ public class PropertySelectionDialog : Form
 
     private static void AddSmartDefaultProperties(List<EntityLump.Entity> entities, ListBox listBox)
     {
-        var smartProperties = new HashSet<string> { "classname", "targetname" };
-
-        foreach (var entity in entities)
-        {
-            var classname = entity.GetProperty<string>("classname", "");
-            var additionalProperties = GetAdditionalPropertiesForClassname(classname);
-            smartProperties.UnionWith(additionalProperties);
-        }
-
+        var smartProperties = GetSmartPropertiesFromEntities(entities);
         UpdateListBoxProperties(listBox, smartProperties, true);
     }
 
@@ -541,110 +515,362 @@ public class PropertySelectionDialog : Form
         return allProperties;
     }
 
-    /// <summary>
-    ///     Returns additional properties to export based on entity classname
-    /// </summary>
-    public static HashSet<string> GetAdditionalPropertiesForClassname(string classname)
+    private static List<EntityLump.Entity> GetEntitiesWithRelated(
+        List<EntityLump.Entity> filteredEntities,
+        List<EntityLump.Entity> allEntities,
+        bool includePropertyRelated,
+        bool includeConnectionRelated)
     {
-        var properties = new HashSet<string>();
+        var namedEntitiesLookup = allEntities
+            .Where(e => !string.IsNullOrEmpty(e.GetProperty<string>("targetname", "")))
+            .ToLookup(e => e.GetProperty<string>("targetname", ""));
 
-        // Common properties for most entities
-        if (!classname.StartsWith("worldspawn"))
+        if (includePropertyRelated && !includeConnectionRelated)
         {
-            properties.Add("origin");
-            properties.Add("angles");
-            properties.Add("spawnflags");
-            properties.Add("hammeruniqueid");
+            return FindEntitiesWithPropertyRelations(filteredEntities, namedEntitiesLookup);
         }
 
-        // Entity type specific properties
-        if (classname.Contains("light") || classname.StartsWith("env_light"))
+        if (includeConnectionRelated && !includePropertyRelated)
         {
-            properties.UnionWith(LightProperties);
+            var entitiesByConnection = BuildConnectionLookup(allEntities);
+            return FindEntitiesWithConnectionRelations(filteredEntities, namedEntitiesLookup, entitiesByConnection);
         }
 
-        if (classname.StartsWith("trigger_"))
+        if (includePropertyRelated && includeConnectionRelated)
         {
-            properties.UnionWith(TriggerProperties);
+            var entitiesByConnection = BuildConnectionLookup(allEntities);
+            return FindEntitiesWithBothRelations(filteredEntities, namedEntitiesLookup, entitiesByConnection);
         }
 
-        if (classname.StartsWith("func_"))
+        return new List<EntityLump.Entity>(filteredEntities);
+    }
+
+    private static List<EntityLump.Entity> FindEntitiesWithPropertyRelations(
+        List<EntityLump.Entity> startEntities,
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup)
+    {
+        var processed = new HashSet<EntityLump.Entity>();
+        var result = new List<EntityLump.Entity>();
+        var queue = new Queue<EntityLump.Entity>();
+
+        foreach (var entity in startEntities)
         {
-            properties.UnionWith(FuncProperties);
+            queue.Enqueue(entity);
         }
 
-        if (classname.Contains("door"))
+        while (queue.Count > 0)
         {
-            properties.UnionWith(DoorProperties);
+            var entity = queue.Dequeue();
+            if (processed.Contains(entity))
+            {
+                continue;
+            }
+
+            processed.Add(entity);
+            result.Add(entity);
+
+            ProcessPropertyRelated(entity, namedEntitiesLookup, processed, queue);
         }
 
-        if (classname.StartsWith("info_"))
+        return result;
+    }
+
+    private static List<EntityLump.Entity> FindEntitiesWithConnectionRelations(
+        List<EntityLump.Entity> startEntities,
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        Dictionary<string, List<EntityLump.Entity>> entitiesByConnection)
+    {
+        var processed = new HashSet<EntityLump.Entity>();
+        var result = new List<EntityLump.Entity>();
+        var queue = new Queue<EntityLump.Entity>();
+
+        foreach (var entity in startEntities)
         {
-            properties.UnionWith(InfoProperties);
+            queue.Enqueue(entity);
         }
 
-        if (classname.StartsWith("env_"))
+        while (queue.Count > 0)
         {
-            properties.UnionWith(EnvProperties);
+            var entity = queue.Dequeue();
+            if (processed.Contains(entity))
+            {
+                continue;
+            }
+
+            processed.Add(entity);
+            result.Add(entity);
+
+            ProcessConnectionRelated(entity, namedEntitiesLookup, entitiesByConnection, processed, queue);
         }
 
-        if (classname.StartsWith("prop_"))
+        return result;
+    }
+
+    private static List<EntityLump.Entity> FindEntitiesWithBothRelations(
+        List<EntityLump.Entity> startEntities,
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        Dictionary<string, List<EntityLump.Entity>> entitiesByConnection)
+    {
+        var processed = new HashSet<EntityLump.Entity>();
+        var result = new List<EntityLump.Entity>();
+        var queue = new Queue<EntityLump.Entity>();
+
+        foreach (var entity in startEntities)
         {
-            properties.UnionWith(PropProperties);
+            queue.Enqueue(entity);
         }
 
-        if (classname.StartsWith("npc_") || classname.Contains("zombie") || classname.Contains("soldier"))
+        while (queue.Count > 0)
         {
-            properties.UnionWith(NpcProperties);
+            var entity = queue.Dequeue();
+            if (processed.Contains(entity))
+            {
+                continue;
+            }
+
+            processed.Add(entity);
+            result.Add(entity);
+
+            ProcessPropertyRelated(entity, namedEntitiesLookup, processed, queue);
+            ProcessConnectionRelated(entity, namedEntitiesLookup, entitiesByConnection, processed, queue);
         }
 
-        if (classname.StartsWith("weapon_") || classname.Contains("item_"))
+        return result;
+    }
+
+    private static Dictionary<string, List<EntityLump.Entity>> BuildConnectionLookup(
+        List<EntityLump.Entity> allEntities)
+    {
+        var lookup = new Dictionary<string, List<EntityLump.Entity>>();
+
+        foreach (var entity in allEntities.Where(e => e.Connections?.Count > 0))
         {
-            properties.UnionWith(WeaponProperties);
+            foreach (var connection in entity.Connections!)
+            {
+                var targetName = connection.GetStringProperty("m_targetName");
+                if (!string.IsNullOrEmpty(targetName))
+                {
+                    if (!lookup.TryGetValue(targetName, out var list))
+                    {
+                        list = new List<EntityLump.Entity>();
+                        lookup[targetName] = list;
+                    }
+
+                    list.Add(entity);
+                }
+            }
         }
 
-        if (classname.Contains("sound") || classname.StartsWith("ambient_"))
+        return lookup;
+    }
+
+    private static void ProcessConnectionRelated(
+        EntityLump.Entity entity,
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        Dictionary<string, List<EntityLump.Entity>> entitiesByConnection,
+        HashSet<EntityLump.Entity> processed,
+        Queue<EntityLump.Entity> queue)
+    {
+        if (entity.Connections?.Count > 0)
         {
-            properties.UnionWith(SoundProperties);
+            foreach (var connection in entity.Connections)
+            {
+                var targetName = connection.GetStringProperty("m_targetName");
+                if (!string.IsNullOrEmpty(targetName))
+                {
+                    // Use flexible entity lookup
+                    var targetEntities = FindEntitiesByName(namedEntitiesLookup, targetName);
+                    foreach (var target in targetEntities.Where(t => !processed.Contains(t)))
+                    {
+                        queue.Enqueue(target);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ProcessPropertyRelated(
+        EntityLump.Entity entity,
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        HashSet<EntityLump.Entity> processed,
+        Queue<EntityLump.Entity> queue)
+    {
+        foreach (var (key, value) in entity.Properties.Properties)
+        {
+            if (value.Value == null || !EntityPropertyManager.ReferenceProperties.Contains(key))
+            {
+                continue;
+            }
+
+            var referencedName = value.Value.ToString()!.Trim();
+            if (string.IsNullOrEmpty(referencedName) ||
+                referencedName.StartsWith('!') ||
+                referencedName.Contains(' ') ||
+                referencedName.Contains(',') ||
+                referencedName.Contains(';'))
+            {
+                continue;
+            }
+
+            // Use flexible entity lookup
+            var referencedEntities = FindEntitiesByName(namedEntitiesLookup, referencedName);
+            foreach (var referenced in referencedEntities.Where(r => !processed.Contains(r)))
+            {
+                queue.Enqueue(referenced);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Find entities by name with fuzzy matching support
+    /// </summary>
+    private static IEnumerable<EntityLump.Entity> FindEntitiesByName(
+        ILookup<string, EntityLump.Entity> namedEntitiesLookup,
+        string targetName)
+    {
+        if (string.IsNullOrEmpty(targetName))
+        {
+            return Enumerable.Empty<EntityLump.Entity>();
         }
 
-        if (classname.StartsWith("logic_"))
+        // Try exact match first
+        var exactMatches = namedEntitiesLookup[targetName];
+        if (exactMatches.Any())
         {
-            properties.UnionWith(LogicProperties);
+            return exactMatches;
         }
 
-        if (classname.StartsWith("math_"))
+        // Fallback to fuzzy matching for names with suffixes like "&0000"
+        var fuzzyMatches = new List<EntityLump.Entity>();
+        foreach (var group in namedEntitiesLookup)
         {
-            properties.UnionWith(MathProperties);
+            var entityName = group.Key;
+
+            // Check if starts with target name followed by separator
+            if (entityName.Length >= targetName.Length &&
+                entityName.StartsWith(targetName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (entityName.Length == targetName.Length)
+                {
+                    fuzzyMatches.AddRange(group);
+                }
+                else
+                {
+                    var nextChar = entityName[targetName.Length];
+                    // Check for separators: &, _, ., #, digits
+                    if (nextChar == '&' || nextChar == '_' || nextChar == '.' || nextChar == '#' ||
+                        char.IsDigit(nextChar))
+                    {
+                        fuzzyMatches.AddRange(group);
+                    }
+                }
+            }
         }
 
-        if (classname.StartsWith("filter_"))
+        return fuzzyMatches;
+    }
+
+    public static HashSet<string> GetSmartPropertiesFromEntities(List<EntityLump.Entity> entities)
+    {
+        return EntityPropertyManager.GetSmartProperties(entities);
+    }
+
+    private static string SerializeEntitiesFull(List<EntityLump.Entity> entities)
+    {
+        return MapExtract.SerializeEntities(entities);
+    }
+
+    private static string SerializeEntitiesWithSelectedProperties(List<EntityLump.Entity> entities,
+        HashSet<string> selectedProperties)
+    {
+        var entitiesByType = entities.GroupBy(e => e.GetProperty<string>("classname", "unknown")).ToList();
+        var propertiesByType = new Dictionary<string, HashSet<string>>();
+
+        foreach (var group in entitiesByType)
         {
-            properties.UnionWith(FilterProperties);
+            var classname = group.Key;
+
+            var prefixProperties = EntityPropertyManager.GetPropertiesForClassname(classname);
+
+            var finalProperties = new HashSet<string>(prefixProperties, StringComparer.OrdinalIgnoreCase);
+            finalProperties.UnionWith(selectedProperties);
+
+            propertiesByType[classname] = finalProperties;
         }
 
-        if (classname.Contains("template"))
+        var filteredEntities = entities.Select(entity =>
         {
-            properties.UnionWith(TemplateProperties);
+            var classname = entity.GetProperty<string>("classname", "unknown");
+            var relevantProperties = propertiesByType.GetValueOrDefault(classname, selectedProperties);
+            var entityDict = new Dictionary<string, object>();
+
+            foreach (var (key, value) in entity.Properties.Properties)
+            {
+                if (relevantProperties.Contains(key) && value.Value != null)
+                {
+                    entityDict[key] = ConvertEntityValue(value.Value);
+                }
+            }
+
+            if (entity.Connections?.Count > 0)
+            {
+                var connections = entity.Connections
+                    .Select(FilterConnection)
+                    .Where(c => c.Count > 0)
+                    .Cast<object>()
+                    .ToList();
+
+                if (connections.Count > 0)
+                {
+                    entityDict["connections"] = connections;
+                }
+            }
+
+            return entityDict;
+        }).Where(dict => dict.Count > 0).ToList();
+
+        return JsonSerializer.Serialize(filteredEntities, KVJsonContext.Options);
+    }
+
+    private static object ConvertEntityValue(object value)
+    {
+        return value switch
+        {
+            string str => str,
+            bool boolean => boolean,
+            Vector3 vector => new { vector.X, vector.Y, vector.Z },
+            Vector2 vector => new { vector.X, vector.Y },
+            KVObject { IsArray: true } kvArray => kvArray.Select(p => p.Value).ToArray(),
+            _ when value.GetType().IsPrimitive => value,
+            _ => value.ToString() ?? ""
+        };
+    }
+
+    private static Dictionary<string, object> FilterConnection(KVObject connection)
+    {
+        var filteredConnection = new Dictionary<string, object>();
+
+        foreach (var (key, kvValue) in connection.Properties)
+        {
+            if (EntityPropertyManager.ConnectionProperties.Contains(key) && kvValue.Value != null)
+            {
+                filteredConnection[key] = ConvertEntityValue(kvValue.Value);
+            }
         }
 
-        // Special individual entities
-        switch (classname)
-        {
-            case "worldspawn":
-                properties.UnionWith(WorldspawnProperties);
-                break;
-            case "player":
-                properties.UnionWith(PlayerProperties);
-                break;
-            case "game_text":
-                properties.UnionWith(GameTextProperties);
-                break;
-            case "env_message":
-                properties.UnionWith(EnvMessageProperties);
-                break;
-        }
+        return filteredConnection;
+    }
 
-        return properties;
+    /// <summary>
+    ///     Test fuzzy entity name matching functionality
+    /// </summary>
+    public static int TestFuzzyEntityMatching(List<EntityLump.Entity> entities, string targetName)
+    {
+        var namedEntitiesLookup = entities
+            .Where(e => !string.IsNullOrEmpty(e.GetProperty<string>("targetname", "")))
+            .ToLookup(e => e.GetProperty<string>("targetname", ""));
+
+        var matches = FindEntitiesByName(namedEntitiesLookup, targetName);
+        return matches.Count();
     }
 }

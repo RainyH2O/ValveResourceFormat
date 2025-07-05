@@ -1,10 +1,8 @@
 using System.Data;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Windows.Forms;
 using GUI.Utils;
-using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 
@@ -12,7 +10,6 @@ namespace GUI.Forms;
 
 public partial class EntityListForm : Form
 {
-
     private readonly List<(string ColumnName, int ColumnWidth)> _columnsToDisplay =
     [
         ("classname", 150),
@@ -24,11 +21,10 @@ public partial class EntityListForm : Form
 
     private readonly Dictionary<string, TextBox> _filterTextBoxes = new();
 
-    // Custom export properties configuration
     private HashSet<string> _customExportProperties = new();
     private DataTable? _dataTable;
     private List<EntityLump.Entity>? _entities;
-    private bool _useCustomProperties;
+
 
     public EntityListForm(List<EntityLump.Entity>? entities)
     {
@@ -145,25 +141,8 @@ public partial class EntityListForm : Form
     }
 
     /// <summary>
-    ///     <para>
-    ///         If a pattern in a LIKE clause contains any of these special characters * % [ ], those characters must be
-    ///         escaped in brackets [ ] like this [*], [%], [[] or []].
-    ///     </para>
-    ///     <para>
-    ///         If the pattern is not in a like clause then you can pass valueIsForLIKEcomparison = false to not escape
-    ///         brackets.
-    ///     </para>
-    ///     <para>Examples:</para>
-    ///     <para>- strFilter = "[Something] LIKE '%" + DataTableHelper.EscapeLikeValue(filterValue) + "%'";</para>
-    ///     <para></para>
-    ///     <para>http://www.csharp-examples.net/dataview-rowfilter/</para>
+    ///     Escapes special characters for LIKE clause in DataView filter
     /// </summary>
-    /// <param name="filterValue">
-    ///     LIKE filterValue. This should not be the entire filter string... just the part that is being
-    ///     compared.
-    /// </param>
-    /// <param name="valueIsForLIKEcomparison">Whether or not the filterValue is being used in a LIKE comparison.</param>
-    /// <returns></returns>
     private static string EscapeFilterValue(string filterValue, bool valueIsForLIKEcomparison = true)
     {
         const string lb = "~~LeftBracket~~";
@@ -304,55 +283,61 @@ public partial class EntityListForm : Form
     {
         var filteredEntities = _entities!.AsEnumerable();
 
-        // Filter by key-value pair
         if (!string.IsNullOrEmpty(keyFilter) && !string.IsNullOrEmpty(valueFilter))
         {
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return entity.Properties.Properties.Any(p =>
+                return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                 {
-                    var keyMatches = isExactMatch
-                        ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                        : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                    if (!keyMatches)
+                    return entity.Properties.Properties.Any(p =>
                     {
-                        return false;
-                    }
+                        var keyMatches = isExactMatch
+                            ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                            : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                    var valueMatches = isExactMatch
-                        ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                        : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                        if (!keyMatches)
+                        {
+                            return false;
+                        }
 
-                    return valueMatches;
+                        return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                        {
+                            return isExactMatch
+                                ? p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase)
+                                : p.Value.Value!.ToString()!.Contains(valueTerm, StringComparison.OrdinalIgnoreCase);
+                        });
+                    });
                 });
             });
         }
         else if (!string.IsNullOrEmpty(keyFilter))
         {
-            // Filter by key
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return isExactMatch
-                    ? entity.ContainsKey(keyFilter)
-                    : entity.Properties.Properties.Any(p =>
-                        p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+                return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
+                {
+                    return isExactMatch
+                        ? entity.ContainsKey(keyTerm)
+                        : entity.Properties.Properties.Any(p =>
+                            p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase));
+                });
             });
         }
         else if (!string.IsNullOrEmpty(valueFilter))
         {
-            // Filter by value
             filteredEntities = filteredEntities.Where(entity =>
             {
-                return isExactMatch
-                    ? entity.Properties.Properties.Any(p =>
-                        p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase))
-                    : entity.Properties.Properties.Any(p =>
-                        p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                {
+                    return isExactMatch
+                        ? entity.Properties.Properties.Any(p =>
+                            p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase))
+                        : entity.Properties.Properties.Any(p =>
+                            p.Value.Value!.ToString()!.Contains(valueTerm, StringComparison.OrdinalIgnoreCase));
+                });
             });
         }
 
-        // Filter by connection (Output-Target-Input relationship)
         var hasConnectionFilter = !string.IsNullOrEmpty(outputFilter) || !string.IsNullOrEmpty(targetFilter) ||
                                   !string.IsNullOrEmpty(inputFilter);
         if (hasConnectionFilter)
@@ -367,16 +352,19 @@ public partial class EntityListForm : Form
                 return entity.Connections.Any(connection =>
                 {
                     var outputMatches = string.IsNullOrEmpty(outputFilter) ||
-                                        connection.GetStringProperty("m_outputName").Contains(outputFilter,
-                                            StringComparison.OrdinalIgnoreCase);
+                                        FilterExpressionParser.MatchesExpression(outputFilter, outputTerm =>
+                                            connection.GetStringProperty("m_outputName").Contains(outputTerm,
+                                                StringComparison.OrdinalIgnoreCase));
 
                     var targetMatches = string.IsNullOrEmpty(targetFilter) ||
-                                        connection.GetStringProperty("m_targetName").Contains(targetFilter,
-                                            StringComparison.OrdinalIgnoreCase);
+                                        FilterExpressionParser.MatchesExpression(targetFilter, targetTerm =>
+                                            connection.GetStringProperty("m_targetName").Contains(targetTerm,
+                                                StringComparison.OrdinalIgnoreCase));
 
                     var inputMatches = string.IsNullOrEmpty(inputFilter) ||
-                                       connection.GetStringProperty("m_inputName").Contains(inputFilter,
-                                           StringComparison.OrdinalIgnoreCase);
+                                       FilterExpressionParser.MatchesExpression(inputFilter, inputTerm =>
+                                           connection.GetStringProperty("m_inputName").Contains(inputTerm,
+                                               StringComparison.OrdinalIgnoreCase));
 
                     return outputMatches && targetMatches && inputMatches;
                 });
@@ -389,10 +377,8 @@ public partial class EntityListForm : Form
     private void UpdateDataTable(List<EntityLump.Entity> filteredEntities, string keyFilter, string valueFilter,
         bool isExactMatch, string outputFilter, string targetFilter, string inputFilter)
     {
-        // Clear existing data
         _dataTable?.Clear();
 
-        // Bind filtered entities to dataTable
         foreach (var entity in filteredEntities)
         {
             var row = _dataTable?.NewRow();
@@ -404,29 +390,36 @@ public partial class EntityListForm : Form
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
                         {
-                            var keyMatches = isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                            if (!keyMatches)
+                            return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                             {
-                                return false;
-                            }
+                                var keyMatches = isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                            var valueMatches = isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                                if (!keyMatches)
+                                {
+                                    return false;
+                                }
 
-                            return valueMatches;
+                                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                {
+                                    return isExactMatch
+                                        ? p.Value.Value!.ToString()!.Equals(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase)
+                                        : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase);
+                                });
+                            });
                         });
                         row![columnName] = matchedProperty.Key ?? "";
                     }
                     else if (!string.IsNullOrEmpty(keyFilter))
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
-                            isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase));
+                            FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
+                                isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase)));
                         row![columnName] = matchedProperty.Key ?? "";
                     }
                     else
@@ -440,29 +433,37 @@ public partial class EntityListForm : Form
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
                         {
-                            var keyMatches = isExactMatch
-                                ? p.Key.Equals(keyFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Key.Contains(keyFilter, StringComparison.OrdinalIgnoreCase);
-
-                            if (!keyMatches)
+                            return FilterExpressionParser.MatchesExpression(keyFilter, keyTerm =>
                             {
-                                return false;
-                            }
+                                var keyMatches = isExactMatch
+                                    ? p.Key.Equals(keyTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Key.Contains(keyTerm, StringComparison.OrdinalIgnoreCase);
 
-                            var valueMatches = isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase);
+                                if (!keyMatches)
+                                {
+                                    return false;
+                                }
 
-                            return valueMatches;
+                                return FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                {
+                                    return isExactMatch
+                                        ? p.Value.Value!.ToString()!.Equals(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase)
+                                        : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                            StringComparison.OrdinalIgnoreCase);
+                                });
+                            });
                         });
                         row![columnName] = matchedProperty.Value.Value?.ToString() ?? "";
                     }
                     else if (!string.IsNullOrEmpty(valueFilter))
                     {
                         var matchedProperty = entity.Properties.Properties.FirstOrDefault(p =>
-                            isExactMatch
-                                ? p.Value.Value!.ToString()!.Equals(valueFilter, StringComparison.OrdinalIgnoreCase)
-                                : p.Value.Value!.ToString()!.Contains(valueFilter, StringComparison.OrdinalIgnoreCase));
+                            FilterExpressionParser.MatchesExpression(valueFilter, valueTerm =>
+                                isExactMatch
+                                    ? p.Value.Value!.ToString()!.Equals(valueTerm, StringComparison.OrdinalIgnoreCase)
+                                    : p.Value.Value!.ToString()!.Contains(valueTerm,
+                                        StringComparison.OrdinalIgnoreCase)));
                         row![columnName] = matchedProperty.Value.Value?.ToString() ?? "";
                     }
                     else
@@ -512,16 +513,19 @@ public partial class EntityListForm : Form
         return entity.Connections.FirstOrDefault(connection =>
         {
             var outputMatches = string.IsNullOrEmpty(outputFilter) ||
-                                connection.GetStringProperty("m_outputName")
-                                    .Contains(outputFilter, StringComparison.OrdinalIgnoreCase);
+                                FilterExpressionParser.MatchesExpression(outputFilter, outputTerm =>
+                                    connection.GetStringProperty("m_outputName")
+                                        .Contains(outputTerm, StringComparison.OrdinalIgnoreCase));
 
             var targetMatches = string.IsNullOrEmpty(targetFilter) ||
-                                connection.GetStringProperty("m_targetName")
-                                    .Contains(targetFilter, StringComparison.OrdinalIgnoreCase);
+                                FilterExpressionParser.MatchesExpression(targetFilter, targetTerm =>
+                                    connection.GetStringProperty("m_targetName")
+                                        .Contains(targetTerm, StringComparison.OrdinalIgnoreCase));
 
             var inputMatches = string.IsNullOrEmpty(inputFilter) ||
-                               connection.GetStringProperty("m_inputName")
-                                   .Contains(inputFilter, StringComparison.OrdinalIgnoreCase);
+                               FilterExpressionParser.MatchesExpression(inputFilter, inputTerm =>
+                                   connection.GetStringProperty("m_inputName")
+                                       .Contains(inputTerm, StringComparison.OrdinalIgnoreCase));
 
             return outputMatches && targetMatches && inputMatches;
         });
@@ -540,19 +544,16 @@ public partial class EntityListForm : Form
                 return;
             }
 
-
             using var dialog =
-                new PropertySelectionDialog(filteredEntities, _customExportProperties, _useCustomProperties);
+                new PropertySelectionDialog(filteredEntities, _customExportProperties, _entities);
             var dialogResult = dialog.ShowDialog(this);
             if (dialogResult != DialogResult.OK)
             {
                 return;
             }
 
-            var exportType = dialog.SelectedExportType;
-            var includeRelated = dialog.IncludeRelatedEntities;
-            var selectedProperties = dialog.SelectedProperties;
-            var entitiesToExport = includeRelated ? GetEntitiesWithRelated(filteredEntities) : filteredEntities;
+            // Update custom properties for future use
+            _customExportProperties = dialog.SelectedProperties;
 
             using var saveDialog = new SaveFileDialog
             {
@@ -573,35 +574,11 @@ public partial class EntityListForm : Form
             var directory = Path.GetDirectoryName(saveDialog.FileName);
             Settings.Config.SaveDirectory = directory;
 
-            string entitiesJson;
-            switch (exportType)
-            {
-                case PropertySelectionDialog.ExportType.Full:
-                    entitiesJson = MapExtract.SerializeEntities(entitiesToExport);
-                    break;
-                case PropertySelectionDialog.ExportType.Minimal:
-                case PropertySelectionDialog.ExportType.Custom:
-                    _customExportProperties = selectedProperties;
-                    _useCustomProperties = true;
-                    entitiesJson = SerializeEntitiesMinimal(entitiesToExport);
-                    break;
-                default:
-                    entitiesJson = MapExtract.SerializeEntities(entitiesToExport);
-                    break;
-            }
-
-            File.WriteAllText(saveDialog.FileName, entitiesJson);
-
-            var exportTypeText = exportType switch
-            {
-                PropertySelectionDialog.ExportType.Full => "full",
-                PropertySelectionDialog.ExportType.Minimal => "minimal",
-                PropertySelectionDialog.ExportType.Custom => "custom",
-                _ => "unknown"
-            };
+            // Use the JSON already generated by PropertySelectionDialog
+            File.WriteAllText(saveDialog.FileName, dialog.ExportedJson);
 
             MessageBox.Show(
-                $"Successfully exported {entitiesToExport.Count} entities ({exportTypeText}) to {Path.GetFileName(saveDialog.FileName)}",
+                $"Successfully exported {dialog.FinalEntityList.Count} entities to {Path.GetFileName(saveDialog.FileName)}",
                 "Export Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
@@ -642,164 +619,67 @@ public partial class EntityListForm : Form
 
         return FilterEntities(keyFilter, valueFilter, isExactMatch, outputFilter, targetFilter, inputFilter);
     }
+}
 
-
-    private List<EntityLump.Entity> GetEntitiesWithRelated(List<EntityLump.Entity> filteredEntities)
+/// <summary>
+///     Filter expression parser supporting AND/OR/NOT logic
+///     Syntax: comma(,)=OR, plus(+)=AND, exclamation(!)=NOT
+/// </summary>
+public static class FilterExpressionParser
+{
+    public static bool MatchesExpression(string expression, Func<string, bool> valueMatchFunc)
     {
-        if (_entities == null)
+        if (string.IsNullOrWhiteSpace(expression))
         {
-            return filteredEntities;
+            return true;
         }
 
-        var visitedEntities = new HashSet<EntityLump.Entity>();
-        var resultEntities = new List<EntityLump.Entity>();
+        var orParts = expression.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-        foreach (var entity in filteredEntities)
+        foreach (var orPart in orParts)
         {
-            if (!visitedEntities.Contains(entity))
+            if (EvaluateAndExpression(orPart.Trim(), valueMatchFunc))
             {
-                resultEntities.Add(entity);
-                visitedEntities.Add(entity);
+                return true;
             }
         }
 
-        foreach (var entity in filteredEntities)
-        {
-            FindRelatedEntities(entity, _entities, visitedEntities, resultEntities);
-        }
-
-        return resultEntities;
+        return false;
     }
 
-    private static void FindRelatedEntities(EntityLump.Entity rootEntity, List<EntityLump.Entity> allEntities,
-        HashSet<EntityLump.Entity> visitedEntities, List<EntityLump.Entity> resultEntities)
+    private static bool EvaluateAndExpression(string andExpression, Func<string, bool> valueMatchFunc)
     {
-        if (rootEntity.Connections == null)
-        {
-            return;
-        }
+        var andParts = andExpression.Split('+', StringSplitOptions.RemoveEmptyEntries);
 
-        var namedEntities = allEntities
-            .Where(entity => entity.Properties.Properties.TryGetValue("targetname", out var kvValue) &&
-                             kvValue.Value != null)
-            .ToList();
-
-        foreach (var connection in rootEntity.Connections)
+        foreach (var andPart in andParts)
         {
-            if (connection.Properties.TryGetValue("m_targetName", out var targetNameValue) &&
-                targetNameValue.Value != null)
+            var part = andPart.Trim();
+            var shouldMatch = true;
+
+            if (part.StartsWith('!'))
             {
-                var targetName = targetNameValue.Value.ToString();
-
-                foreach (var entity in namedEntities)
-                {
-                    if (entity.Properties.Properties.TryGetValue("targetname", out var entityTargetName) &&
-                        entityTargetName.Value?.ToString() == targetName &&
-                        entity != rootEntity && !visitedEntities.Contains(entity))
-                    {
-                        resultEntities.Add(entity);
-                        visitedEntities.Add(entity);
-
-                        FindRelatedEntities(entity, allEntities, visitedEntities, resultEntities);
-                    }
-                }
-            }
-        }
-
-        if (rootEntity.Properties.Properties.TryGetValue("targetname", out var rootTargetName) &&
-            rootTargetName.Value != null)
-        {
-            var rootName = rootTargetName.Value.ToString();
-
-            foreach (var entity in allEntities)
-            {
-                if (entity.Connections != null && entity != rootEntity && !visitedEntities.Contains(entity))
-                {
-                    var hasConnectionToRoot = entity.Connections.Any(conn =>
-                        conn.Properties.TryGetValue("m_targetName", out var targetValue) &&
-                        targetValue.Value?.ToString() == rootName);
-
-                    if (hasConnectionToRoot)
-                    {
-                        resultEntities.Add(entity);
-                        visitedEntities.Add(entity);
-
-                        FindRelatedEntities(entity, allEntities, visitedEntities, resultEntities);
-                    }
-                }
-            }
-        }
-    }
-
-    private string SerializeEntitiesMinimal(List<EntityLump.Entity> entities, HashSet<string>? customProperties = null)
-    {
-        var essentialProperties = new HashSet<string> { "classname", "targetname" };
-        var essentialConnectionProps = new HashSet<string>
-            { "m_outputName", "m_targetName", "m_inputName", "m_overrideParam", "m_flDelay", "m_nTimesToFire" };
-
-        var filteredEntities = entities.Select(entity =>
-        {
-            var entityDict = new Dictionary<string, object>();
-            var classname = entity.GetProperty<string>("classname") ?? "";
-            var allowedProperties = _useCustomProperties && _customExportProperties.Count > 0
-                ? _customExportProperties
-                : essentialProperties.Union(PropertySelectionDialog.GetAdditionalPropertiesForClassname(classname))
-                    .ToHashSet();
-
-            foreach (var (key, value) in entity.Properties.Properties)
-            {
-                if (allowedProperties.Contains(key) && value.Value != null)
-                {
-                    entityDict[key] = ConvertEntityValue(value.Value);
-                }
+                shouldMatch = false;
+                part = part.Substring(1).Trim();
             }
 
-            if (entity.Connections?.Count > 0)
+            if (string.IsNullOrEmpty(part))
             {
-                var connections = entity.Connections
-                    .Select(conn => FilterConnection(conn, essentialConnectionProps))
-                    .Where(filteredConn => filteredConn.Count > 0)
-                    .Cast<object>()
-                    .ToList();
-
-                if (connections.Count > 0)
-                    entityDict["connections"] = connections;
+                continue;
             }
 
-            return entityDict;
-        }).Where(dict => dict.Count > 0).ToList();
+            var matches = valueMatchFunc(part);
 
-        return JsonSerializer.Serialize(filteredEntities, KVJsonContext.Options);
-    }
-
-    private static object ConvertEntityValue(object value)
-    {
-        return value switch
-        {
-            string str => str,
-            bool boolean => boolean,
-            Vector3 vector => new { vector.X, vector.Y, vector.Z },
-            Vector2 vector => new { vector.X, vector.Y },
-            KVObject { IsArray: true } kvArray => kvArray.Select(p => p.Value).ToArray(),
-            _ when value.GetType().IsPrimitive => value,
-            _ => value.ToString() ?? ""
-        };
-    }
-
-    private static Dictionary<string, object> FilterConnection(KVObject connection, HashSet<string> allowedProps)
-    {
-        var filteredConnection = new Dictionary<string, object>();
-
-        foreach (var (key, kvValue) in connection.Properties)
-        {
-            if (allowedProps.Contains(key) && kvValue.Value != null)
+            if (!shouldMatch)
             {
-                filteredConnection[key] = ConvertEntityValue(kvValue.Value);
+                matches = !matches;
+            }
+
+            if (!matches)
+            {
+                return false;
             }
         }
 
-        return filteredConnection;
+        return true;
     }
-
-
 }
