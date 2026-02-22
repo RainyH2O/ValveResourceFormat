@@ -99,6 +99,8 @@ namespace GUI.Utils
             public int PackageGridView { get; set; }
             /// <summary>Gets or sets the grid thumbnail size index (0-4, mapping to <see cref="GUI.Types.PackageViewer.ThumbnailRenderers.ThumbnailSizes"/> enum).</summary>
             public int PackageGridSize { get; set; }
+            /// <summary>Gets or sets the path to the external editor used to open entity list JSON files. Leave empty to use the system default for .json files.</summary>
+            public string EntityListEditorPath { get; set; } = string.Empty;
             /// <summary>Internal settings file version used to apply migrations when upgrading from older versions. Do not modify manually.</summary>
             public int _VERSION_DO_NOT_MODIFY { get; set; }
             /// <summary>Gets or sets the application update check state.</summary>

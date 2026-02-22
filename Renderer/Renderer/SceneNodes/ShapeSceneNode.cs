@@ -37,6 +37,9 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         /// <summary>Gets the number of indices uploaded to the GPU index buffer.</summary>
         protected int indexCount { get; private set; }
 
+        private int vboHandle;
+        private int iboHandle;
+
         /// <summary>Gets the vertex array state for this shape.</summary>
         protected int vao { get; private set; }
 
@@ -111,10 +114,21 @@ namespace ValveResourceFormat.Renderer.SceneNodes
             indexCount = inds.Count;
 
             var label = GetType().Name;
-            var vboHandle = GraphicsDevice.CreateBuffer<SimpleVertexNormal>(label, CollectionsMarshal.AsSpan(verts), BufferUsage.Static);
-            var iboHandle = GraphicsDevice.CreateBuffer<int>(label, CollectionsMarshal.AsSpan(inds), BufferUsage.Static);
+            vboHandle = GraphicsDevice.CreateBuffer<SimpleVertexNormal>(label, CollectionsMarshal.AsSpan(verts), BufferUsage.Static);
+            iboHandle = GraphicsDevice.CreateBuffer<int>(label, CollectionsMarshal.AsSpan(inds), BufferUsage.Static);
 
             vao = SimpleVertexNormal.InputLayout.CreateVertexArray(nameof(ShapeSceneNode), vboHandle, iboHandle);
+        }
+
+        /// <inheritdoc/>
+        public override void Delete()
+        {
+            VertexArray.Delete(vao);
+            GL.DeleteBuffer(vboHandle);
+            GL.DeleteBuffer(iboHandle);
+            vao = 0;
+            vboHandle = 0;
+            iboHandle = 0;
         }
 
         /// <summary>Appends two triangles forming a quad face from four vertex indices.</summary>

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Controls;
+using GUI.Forms;
 using GUI.Types.Audio;
 using GUI.Types.GLViewers;
 using GUI.Types.Graphs;
@@ -40,6 +41,7 @@ namespace GUI.Types.Viewers
         public GLBaseControl? GLViewer { get; private set; }
         private CodeTextBox? GLViewerError;
         private string? GLViewerTabName;
+        private EntityIOGraphWindow? entityIOGraphWindow;
 
         public static bool IsAccepted(uint magic)
         {
@@ -519,12 +521,14 @@ namespace GUI.Types.Viewers
                 {
                     foreach (var (viewer, tabName) in preparedGraphViewers)
                     {
-                        AddGraphViewerTab(viewer, tabName, resTabs);
+                        var graphTab = AddGraphViewerTab(viewer, tabName, resTabs);
 
                         if (GLViewer is GLWorldViewer worldViewerWithGraph && viewer is EntityIOGraphViewer entityGraphViewer)
                         {
                             worldViewerWithGraph.ShowEntityInGraph = entityGraphViewer.ShowEntity;
                             worldViewerWithGraph.EntityHasGraphNode = entityGraphViewer.HasEntity;
+                            TabWindowMenu.Register(resTabs, graphTab,
+                                () => OpenEntityIOGraphWindow(worldViewerWithGraph));
                         }
                     }
                 }
@@ -536,13 +540,43 @@ namespace GUI.Types.Viewers
             return AddSpecialViewerData(resource, isPreview, resTabs);
         }
 
-        private static void AddGraphViewerTab(GLGraphViewer viewer, string tabName, TabControl resTabs)
+        private static ThemedTabPage AddGraphViewerTab(GLGraphViewer viewer, string tabName, TabControl resTabs)
         {
             viewer.InitializeLoad();
             var tabPage = new ThemedTabPage(tabName);
             tabPage.Controls.Add(viewer.InitializeUiControls(isPreview: false));
             resTabs.TabPages.Add(tabPage);
             viewer.InitializeRenderLoop();
+            return tabPage;
+        }
+
+        private void OpenEntityIOGraphWindow(GLWorldViewer worldViewer)
+        {
+            if (entityIOGraphWindow != null)
+            {
+                entityIOGraphWindow.Activate();
+                return;
+            }
+
+            if (worldViewer.LoadedWorld == null)
+            {
+                return;
+            }
+
+            var window = new EntityIOGraphWindow(vrfGuiContext, worldViewer);
+            window.Closed += OnEntityIOGraphWindowClosed;
+            entityIOGraphWindow = window;
+            window.Show();
+        }
+
+        private void OnEntityIOGraphWindowClosed(object? sender, EventArgs e)
+        {
+            if (sender is EntityIOGraphWindow window)
+            {
+                window.Closed -= OnEntityIOGraphWindowClosed;
+            }
+
+            entityIOGraphWindow = null;
         }
 
         // Runs on the background load thread: graph construction (entity scans, icon decoding,
@@ -570,7 +604,8 @@ namespace GUI.Types.Viewers
 
                 if (hasConnections)
                 {
-                    preparedGraphViewers.Add((new EntityIOGraphViewer(vrfGuiContext, rendererContext, loadedWorld.Entities, glWorldViewer.SelectAndFocusEntities), "ENTITY I/O GRAPH"));
+                    preparedGraphViewers.Add((new EntityIOGraphViewer(vrfGuiContext, rendererContext, loadedWorld.Entities,
+                        glWorldViewer.SelectAndFocusEntities), "ENTITY I/O GRAPH"));
                 }
 
                 PrepareMapPulseGraphViewers(vrfGuiContext, loadedWorld.Entities);
@@ -1082,6 +1117,8 @@ namespace GUI.Types.Viewers
 
         public void Dispose()
         {
+            entityIOGraphWindow?.Dispose();
+            entityIOGraphWindow = null;
             resource?.Dispose();
             rendererContext?.Dispose();
             GLViewer?.Dispose();

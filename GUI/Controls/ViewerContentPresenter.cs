@@ -38,7 +38,7 @@ static class ViewerContentPresenter
         switch (content)
         {
             case ViewerContent.Text text:
-                return CodeTextBox.Create(text.Content, text.Language, text.SourceMap);
+                return SwitchableTextControl.Create(text.Content, text.Language, text.SourceMap);
 
             case ViewerContent.LazyText lazy:
                 {
@@ -54,7 +54,7 @@ static class ViewerContentPresenter
                         contentFailed = true;
                     }
 
-                    return CodeTextBox.Create(producedText, lazy.Language);
+                    return SwitchableTextControl.Create(producedText, lazy.Language);
                 }
 
             case ViewerContent.HexDump hex:

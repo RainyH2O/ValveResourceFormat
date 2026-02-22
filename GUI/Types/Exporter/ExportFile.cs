@@ -8,6 +8,7 @@ using GUI.Types.PackageViewer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
 using ValveResourceFormat.IO;
+using ValveResourceFormat.ResourceTypes;
 using Resource = ValveResourceFormat.Resource;
 
 namespace GUI.Types.Exporter
@@ -253,6 +254,94 @@ namespace GUI.Types.Exporter
             }
 
             return true;
+        }
+
+        public static void ExportEntitiesFromTreeNode(IBetterBaseItem selectedNode, VrfGuiContext vrfGuiContext)
+        {
+            if (selectedNode.PackageEntry == null || vrfGuiContext.CurrentPackage == null)
+            {
+                return;
+            }
+
+            vrfGuiContext.CurrentPackage.ReadEntry(selectedNode.PackageEntry, out var data, validateCrc: false);
+            using var ms = new MemoryStream(data);
+            using var resource = new Resource();
+            resource.Read(ms);
+
+            var entities = FileExtract.ExtractEntities(resource, vrfGuiContext);
+            ExportEntitiesPipeline(entities, selectedNode.PackageEntry.GetFileName());
+        }
+
+        public static void ExportEntitiesFromTabPage(ExportData exportData)
+        {
+            Resource resource;
+            Stream? stream = null;
+
+            try
+            {
+                if (exportData.PackageEntry != null && exportData.VrfGuiContext.CurrentPackage != null)
+                {
+                    exportData.VrfGuiContext.CurrentPackage.ReadEntry(exportData.PackageEntry, out var data, validateCrc: false);
+                    stream = new MemoryStream(data);
+                }
+                else
+                {
+                    stream = File.OpenRead(exportData.VrfGuiContext.FileName);
+                }
+
+                resource = new Resource();
+                resource.Read(stream);
+            }
+            catch
+            {
+                stream?.Dispose();
+                throw;
+            }
+
+            using (resource)
+            using (stream)
+            {
+                var entities = FileExtract.ExtractEntities(resource, exportData.VrfGuiContext);
+                var fileName = exportData.PackageEntry?.GetFileName() ?? Path.GetFileName(exportData.VrfGuiContext.FileName);
+                ExportEntitiesPipeline(entities, fileName);
+            }
+        }
+
+        private static void ExportEntitiesPipeline(List<EntityLump.Entity> entities, string sourceFileName)
+        {
+            if (entities.Count == 0)
+            {
+                _ = AppMessageDialogs.ShowMessageAsync("No entities found in this resource.", "Export Entities");
+                return;
+            }
+
+            // Step 1: Filter by classname
+            using var filterForm = new FilterForm(entities);
+            if (filterForm.ShowDialog() != DialogResult.Continue || filterForm.FilteredEntities.Count == 0)
+            {
+                return;
+            }
+
+            // Step 2: Property selection and export config
+            using var propDialog = new PropertySelectionDialog(filterForm.FilteredEntities, allEntities: entities);
+            if (propDialog.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            // Step 3: Save file
+            var defaultName = Path.GetFileNameWithoutExtension(sourceFileName) + "_entities.json";
+            var savePath = AppFileDialogs.SaveFile("Save Entities", defaultName, "json", "JSON files|*.json");
+            if (savePath == null)
+            {
+                return;
+            }
+
+            File.WriteAllText(savePath, propDialog.ExportedJson);
+
+            _ = AppMessageDialogs.ShowMessageAsync(
+                $"Successfully exported {propDialog.FinalEntityList.Count} entities to {Path.GetFileName(savePath)}",
+                "Export Success");
         }
 
     }

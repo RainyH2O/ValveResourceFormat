@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using ValveKeyValue;
 using ValveResourceFormat.Serialization.KeyValues;
@@ -26,6 +27,34 @@ namespace ValveResourceFormat.ResourceTypes
             /// Gets the parent entity lump that contains this entity.
             /// </summary>
             public required EntityLump ParentLump { get; init; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj)
+            {
+                if (obj is not Entity other)
+                {
+                    return false;
+                }
+
+                if (TryGetValue("hammeruniqueid", out var thisId)
+                    && other.TryGetValue("hammeruniqueid", out var otherId))
+                {
+                    return string.Equals(thisId.ToString(), otherId.ToString(), StringComparison.Ordinal);
+                }
+
+                return ReferenceEquals(this, other);
+            }
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+            {
+                if (TryGetValue("hammeruniqueid", out var id))
+                {
+                    return id.ToString().GetHashCode(StringComparison.Ordinal);
+                }
+
+                return RuntimeHelpers.GetHashCode(this);
+            }
 
             /// <summary>
             /// Gets the target name of the entity.
@@ -122,33 +151,6 @@ namespace ValveResourceFormat.ResourceTypes
 
                 return new Vector4(color, amount);
             }
-
-            /// <summary>
-            /// Finds all connections in the parent lump that target this entity by its targetname.
-            /// </summary>
-            /// <param name="entities">List of world entities to look for connections for, defaults to the current lump.</param>
-            /// <returns>A list of input connections targeting this entity.</returns>
-            public List<Connection> GetInputConnections(List<Entity>? entities)
-            {
-                if (string.IsNullOrEmpty(TargetName))
-                {
-                    return [];
-                }
-
-                var inputConnections = new List<Connection>();
-
-                foreach (var sourceEntity in entities ?? ParentLump.GetEntities())
-                {
-                    if (sourceEntity.Connections == null)
-                    {
-                        continue;
-                    }
-
-                    inputConnections.AddRange(sourceEntity.Connections.Where(connection => EntityNameMatches(connection.TargetName, TargetName)));
-                }
-
-                return inputConnections;
-            }
         }
 
         /// <summary>
@@ -239,9 +241,9 @@ namespace ValveResourceFormat.ResourceTypes
                 entity.Connections = connections.Select((connection) => new Connection
                 {
                     SourceEntity = entity,
-                    TargetName = connection.GetStringProperty("m_targetName"),
                     OutputName = connection.GetStringProperty("m_outputName"),
                     InputName = connection.GetStringProperty("m_inputName"),
+                    TargetName = connection.GetStringProperty("m_targetName"),
                     OverrideParam = connection.GetStringProperty("m_overrideParam"),
                     Delay = connection.GetFloatProperty("m_flDelay"),
                     TimesToFire = connection.GetInt32Property("m_nTimesToFire"),

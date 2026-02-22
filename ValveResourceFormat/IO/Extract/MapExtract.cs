@@ -9,6 +9,7 @@ using ValveResourceFormat.IO.ContentFormats.DmxModel;
 using ValveResourceFormat.IO.ContentFormats.ValveMap;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
+using ValveResourceFormat.Utils;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
 namespace ValveResourceFormat.IO;
@@ -1663,6 +1664,48 @@ public sealed class MapExtract
     }
 
     #endregion Entities
+
+    /// <summary>
+    /// Extracts all entities from this map's entity lumps.
+    /// </summary>
+    public List<Entity> ToEntities()
+    {
+        var allEntities = new List<Entity>();
+
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            if (entityLumpName == null)
+            {
+                continue;
+            }
+
+            using var resource = FileLoader.LoadFileCompiled(entityLumpName);
+            if (resource == null)
+            {
+                continue;
+            }
+
+            var entityLump = resource.DataBlock as EntityLump;
+            if (entityLump == null)
+            {
+                continue;
+            }
+
+            allEntities.AddRange(EntityLumpTraversal
+                .EnumerateEntities(entityLump, FileLoader, Matrix4x4.Identity, includeUnreferencedChildLumps: true)
+                .Select(static traversed => traversed.Entity));
+        }
+
+        return allEntities;
+    }
+
+    /// <summary>
+    /// Serializes entities to JSON.
+    /// </summary>
+    public static string SerializeEntities(List<Entity> entities)
+    {
+        return ValveResourceFormat.Serialization.KeyValues.KVJsonSerializer.SerializeEntities(entities);
+    }
 }
 
 /// <summary>

@@ -23,6 +23,7 @@ namespace GUI
             openWithDefaultAppToolStripMenuItem.Visible = !isRootNode && !isFolderNode;
             openWithoutViewerToolStripMenuItem.Visible = !isRootNode && !isFolderNode;
             viewAssetInfoToolStripMenuItem.Visible = !isRootNode && !isFolderNode;
+            exportEntitiesToolStripMenuItem.Visible = !isRootNode && !isFolderNode;
             toolStripSeparator3.Visible = isRootNode || !isFolderNode;
 
             verifyPackageContentsToolStripMenuItem.Visible = isRootNode;
@@ -595,6 +596,29 @@ namespace GUI
 #if DEBUG
             ValidateShaders();
 #endif
+        }
+
+        private void ExportEntitiesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var (guiContext, selectedNode) = GetSingleSelectedNode(sender);
+            if (guiContext == null || selectedNode == null)
+            {
+                return;
+            }
+
+            ExportFile.ExportEntitiesFromTreeNode(selectedNode, guiContext);
+        }
+
+        private void ExportEntitiesTabToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var tabPage = FetchToolstripTabContext(sender);
+
+            if (tabPage.Tag is not ExportData exportData)
+            {
+                return;
+            }
+
+            ExportFile.ExportEntitiesFromTabPage(exportData);
         }
     }
 }

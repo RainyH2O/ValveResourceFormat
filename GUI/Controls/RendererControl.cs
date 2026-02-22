@@ -175,7 +175,11 @@ partial class RendererControl : UserControl
         return selectionControl.ComboBox;
     }
 
-    public CheckedListBox AddMultiSelection(string name, Action<CheckedListBox>? initializeCallback, Action<IEnumerable<string>> changeCallback)
+    public CheckedListBox AddMultiSelection(
+        string name,
+        Action<CheckedListBox>? initializeCallback,
+        Action<IEnumerable<string>> changeCallback,
+        Predicate<object>? checkAllPredicate = null)
     {
         var selectionControl = new GLViewerMultiSelectionControl(name);
 
@@ -185,8 +189,47 @@ partial class RendererControl : UserControl
 
         SetControlLocation(selectionControl);
 
+        var isBulkUpdating = false;
+
+        selectionControl.CheckedListBox.KeyDown += (_, e) =>
+        {
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                var checkedListBox = selectionControl.CheckedListBox;
+                bool CanCheckItem(int index) => checkAllPredicate?.Invoke(checkedListBox.Items[index]) ?? true;
+
+                var checkItems = Enumerable.Range(0, checkedListBox.Items.Count)
+                    .Any(index => CanCheckItem(index) && !checkedListBox.GetItemChecked(index));
+
+                isBulkUpdating = true;
+                checkedListBox.BeginUpdate();
+                try
+                {
+                    for (var i = 0; i < checkedListBox.Items.Count; i++)
+                    {
+                        var shouldCheck = checkItems && CanCheckItem(i);
+                        checkedListBox.SetItemChecked(i, shouldCheck);
+                    }
+                }
+                finally
+                {
+                    checkedListBox.EndUpdate();
+                    isBulkUpdating = false;
+                }
+
+                changeCallback(checkedListBox.CheckedItems.OfType<string>().ToArray());
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            }
+        };
+
         selectionControl.CheckedListBox.ItemCheck += (_, e) =>
         {
+            if (isBulkUpdating)
+            {
+                return;
+            }
+
             // Manually calculate the new checked items since ItemCheck is called before CheckedItems is updated
             if (selectionControl.CheckedListBox.Items[e.Index] is string changedItem)
             {

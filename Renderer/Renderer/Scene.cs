@@ -203,6 +203,11 @@ namespace ValveResourceFormat.Renderer
 
         private readonly List<SceneNode> staticNodes = [];
         private readonly List<SceneNode> dynamicNodes = [];
+        private readonly HashSet<EntityLump.Entity> hiddenEntities = new(ReferenceEqualityComparer.Instance);
+        private readonly HashSet<SceneNode> hiddenNodes = new(ReferenceEqualityComparer.Instance);
+        private readonly HashSet<EntityLump.Entity> isolatedEntities = new(ReferenceEqualityComparer.Instance);
+        private readonly HashSet<SceneNode> isolatedNodes = new(ReferenceEqualityComparer.Instance);
+        private bool isolateSelection;
 
         private Shader? OutlineShader;
 
@@ -254,6 +259,8 @@ namespace ValveResourceFormat.Renderer
         /// <param name="dynamic">When <see langword="true"/>, the node is placed in <see cref="DynamicOctree"/>; otherwise in <see cref="StaticOctree"/>.</param>
         public void Add(SceneNode node, bool dynamic)
         {
+            node.ViewerHidden = IsViewerHidden(node);
+
             if (dynamic)
             {
                 dynamicNodes.Add(node);
@@ -282,6 +289,122 @@ namespace ValveResourceFormat.Renderer
             {
                 staticNodes.Remove(node);
                 StaticOctree.Dirty = true;
+            }
+        }
+
+        /// <summary>Hides the specified nodes and every node associated with the same map entities.</summary>
+        /// <param name="nodes">Selected nodes to hide.</param>
+        public void HideSelectedNodes(IEnumerable<SceneNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.EntityData is { } entity)
+                {
+                    hiddenEntities.Add(entity);
+                }
+                else
+                {
+                    hiddenNodes.Add(node);
+                }
+            }
+
+            ApplyViewerVisibility();
+        }
+
+        /// <summary>Hides all scene nodes except the specified nodes and nodes associated with the same map entities.</summary>
+        /// <param name="nodes">Selected nodes to keep visible.</param>
+        public void IsolateSelectedNodes(IEnumerable<SceneNode> nodes)
+        {
+            hiddenEntities.Clear();
+            hiddenNodes.Clear();
+            isolatedEntities.Clear();
+            isolatedNodes.Clear();
+            isolateSelection = true;
+
+            var sceneNodes = AllNodes.ToList();
+            var selection = nodes.ToList();
+            var selectedNodes = new HashSet<SceneNode>(
+                selection.Where(node => node.Scene == this),
+                ReferenceEqualityComparer.Instance);
+            var selectedEntities = new HashSet<EntityLump.Entity>(
+                selection.Select(static node => node.EntityData).OfType<EntityLump.Entity>(),
+                ReferenceEqualityComparer.Instance);
+
+            foreach (var node in sceneNodes)
+            {
+                if (node.EntityData is { } nodeEntity && selectedEntities.Contains(nodeEntity))
+                {
+                    selectedNodes.Add(node);
+                }
+            }
+
+            foreach (var node in sceneNodes)
+            {
+                if (!selectedNodes.Contains(node)
+                    && !selectedNodes.Any(selectedNode => IsAncestorOf(selectedNode, node) || IsAncestorOf(node, selectedNode)))
+                {
+                    continue;
+                }
+
+                isolatedNodes.Add(node);
+            }
+
+            isolatedEntities.UnionWith(selectedEntities);
+
+            ApplyViewerVisibility();
+        }
+
+        private static bool IsAncestorOf(SceneNode ancestor, SceneNode node)
+        {
+            var ancestors = new HashSet<SceneNode>(ReferenceEqualityComparer.Instance);
+            for (var parent = GetRenderParent(node); parent != null && ancestors.Add(parent); parent = GetRenderParent(parent))
+            {
+                if (parent == ancestor)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static SceneNode? GetRenderParent(SceneNode node)
+            => node is SceneAggregate.Fragment fragment ? fragment.Parent : node.Parent;
+
+        /// <summary>Clears visibility overrides applied by the viewer.</summary>
+        public void ShowAllNodes()
+        {
+            if (hiddenEntities.Count == 0 && hiddenNodes.Count == 0 && !isolateSelection)
+            {
+                return;
+            }
+
+            hiddenEntities.Clear();
+            hiddenNodes.Clear();
+            isolatedEntities.Clear();
+            isolatedNodes.Clear();
+            isolateSelection = false;
+
+            ApplyViewerVisibility();
+        }
+
+        private bool IsViewerHidden(SceneNode node)
+        {
+            if (node.EntityData is { } entity)
+            {
+                return hiddenEntities.Contains(entity)
+                    || isolateSelection && !isolatedEntities.Contains(entity) && !isolatedNodes.Contains(node);
+            }
+
+            return hiddenNodes.Contains(node)
+                || isolateSelection && !isolatedNodes.Contains(node);
+        }
+
+        private void ApplyViewerVisibility()
+        {
+            foreach (var node in AllNodes)
+            {
+                node.ViewerHidden = IsViewerHidden(node);
             }
         }
 
@@ -426,6 +549,23 @@ namespace ValveResourceFormat.Renderer
             }
 
             return staticNodes.Find(IsMatchingEntity) ?? dynamicNodes.Find(IsMatchingEntity);
+        }
+
+        /// <summary>
+        /// Returns every scene node whose string entity property contains the specified text.
+        /// </summary>
+        public List<SceneNode> FindNodesByKeyValuePartial(string keyToFind, string valueToFind)
+        {
+            bool IsMatchingEntity(SceneNode node)
+            {
+                return node.EntityData?.TryGetValue(keyToFind, out var value) == true
+                    && value.ValueType == ValveKeyValue.KVValueType.String
+                    && ((string)value).Contains(valueToFind, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var results = staticNodes.FindAll(IsMatchingEntity);
+            results.AddRange(dynamicNodes.FindAll(IsMatchingEntity));
+            return results;
         }
 
         /// <summary>
@@ -738,7 +878,7 @@ namespace ValveResourceFormat.Renderer
                                 firstIndex = (uint)(drawMeshletIndex * count);
                             }
 
-                            if (fragment.LayerEnabled == false)
+                            if (!fragment.IsVisibleInViewer)
                             {
                                 count = 0;
                             }
@@ -1862,7 +2002,7 @@ namespace ValveResourceFormat.Renderer
 
                 foreach (var node in staticNodes)
                 {
-                    if (node.LayerEnabled)
+                    if (node.IsVisibleInViewer)
                     {
                         maxBounds = hasBounds ? maxBounds.Union(node.BoundingBox) : node.BoundingBox;
                         hasBounds = true;
@@ -1873,7 +2013,7 @@ namespace ValveResourceFormat.Renderer
 
                 foreach (var node in staticNodes)
                 {
-                    if (node.LayerEnabled)
+                    if (node.IsVisibleInViewer)
                     {
                         StaticOctree.Insert(node);
                     }
@@ -1889,7 +2029,7 @@ namespace ValveResourceFormat.Renderer
 
                 foreach (var node in dynamicNodes)
                 {
-                    if (node.LayerEnabled)
+                    if (node.IsVisibleInViewer)
                     {
                         DynamicOctree.Insert(node);
                     }

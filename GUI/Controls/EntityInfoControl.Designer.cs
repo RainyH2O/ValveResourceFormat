@@ -56,8 +56,10 @@ namespace GUI.Forms
             OutputsParameter = new DataGridViewTextBoxColumn();
             OutputsDelay = new DataGridViewTextBoxColumn();
             OutputsTimesToFire = new DataGridViewTextBoxColumn();
+            OutputsTargetHammerId = new DataGridViewTextBoxColumn();
             tabPageInputs = new TabPage();
             dataGridInputs = new DataGridView();
+            InputsSourceHammerId = new DataGridViewTextBoxColumn();
             InputsSource = new DataGridViewTextBoxColumn();
             InputsOutput = new DataGridViewTextBoxColumn();
             InputsTargetInput = new DataGridViewTextBoxColumn();
@@ -197,7 +199,7 @@ namespace GUI.Forms
             dataGridViewCellStyle6.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
             dataGridViewCellStyle6.WrapMode = DataGridViewTriState.True;
             dataGridOutputs.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle6;
-            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { OutputsOutput, OutputsTargetEntity, OutputsTargetInput, OutputsParameter, OutputsDelay, OutputsTimesToFire });
+            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { OutputsOutput, OutputsTargetEntity, OutputsTargetInput, OutputsParameter, OutputsDelay, OutputsTimesToFire, OutputsTargetHammerId });
             dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle7.BackColor = System.Drawing.Color.FromArgb(236, 236, 236);
             dataGridViewCellStyle7.Font = new System.Drawing.Font("Cascadia Mono", 10F);
@@ -237,7 +239,7 @@ namespace GUI.Forms
             OutputsTargetEntity.HeaderText = "Target Entity";
             OutputsTargetEntity.Name = "OutputsTargetEntity";
             OutputsTargetEntity.ReadOnly = true;
-            // 
+            //
             // OutputsTargetInput
             // 
             OutputsTargetInput.HeaderText = "Target Input";
@@ -261,6 +263,12 @@ namespace GUI.Forms
             OutputsTimesToFire.HeaderText = "Times To Fire";
             OutputsTimesToFire.Name = "OutputsTimesToFire";
             OutputsTimesToFire.ReadOnly = true;
+            //
+            // OutputsTargetHammerId
+            //
+            OutputsTargetHammerId.HeaderText = "Target Hammer ID";
+            OutputsTargetHammerId.Name = "OutputsTargetHammerId";
+            OutputsTargetHammerId.ReadOnly = true;
             // 
             // tabPageInputs
             // 
@@ -290,7 +298,7 @@ namespace GUI.Forms
             dataGridViewCellStyle10.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
             dataGridViewCellStyle10.WrapMode = DataGridViewTriState.True;
             dataGridInputs.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle10;
-            dataGridInputs.Columns.AddRange(new DataGridViewColumn[] { InputsSource, InputsOutput, InputsTargetInput, InputsParameter, InputsDelay, InputsTimeToFire });
+            dataGridInputs.Columns.AddRange(new DataGridViewColumn[] { InputsSourceHammerId, InputsSource, InputsOutput, InputsTargetInput, InputsParameter, InputsDelay, InputsTimeToFire });
             dataGridViewCellStyle11.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle11.BackColor = System.Drawing.Color.FromArgb(236, 236, 236);
             dataGridViewCellStyle11.Font = new System.Drawing.Font("Cascadia Mono", 10F);
@@ -319,8 +327,14 @@ namespace GUI.Forms
             dataGridInputs.Size = new System.Drawing.Size(800, 420);
             dataGridInputs.TabIndex = 1;
             // 
+            // InputsSourceHammerId
+            //
+            InputsSourceHammerId.HeaderText = "Source Hammer ID";
+            InputsSourceHammerId.Name = "InputsSourceHammerId";
+            InputsSourceHammerId.ReadOnly = true;
+            //
             // InputsSource
-            // 
+            //
             InputsSource.HeaderText = "Source";
             InputsSource.Name = "InputsSource";
             InputsSource.ReadOnly = true;
@@ -383,11 +397,13 @@ namespace GUI.Forms
         private DataGridViewTextBoxColumn OutputsParameter;
         private DataGridViewTextBoxColumn OutputsDelay;
         private DataGridViewTextBoxColumn OutputsTimesToFire;
+        private DataGridViewTextBoxColumn OutputsTargetHammerId;
         private ThemedTabControl tabControl;
         private TabPage tabPageInputs;
         private ThemedTabPage tabPageProperties;
         private ThemedTabPage tabPageOutputs;
         private DataGridView dataGridInputs;
+        private DataGridViewTextBoxColumn InputsSourceHammerId;
         private DataGridViewTextBoxColumn InputsSource;
         private DataGridViewTextBoxColumn InputsOutput;
         private DataGridViewTextBoxColumn InputsTargetInput;

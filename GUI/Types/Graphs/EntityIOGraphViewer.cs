@@ -26,7 +26,7 @@ internal class EntityIOGraphViewer : GLGraphViewer
     private readonly List<List<GraphNode>> islands;
     private string? focusedIslandName;
     private readonly Action<IReadOnlyList<EntityLump.Entity>>? showInMap;
-    private readonly Dictionary<GraphNode, List<EntityLump.Entity>> nodeMembers = [];
+    protected readonly Dictionary<GraphNode, List<EntityLump.Entity>> NodeMembers = [];
     private readonly int entityCount;
 
     public EntityIOGraphViewer(VrfGuiContext vrfGuiContext, RendererContext rendererContext, EntityLump entityLump)
@@ -56,12 +56,13 @@ internal class EntityIOGraphViewer : GLGraphViewer
         }
     }
 
-    public EntityIOGraphViewer(VrfGuiContext vrfGuiContext, RendererContext rendererContext, List<EntityLump.Entity> entities, Action<IReadOnlyList<EntityLump.Entity>>? showInMap)
+    public EntityIOGraphViewer(VrfGuiContext vrfGuiContext, RendererContext rendererContext, List<EntityLump.Entity> entities,
+        Action<IReadOnlyList<EntityLump.Entity>>? showInMap)
         : base(vrfGuiContext, rendererContext, new GraphView())
     {
         this.showInMap = showInMap;
         entityCount = entities.Count;
-        EntityIOGraphBuilder.Build(View.Document, entities, nodeMembers,
+        EntityIOGraphBuilder.Build(View.Document, entities, NodeMembers,
             new Progress<string>(message => Log.Debug(nameof(EntityIOGraphViewer), message)));
 
         View.Legend.AddRange(
@@ -256,10 +257,7 @@ internal class EntityIOGraphViewer : GLGraphViewer
             FocusIslandOf(target);
         }
 
-        if (UiControl?.Parent is TabPage tabPage && tabPage.Parent is TabControl tabControl)
-        {
-            tabControl.SelectTab(tabPage);
-        }
+        SelectContainingTabs();
 
         FocusNode(target);
         return true;
@@ -271,7 +269,7 @@ internal class EntityIOGraphViewer : GLGraphViewer
     {
         if (showInMap != null && node.Tag is EntityLump.Entity entity)
         {
-            showInMap(nodeMembers.GetValueOrDefault(node) ?? [entity]);
+            showInMap(NodeMembers.GetValueOrDefault(node) ?? [entity]);
             return;
         }
 
@@ -283,7 +281,7 @@ internal class EntityIOGraphViewer : GLGraphViewer
         if (showInMap != null && node.Tag is EntityLump.Entity entity)
         {
             var item = new ToolStripMenuItem("Show in map viewer");
-            item.Click += (_, _) => showInMap(nodeMembers.GetValueOrDefault(node) ?? [entity]);
+            item.Click += (_, _) => showInMap(NodeMembers.GetValueOrDefault(node) ?? [entity]);
             menu.Items.Add(item);
         }
     }

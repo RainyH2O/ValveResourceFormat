@@ -1,6 +1,9 @@
+using System.ComponentModel;
+using System.Linq;
 using System.Windows.Forms;
 using GUI.Utils;
 using ValveKeyValue;
+using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
@@ -98,6 +101,8 @@ namespace GUI.Forms
         }
         public void PopulateFromEntity(List<Entity> entities, Entity entity)
         {
+            var targetResolver = new EntityIOTargetResolver(entities);
+
             foreach (var child in entity.Children)
             {
                 var resourcePath = ResourcePath(child.Value);
@@ -108,11 +113,11 @@ namespace GUI.Forms
             {
                 foreach (var connection in entity.Connections)
                 {
-                    AddOutputConnection(connection);
+                    AddOutputConnection(connection, targetResolver);
                 }
             }
 
-            foreach (var connection in entity.GetInputConnections(entities))
+            foreach (var connection in targetResolver.GetInputConnections(entity))
             {
                 AddInputConnection(connection);
             }
@@ -138,20 +143,32 @@ namespace GUI.Forms
 
         public void AddOutputConnection(Connection connectionData)
         {
-            dataGridOutputs.Rows.Add([
+            AddOutputConnection(connectionData, targetResolver: null);
+        }
+
+        private void AddOutputConnection(Connection connectionData, EntityIOTargetResolver? targetResolver)
+        {
+            var targetHammerIds = GetTargetHammerIds(connectionData, targetResolver);
+            var rowIndex = dataGridOutputs.Rows.Add([
                 connectionData.OutputName,
                 connectionData.TargetName,
                 connectionData.InputName,
                 connectionData.OverrideParam,
                 connectionData.Delay,
-                GetStringTimesToFire(connectionData.TimesToFire)
+                GetStringTimesToFire(connectionData.TimesToFire),
+                targetHammerIds
             ]);
+            dataGridOutputs.Rows[rowIndex].Tag = connectionData;
         }
 
         public void AddInputConnection(Connection connectionData)
         {
+            var sourceName = connectionData.SourceEntity.TargetName ?? string.Empty;
+            var sourceHammerId = connectionData.SourceEntity.GetStringProperty("hammeruniqueid");
+
             var rowIndex = dataGridInputs.Rows.Add([
-                connectionData.SourceEntity.TargetName ?? "",
+                sourceHammerId,
+                sourceName,
                 connectionData.OutputName,
                 connectionData.InputName,
                 connectionData.OverrideParam,
@@ -159,7 +176,71 @@ namespace GUI.Forms
                 GetStringTimesToFire(connectionData.TimesToFire)
             ]);
 
-            dataGridInputs.Rows[rowIndex].Tag = connectionData.SourceEntity;
+            dataGridInputs.Rows[rowIndex].Tag = connectionData;
+        }
+
+        private static string GetTargetHammerIds(Connection connection, EntityIOTargetResolver? targetResolver)
+        {
+            if (targetResolver == null)
+            {
+                return string.Empty;
+            }
+
+            var targets = new List<Entity>();
+            targetResolver.Resolve(connection, targets);
+
+            return string.Join(",", targets
+                .Select(static target => target.TryGetValue("hammeruniqueid", out var hammerId) ? hammerId.ToString() : string.Empty)
+                .Where(static hammerId => !string.IsNullOrEmpty(hammerId))
+                .Distinct(StringComparer.Ordinal));
+        }
+
+        public void SortConnections()
+        {
+            SortDataGridView(dataGridOutputs, [OutputsTargetHammerId.Name, OutputsDelay.Name]);
+            SortDataGridView(dataGridInputs, [InputsSourceHammerId.Name, InputsDelay.Name]);
+        }
+
+        private static void SortDataGridView(DataGridView grid, string[] columnNames)
+        {
+            if (grid.RowCount <= 1)
+            {
+                return;
+            }
+
+            var comparer = new MultiColumnNumericStringComparer(ListSortDirection.Ascending, columnNames);
+            var rows = grid.Rows.Cast<DataGridViewRow>().Where(static row => !row.IsNewRow).ToList();
+            rows.Sort(comparer.Compare);
+
+            grid.Rows.Clear();
+            foreach (var row in rows)
+            {
+                grid.Rows.Add(row);
+            }
+        }
+
+        public void SelectConnection(DataGridView targetGrid, Connection connection)
+        {
+            var targetTab = targetGrid == dataGridOutputs ? tabPageOutputs : tabPageInputs;
+            if (targetTab.Parent != null)
+            {
+                tabControl.SelectedTab = targetTab;
+            }
+
+            for (var i = 0; i < targetGrid.RowCount; i++)
+            {
+                var row = targetGrid.Rows[i];
+                if (!ReferenceEquals(row.Tag, connection))
+                {
+                    continue;
+                }
+
+                targetGrid.ClearSelection();
+                row.Selected = true;
+                targetGrid.CurrentCell = row.Cells[0];
+                targetGrid.FirstDisplayedScrollingRowIndex = i;
+                return;
+            }
         }
 
         private static string GetStringTimesToFire(int timesToFire)

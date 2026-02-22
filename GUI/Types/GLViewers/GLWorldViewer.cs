@@ -35,17 +35,36 @@ namespace GUI.Types.GLViewers
         private ComboBox? cameraComboBox;
         private SavedCameraPositionsControl? savedCameraPositionsControl;
         private EntityInfoForm? entityInfoForm;
+        private EntityListForm? entityListForm;
+        private CoordinateMarkerForm? coordinateMarkerForm;
+        private CoordinateMarkerSession? coordinateMarkerSession;
+        private string EntityListExportPath = string.Empty;
         private bool ignoreLayersChangeEvents = true;
         private List<Matrix4x4> CameraMatrices = [];
         private WorldNodeLoader? LoadedWorldNode;
         public WorldLoader? LoadedWorld;
         private EntityLump.Entity? entityInfoEntity;
+        private Action<IReadOnlyCollection<EntityLump.Entity>>? selectEntitiesInGraph;
+        private bool selectingEntities;
+        private SelectionHighlightSettings selectionHighlightSettings = SelectionHighlightSettings.Default;
+        private SelectionHighlightSettingsForm? selectionHighlightSettingsForm;
 
         /// <summary>Jump from the entity info popup to the entity's node in the I/O graph tab, when the map has one.</summary>
         public Func<EntityLump.Entity, bool>? ShowEntityInGraph { get; set; }
 
         /// <summary>Whether the I/O graph tab has a node for an entity. Set together with <see cref="ShowEntityInGraph"/>.</summary>
         public Func<EntityLump.Entity, bool>? EntityHasGraphNode { get; set; }
+
+        /// <summary>Synchronizes the map selection into the entity I/O graph, when one is open.</summary>
+        public Action<IReadOnlyCollection<EntityLump.Entity>>? SelectEntitiesInGraph
+        {
+            get => selectEntitiesInGraph;
+            set
+            {
+                selectEntitiesInGraph = value;
+                SynchronizeEntitySelection();
+            }
+        }
 
         public GLWorldViewer(VrfGuiContext vrfGuiContext, RendererContext rendererContext, World world, ResourceExtRefList? externalReferences = null)
             : base(vrfGuiContext, rendererContext)
@@ -63,6 +82,18 @@ namespace GUI.Types.GLViewers
 
         public override void Dispose()
         {
+            if (SelectedNodeRenderer != null)
+            {
+                SelectedNodeRenderer.SelectionChanged -= OnMapSelectionChanged;
+            }
+
+            if (selectionHighlightSettingsForm != null)
+            {
+                selectionHighlightSettingsForm.FormClosed -= OnSelectionHighlightSettingsClosed;
+                selectionHighlightSettingsForm.Dispose();
+                selectionHighlightSettingsForm = null;
+            }
+
             base.Dispose();
 
             worldLayersComboBox?.Dispose();
@@ -70,6 +101,17 @@ namespace GUI.Types.GLViewers
             cameraComboBox?.Dispose();
             savedCameraPositionsControl?.Dispose();
             entityInfoForm?.Dispose();
+            entityListForm?.Dispose();
+            coordinateMarkerForm?.Dispose();
+        }
+
+        public override void PostSceneLoad()
+        {
+            base.PostSceneLoad();
+
+            Debug.Assert(SelectedNodeRenderer != null);
+            ApplySelectionHighlightSettings(selectionHighlightSettings);
+            SelectedNodeRenderer.SelectionChanged += OnMapSelectionChanged;
         }
 
         private void AddSceneExposureSlider()
@@ -97,6 +139,40 @@ namespace GUI.Types.GLViewers
             var sceneExposure = Renderer.Postprocess.CurrentExposure;
             exposureSlider.Slider.Value = sceneExposure / 10;
             UpdateExposureText(sceneExposure);
+        }
+
+        private void ShowSelectionHighlightSettings()
+        {
+            if (selectionHighlightSettingsForm != null)
+            {
+                selectionHighlightSettingsForm.Activate();
+                return;
+            }
+
+            selectionHighlightSettingsForm = new(selectionHighlightSettings, ApplySelectionHighlightSettings);
+            selectionHighlightSettingsForm.FormClosed += OnSelectionHighlightSettingsClosed;
+            selectionHighlightSettingsForm.Show(Program.MainForm);
+        }
+
+        private void OnSelectionHighlightSettingsClosed(object? sender, FormClosedEventArgs e)
+        {
+            if (selectionHighlightSettingsForm != null)
+            {
+                selectionHighlightSettingsForm.FormClosed -= OnSelectionHighlightSettingsClosed;
+                selectionHighlightSettingsForm.Dispose();
+                selectionHighlightSettingsForm = null;
+            }
+        }
+
+        private void ApplySelectionHighlightSettings(SelectionHighlightSettings settings)
+        {
+            selectionHighlightSettings = settings;
+            Renderer.Postprocess.SelectionHighlightSettings = settings;
+
+            if (SelectedNodeRenderer != null)
+            {
+                SelectedNodeRenderer.HighlightSettings = settings;
+            }
         }
 
         private void OnGetOrSetPositionFromClipboardRequest(object? sender, bool isSetRequest)
@@ -387,6 +463,22 @@ namespace GUI.Types.GLViewers
             {
                 AddRenderModeSelectionControl();
                 AddWireframeToggleControl();
+
+                var selectionHighlightButton = new ThemedButton
+                {
+                    Text = "Selection display...",
+                    AutoSize = true,
+                };
+                selectionHighlightButton.Click += (_, _) => ShowSelectionHighlightSettings();
+                UiControl.AddControl(selectionHighlightButton);
+
+                var coordinateMarkersButton = new ThemedButton
+                {
+                    Text = "Coordinate markers...",
+                    AutoSize = true,
+                };
+                coordinateMarkersButton.Click += (_, _) => ShowCoordinateMarkerForm();
+                UiControl.AddControl(coordinateMarkersButton);
             }
 
             worldLayersComboBox = UiControl.AddMultiSelection("World Layers", null, (worldLayers) =>
@@ -398,15 +490,21 @@ namespace GUI.Types.GLViewers
 
                 SetEnabledLayers([.. worldLayers]);
             });
-            physicsGroupsComboBox = UiControl.AddMultiSelection("Physics Groups", null, (physicsGroups) =>
-            {
-                if (ignoreLayersChangeEvents)
+            physicsGroupsComboBox = UiControl.AddMultiSelection(
+                "Physics Groups",
+                null,
+                (physicsGroups) =>
                 {
-                    return;
-                }
+                    if (ignoreLayersChangeEvents)
+                    {
+                        return;
+                    }
 
-                SetEnabledPhysicsGroups([.. physicsGroups]);
-            });
+                    SetEnabledPhysicsGroups([.. physicsGroups]);
+                },
+                item => item is not string value
+                    || value != PhysicsRenderAsOpaque
+                        && !Scene.AllNodes.OfType<PhysSceneNode>().Any(node => node.IsDefaultGroup && node.PhysGroupName == value));
 
             using (UiControl.BeginGroup("Camera"))
             {
@@ -653,17 +751,9 @@ namespace GUI.Types.GLViewers
 
         public void SelectAndFocusEntity(EntityLump.Entity entity)
         {
-            if (UiControl != null && UiControl.Parent is TabPage tabPage && tabPage.Parent is TabControl tabControl)
-            {
-                tabControl.SelectTab(tabPage);
-            }
+            SelectContainingTabs();
 
-            var node = Scene.Find(entity);
-
-            if (node == null && SkyboxScene != null)
-            {
-                node = SkyboxScene.Find(entity);
-            }
+            var node = FindEntityNode(entity);
 
             if (node == null)
             {
@@ -671,11 +761,15 @@ namespace GUI.Types.GLViewers
                 // scene node; fly to the entity origin instead.
                 var origin = entity.GetVector3Property("origin");
                 FocusCameraOnBounds(new AABB(origin - new Vector3(32f), origin + new Vector3(32f)));
+                ActivateRenderLoopAfterLayout();
                 return;
             }
 
             SelectAndFocusNode(node);
         }
+
+        private SceneNode? FindEntityNode(EntityLump.Entity entity)
+            => Scene.Find(entity) ?? SkyboxScene?.Find(entity);
 
         public void SelectAndFocusEntities(IReadOnlyList<EntityLump.Entity> entities)
         {
@@ -685,10 +779,7 @@ namespace GUI.Types.GLViewers
                 return;
             }
 
-            if (UiControl != null && UiControl.Parent is TabPage tabPage && tabPage.Parent is TabControl tabControl)
-            {
-                tabControl.SelectTab(tabPage);
-            }
+            SelectContainingTabs();
 
             Debug.Assert(SelectedNodeRenderer != null);
 
@@ -696,40 +787,51 @@ namespace GUI.Types.GLViewers
             var bounds = default(AABB);
             var selectedAny = false;
 
-            foreach (var entity in entities)
+            selectingEntities = true;
+            try
             {
-                var node = Scene.Find(entity) ?? SkyboxScene?.Find(entity);
-
-                AABB entityBounds;
-
-                if (node != null)
+                foreach (var entity in entities)
                 {
-                    if (selectedAny)
+                    var node = Scene.Find(entity) ?? SkyboxScene?.Find(entity);
+
+                    AABB entityBounds;
+
+                    if (node != null)
                     {
-                        SelectedNodeRenderer.ToggleNode(node);
+                        if (selectedAny)
+                        {
+                            SelectedNodeRenderer.ToggleNode(node);
+                        }
+                        else
+                        {
+                            SelectedNodeRenderer.SelectNode(node, forceDisableDepth: true);
+                            selectedAny = true;
+                        }
+
+                        EnsureNodeVisible(node);
+                        entityBounds = SelectionBounds(node);
                     }
                     else
                     {
-                        SelectedNodeRenderer.SelectNode(node, forceDisableDepth: true);
-                        selectedAny = true;
+                        var origin = entity.GetVector3Property("origin");
+                        entityBounds = new AABB(origin - new Vector3(32f), origin + new Vector3(32f));
                     }
 
-                    EnsureNodeVisible(node);
-                    entityBounds = SelectionBounds(node);
+                    bounds = hasBounds ? bounds.Union(entityBounds) : entityBounds;
+                    hasBounds = true;
                 }
-                else
-                {
-                    var origin = entity.GetVector3Property("origin");
-                    entityBounds = new AABB(origin - new Vector3(32f), origin + new Vector3(32f));
-                }
-
-                bounds = hasBounds ? bounds.Union(entityBounds) : entityBounds;
-                hasBounds = true;
             }
+            finally
+            {
+                selectingEntities = false;
+            }
+
+            SynchronizeEntitySelection(synchronizeGraph: false);
 
             if (hasBounds)
             {
                 FocusCameraOnBounds(bounds);
+                ActivateRenderLoopAfterLayout();
             }
         }
 
@@ -742,6 +844,7 @@ namespace GUI.Types.GLViewers
             SelectedNodeRenderer.SelectNode(node, forceDisableDepth: true);
             FocusCameraOnBounds(SelectionBounds(node));
             EnsureNodeVisible(node);
+            ActivateRenderLoopAfterLayout();
         }
 
         private static AABB SelectionBounds(SceneNode node)
@@ -808,20 +911,7 @@ namespace GUI.Types.GLViewers
             var isEntity = sceneNode.EntityData != null;
             entityInfoEntity = sceneNode.EntityData;
 
-            if (entityInfoForm == null)
-            {
-                entityInfoForm = new EntityInfoForm(GuiContext);
-
-                if (ShowEntityInGraph != null)
-                {
-                    entityInfoForm.AddShowInGraphButton(OnShowInGraphButtonClick);
-                }
-
-                entityInfoForm.Show();
-                entityInfoForm.EntityInfoControl.OutputsGrid.CellDoubleClick += OnEntityInfoOutputsCellDoubleClick;
-                entityInfoForm.EntityInfoControl.InputsGrid.CellDoubleClick += OnEntityInfoInputsCellDoubleClick;
-                entityInfoForm.EntityInfoControl.Disposed += OnEntityInfoFormDisposed;
-            }
+            EnsureEntityInfoForm();
 
             Debug.Assert(entityInfoForm != null);
 
@@ -836,7 +926,7 @@ namespace GUI.Types.GLViewers
 
             if (isEntity)
             {
-                ShowEntityProperties(sceneNode);
+                ShowEntityProperties(sceneNode.EntityData!);
             }
             else
             {
@@ -916,6 +1006,25 @@ namespace GUI.Types.GLViewers
             entityInfoForm.EntityInfoControl.Show();
         }
 
+        private void EnsureEntityInfoForm()
+        {
+            if (entityInfoForm == null)
+            {
+                entityInfoForm = new EntityInfoForm(GuiContext);
+                entityInfoForm.ShowInTaskbar = false;
+
+                if (ShowEntityInGraph != null)
+                {
+                    entityInfoForm.AddShowInGraphButton(OnShowInGraphButtonClick);
+                }
+
+                entityInfoForm.Show(Program.MainForm);
+                entityInfoForm.EntityInfoControl.OutputsGrid.CellDoubleClick += OnEntityInfoOutputsCellDoubleClick;
+                entityInfoForm.EntityInfoControl.InputsGrid.CellDoubleClick += OnEntityInfoInputsCellDoubleClick;
+                entityInfoForm.EntityInfoControl.Disposed += OnEntityInfoFormDisposed;
+            }
+        }
+
         private void OnEntityInfoOutputsCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (entityInfoForm == null)
@@ -923,32 +1032,47 @@ namespace GUI.Types.GLViewers
                 return;
             }
 
-            if (e.ColumnIndex != 1)
+            if (e.RowIndex < 0 || entityInfoForm.EntityInfoControl.OutputsGrid.Rows[e.RowIndex].Tag is not EntityLump.Connection connection)
             {
                 return;
             }
 
-            var entityName = (string)(entityInfoForm.EntityInfoControl.OutputsGrid[e.ColumnIndex, e.RowIndex].Value ?? string.Empty);
-
-            if (string.IsNullOrEmpty(entityName))
+            var nodes = ResolveOutputTargets(connection);
+            if (nodes.Count == 0)
             {
                 return;
             }
 
-            var node = Scene.FindNodeByTargetName(entityName);
-
-            if (node == null && SkyboxScene != null)
+            if (nodes.Count > 1)
             {
-                node = SkyboxScene.FindNodeByTargetName(entityName);
-            }
-
-            if (node == null)
-            {
+                ShowEntitySelectionDialog(nodes, connection.TargetName, _ => SelectEntityInfoConnection(entityInfoForm.EntityInfoControl.InputsGrid, connection));
                 return;
             }
 
-            SelectAndFocusNode(node);
-            ShowSceneNodeDetails(node);
+            SelectAndFocusNode(nodes[0]);
+            ShowSceneNodeDetails(nodes[0]);
+            SelectEntityInfoConnection(entityInfoForm.EntityInfoControl.InputsGrid, connection);
+        }
+
+        private List<SceneNode> ResolveOutputTargets(EntityLump.Connection connection)
+        {
+            if (LoadedWorld == null)
+            {
+                var node = Scene.FindNodeByTargetName(connection.TargetName)
+                    ?? SkyboxScene?.FindNodeByTargetName(connection.TargetName);
+                return node == null ? [] : [node];
+            }
+
+            var entities = new List<EntityLump.Entity>();
+            var resolver = new EntityIOTargetResolver(LoadedWorld.Entities);
+            resolver.Resolve(connection, entities);
+
+            return entities
+                .Select(FindEntityNode)
+                .Where(static node => node != null)
+                .Cast<SceneNode>()
+                .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+                .ToList();
         }
 
         private void OnEntityInfoInputsCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -958,15 +1082,17 @@ namespace GUI.Types.GLViewers
                 return;
             }
 
-            if (e.ColumnIndex != 0 || e.RowIndex < 0)
+            if (e.RowIndex < 0)
             {
                 return;
             }
 
-            if (entityInfoForm.EntityInfoControl.InputsGrid.Rows[e.RowIndex].Tag is not EntityLump.Entity sourceEntity)
+            if (entityInfoForm.EntityInfoControl.InputsGrid.Rows[e.RowIndex].Tag is not EntityLump.Connection connection)
             {
                 return;
             }
+
+            var sourceEntity = connection.SourceEntity;
 
             var node = Scene.Find(sourceEntity);
 
@@ -982,6 +1108,12 @@ namespace GUI.Types.GLViewers
 
             SelectAndFocusNode(node);
             ShowSceneNodeDetails(node);
+            SelectEntityInfoConnection(entityInfoForm.EntityInfoControl.OutputsGrid, connection);
+        }
+
+        private void SelectEntityInfoConnection(DataGridView targetGrid, EntityLump.Connection connection)
+        {
+            entityInfoForm?.EntityInfoControl.SelectConnection(targetGrid, connection);
         }
 
         private void OnShowInGraphButtonClick(object? sender, EventArgs e)
@@ -1152,25 +1284,482 @@ namespace GUI.Types.GLViewers
             });
         }
 
-        private void ShowEntityProperties(SceneNode sceneNode)
+        private void ShowEntityDetails(EntityLump.Entity entity)
+        {
+            entityInfoEntity = entity;
+            EnsureEntityInfoForm();
+
+            Debug.Assert(entityInfoForm != null);
+
+            if (entityInfoForm.ShowInGraphButton != null)
+            {
+                entityInfoForm.ShowInGraphButton.Visible = EntityHasGraphNode?.Invoke(entity) ?? false;
+            }
+
+            entityInfoForm.EntityInfoControl.Clear();
+            ShowEntityProperties(entity);
+            entityInfoForm.EntityInfoControl.ShowPopulatedTabs();
+            entityInfoForm.EntityInfoControl.Show();
+        }
+
+        private void ShowEntityProperties(EntityLump.Entity entity)
         {
             Debug.Assert(entityInfoForm != null);
-            Debug.Assert(sceneNode.EntityData != null);
 
             if (LoadedWorld is null)
             {
-                entityInfoForm.EntityInfoControl.PopulateFromEntity(sceneNode.EntityData);
+                entityInfoForm.EntityInfoControl.PopulateFromEntity(entity);
             }
             else
             {
-                entityInfoForm.EntityInfoControl.PopulateFromEntity(LoadedWorld.Entities, sceneNode.EntityData);
+                entityInfoForm.EntityInfoControl.PopulateFromEntity(LoadedWorld.Entities, entity);
             }
 
-            var classname = sceneNode.EntityData.GetStringProperty("classname");
-            var targetName = sceneNode.EntityData.FriendlyTargetName;
+            entityInfoForm.EntityInfoControl.SortConnections();
+
+            var classname = entity.GetStringProperty("classname");
+            var targetName = entity.FriendlyTargetName;
             entityInfoForm.Text = string.IsNullOrEmpty(targetName)
                 ? $"Entity: {classname}"
                 : $"Entity: {classname} ({targetName})";
+        }
+
+        protected override void OnKeyDown(Keys keyData)
+        {
+            if (keyData == Keys.H)
+            {
+                HideSelectedEntities();
+                return;
+            }
+
+            if (keyData == (Keys.Control | Keys.H))
+            {
+                IsolateSelectedEntities();
+                return;
+            }
+
+            if (keyData == Keys.U)
+            {
+                ShowAllEntities();
+                return;
+            }
+
+            if (keyData == (Keys.Control | Keys.G))
+            {
+                Program.MainForm.Invoke(ShowGoToDialog);
+                return;
+            }
+
+            if (keyData == (Keys.Control | Keys.Alt | Keys.R))
+            {
+                Program.MainForm.Invoke(ShowEntityListForm);
+                return;
+            }
+
+            if (keyData == (Keys.Alt | Keys.Return) && SelectedNodeRenderer?.SelectedNode is { } selectedNode)
+            {
+                Program.MainForm.Invoke(() => ShowSceneNodeDetails(selectedNode));
+                return;
+            }
+
+            base.OnKeyDown(keyData);
+        }
+
+        private void HideSelectedEntities()
+        {
+            if (SelectedNodeRenderer?.SelectedNodes is not { Count: > 0 } selectedNodes)
+            {
+                return;
+            }
+
+            Scene.HideSelectedNodes(selectedNodes);
+            SkyboxScene?.HideSelectedNodes(selectedNodes);
+            SelectedNodeRenderer.SelectNode(null);
+        }
+
+        private void IsolateSelectedEntities()
+        {
+            var selectedNodes = SelectedNodeRenderer?.SelectedNodes ?? [];
+            Scene.IsolateSelectedNodes(selectedNodes);
+            SkyboxScene?.IsolateSelectedNodes(selectedNodes);
+        }
+
+        private void ShowAllEntities()
+        {
+            Scene.ShowAllNodes();
+            SkyboxScene?.ShowAllNodes();
+        }
+
+        private void ShowGoToDialog()
+        {
+            using var dialog = new GoToForm();
+            if (dialog.ShowDialog() != DialogResult.OK || string.IsNullOrEmpty(dialog.InputText))
+            {
+                return;
+            }
+
+            switch (dialog.SelectedGoToType)
+            {
+                case GoToType.EntityName:
+                    GoToEntityByName(dialog.InputText);
+                    break;
+                case GoToType.Coordinate:
+                    GoToCoordinate(dialog.InputText);
+                    break;
+                case GoToType.HammerId:
+                    GoToEntityByHammerId(dialog.InputText);
+                    break;
+            }
+        }
+
+        private void GoToEntityByName(string name)
+        {
+            var node = Scene.FindNodeByTargetName(name) ?? SkyboxScene?.FindNodeByTargetName(name);
+
+            if (node == null)
+            {
+                var matches = Scene.FindNodesByKeyValuePartial("targetname", name);
+                if (SkyboxScene != null)
+                {
+                    matches.AddRange(SkyboxScene.FindNodesByKeyValuePartial("targetname", name));
+                }
+
+                if (matches.Count == 1)
+                {
+                    node = matches[0];
+                }
+                else if (matches.Count > 1)
+                {
+                    ShowEntitySelectionDialog(matches, name);
+                    return;
+                }
+            }
+
+            if (node == null)
+            {
+                _ = AppMessageDialogs.ShowMessageAsync($"No entity found with name containing '{name}'.", "Not Found");
+                return;
+            }
+
+            SelectAndFocusNode(node);
+            ShowSceneNodeDetails(node);
+        }
+
+        private void ShowEntitySelectionDialog(List<SceneNode> matches, string searchTerm, Action<SceneNode>? onSelected = null)
+        {
+            using var selectionForm = new ThemedForm
+            {
+                Text = $"Select Entity — {matches.Count} matches for \"{searchTerm}\"",
+                Size = new System.Drawing.Size(400, 300),
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+            };
+
+            var listBox = new ListBox { Dock = DockStyle.Fill };
+            var items = matches.Select(node => new
+            {
+                Text = $"{node.EntityData?.GetStringProperty("targetname", "Unknown")} ({node.EntityData?.GetStringProperty("classname", "Unknown")})",
+                Node = node,
+            }).ToList();
+            listBox.DisplayMember = "Text";
+            listBox.DataSource = items;
+
+            var buttonPanel = new Panel { Height = 40, Dock = DockStyle.Bottom };
+            var okButton = new ThemedButton { Text = "OK", DialogResult = DialogResult.OK, Location = new System.Drawing.Point(10, 8), Size = new System.Drawing.Size(80, 25) };
+            var cancelButton = new ThemedButton { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new System.Drawing.Point(100, 8), Size = new System.Drawing.Size(80, 25) };
+            buttonPanel.Controls.Add(okButton);
+            buttonPanel.Controls.Add(cancelButton);
+            selectionForm.Controls.Add(listBox);
+            selectionForm.Controls.Add(buttonPanel);
+            selectionForm.AcceptButton = okButton;
+            selectionForm.CancelButton = cancelButton;
+            listBox.DoubleClick += (_, _) => selectionForm.DialogResult = DialogResult.OK;
+
+            if (selectionForm.ShowDialog() == DialogResult.OK && listBox.SelectedIndex >= 0)
+            {
+                var selectedNode = items[listBox.SelectedIndex].Node;
+                SelectAndFocusNode(selectedNode);
+                ShowSceneNodeDetails(selectedNode);
+                onSelected?.Invoke(selectedNode);
+            }
+        }
+
+        private void GoToCoordinate(string input)
+        {
+            var match = Regexes.Coord().Match(input);
+            if (!match.Success)
+            {
+                _ = AppMessageDialogs.ShowMessageAsync("Invalid coordinate format. Use: X Y Z", "Invalid Input", MessageIcon.Warning);
+                return;
+            }
+
+            var position = new Vector3(
+                float.Parse(match.Groups["x"].Value, CultureInfo.InvariantCulture),
+                float.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture),
+                float.Parse(match.Groups["z"].Value, CultureInfo.InvariantCulture));
+            Input.SaveCameraForTransition();
+            Input.Camera.SetLocation(position);
+        }
+
+        private void GoToEntityByHammerId(string hammerId)
+        {
+            var node = Scene.FindNodeByKeyValue("hammeruniqueid", hammerId) ?? SkyboxScene?.FindNodeByKeyValue("hammeruniqueid", hammerId);
+            if (node == null)
+            {
+                _ = AppMessageDialogs.ShowMessageAsync($"No entity found with hammeruniqueid '{hammerId}'.", "Not Found");
+                return;
+            }
+
+            SelectAndFocusNode(node);
+            ShowSceneNodeDetails(node);
+        }
+
+        private void ShowCoordinateMarkerForm()
+        {
+            if (LoadedWorld == null)
+            {
+                return;
+            }
+
+            coordinateMarkerSession ??= new CoordinateMarkerSession(
+                Scene,
+                LoadedWorld.Entities.FirstOrDefault()?.ParentLump
+                    ?? new EntityLump { Resource = new ValveResourceFormat.Resource() });
+
+            if (coordinateMarkerForm == null || coordinateMarkerForm.IsDisposed)
+            {
+                coordinateMarkerForm = new CoordinateMarkerForm(
+                    coordinateMarkerSession,
+                    AddCoordinateMarkers,
+                    RenameCoordinateMarker,
+                    RemoveCoordinateMarkers,
+                    ClearCoordinateMarkers);
+                coordinateMarkerForm.ShowInTaskbar = false;
+                coordinateMarkerForm.FormClosed += OnCoordinateMarkerFormClosed;
+                coordinateMarkerForm.Show(Program.MainForm);
+            }
+            else
+            {
+                coordinateMarkerForm.Activate();
+            }
+        }
+
+        private string? AddCoordinateMarkers(string name, string coordinatesText)
+        {
+            Debug.Assert(coordinateMarkerSession != null);
+
+            if (!CoordinateMarkerSession.TryParseCoordinates(coordinatesText, out var coordinates, out var error))
+            {
+                return error;
+            }
+
+            using (MakeCurrent())
+            {
+                coordinateMarkerSession.Add(name, coordinates);
+            }
+
+            RefreshCoordinateMarkerConsumers();
+            return null;
+        }
+
+        private void RenameCoordinateMarker(CoordinateMarkerSession.Marker marker, string name)
+        {
+            Debug.Assert(coordinateMarkerSession != null);
+            using (MakeCurrent())
+            {
+                coordinateMarkerSession.Rename(marker, name);
+            }
+
+            RefreshCoordinateMarkerConsumers();
+        }
+
+        private void RemoveCoordinateMarkers(IReadOnlyCollection<CoordinateMarkerSession.Marker> markers)
+        {
+            Debug.Assert(coordinateMarkerSession != null);
+            Debug.Assert(SelectedNodeRenderer != null);
+
+            using (MakeCurrent())
+            {
+                var removedNodes = markers.Select(static marker => marker.Node).ToHashSet();
+                var remainingSelection = SelectedNodeRenderer.SelectedNodes.Where(node => !removedNodes.Contains(node)).ToList();
+                if (remainingSelection.Count != SelectedNodeRenderer.SelectedNodes.Count)
+                {
+                    SelectedNodeRenderer.SelectNode(remainingSelection.FirstOrDefault(), forceDisableDepth: true);
+                    foreach (var node in remainingSelection.Skip(1))
+                    {
+                        SelectedNodeRenderer.ToggleNode(node);
+                    }
+                }
+
+                coordinateMarkerSession.Remove(markers);
+            }
+
+            RefreshCoordinateMarkerConsumers();
+        }
+
+        private void ClearCoordinateMarkers()
+        {
+            Debug.Assert(coordinateMarkerSession != null);
+            RemoveCoordinateMarkers([.. coordinateMarkerSession.Markers]);
+        }
+
+        private void RefreshCoordinateMarkerConsumers()
+        {
+            if (LoadedWorld != null && coordinateMarkerSession != null)
+            {
+                entityListForm?.SetEntities(coordinateMarkerSession.CombineWith(LoadedWorld.Entities));
+            }
+
+            ActivateRenderLoop();
+        }
+
+        private void OnCoordinateMarkerFormClosed(object? sender, FormClosedEventArgs e)
+        {
+            if (coordinateMarkerForm == null)
+            {
+                return;
+            }
+
+            coordinateMarkerForm.FormClosed -= OnCoordinateMarkerFormClosed;
+            coordinateMarkerForm.Dispose();
+            coordinateMarkerForm = null;
+        }
+
+        private void ShowEntityListForm()
+        {
+            if (LoadedWorld == null)
+            {
+                return;
+            }
+
+            if (entityListForm == null || entityListForm.IsDisposed)
+            {
+                var mapName = Path.GetFileNameWithoutExtension(GuiContext.FileName);
+                var defaultExportFileName = string.IsNullOrEmpty(mapName) ? "entities.json" : $"{mapName}_entities.json";
+                var entities = coordinateMarkerSession?.CombineWith(LoadedWorld.Entities) ?? LoadedWorld.Entities;
+                entityListForm = new EntityListForm(
+                    entities,
+                    defaultExportFileName,
+                    EntityListExportPath,
+                    entity => coordinateMarkerSession?.Contains(entity) != true);
+                entityListForm.ShowInTaskbar = false;
+                entityListForm.OnEntitySelectionChanged += OnEntityListSelectionChanged;
+                entityListForm.OnEntityDoubleClicked += OnEntityListDoubleClicked;
+                entityListForm.OnEntityInfoRequested += OnEntityListInfoRequested;
+                entityListForm.OnMapSelectionSyncRequested += OnEntityListMapSelectionSyncRequested;
+                entityListForm.FormClosed += (sender, _) =>
+                {
+                    entityListForm.OnMapSelectionSyncRequested -= OnEntityListMapSelectionSyncRequested;
+                    EntityListExportPath = ((EntityListForm)sender!).ExportPath;
+                    entityListForm = null;
+                };
+                entityListForm.Show(Program.MainForm);
+                SynchronizeEntitySelection();
+            }
+            else
+            {
+                entityListForm.Activate();
+            }
+        }
+
+        private void OnEntityListSelectionChanged(object? sender, IReadOnlyList<EntityLump.Entity> entities)
+        {
+            SelectEntities(entities, synchronizeList: false, synchronizeGraph: true);
+
+            if (entities.Count == 1 && SelectedNodeRenderer?.SelectedNodes is [var selectedNode] && entityInfoForm != null)
+            {
+                ShowSceneNodeDetails(selectedNode);
+            }
+        }
+
+        private void OnEntityListMapSelectionSyncRequested(object? sender, EventArgs e)
+            => SynchronizeEntitySelection();
+
+        public void SelectEntities(IReadOnlyList<EntityLump.Entity> entities)
+            => SelectEntities(entities, synchronizeList: true, synchronizeGraph: true);
+
+        public void SelectEntitiesFromGraph(IReadOnlyList<EntityLump.Entity> entities)
+            => SelectEntities(entities, synchronizeList: true, synchronizeGraph: false);
+
+        private void SelectEntities(IReadOnlyList<EntityLump.Entity> entities, bool synchronizeList, bool synchronizeGraph)
+        {
+            if (SelectedNodeRenderer == null)
+            {
+                return;
+            }
+
+            var nodes = entities
+                .Select(FindEntityNode)
+                .OfType<SceneNode>()
+                .Distinct()
+                .ToList();
+
+            selectingEntities = true;
+            try
+            {
+                SelectedNodeRenderer.SelectNode(nodes.FirstOrDefault(), forceDisableDepth: true);
+                foreach (var node in nodes.Skip(1))
+                {
+                    SelectedNodeRenderer.ToggleNode(node);
+                }
+            }
+            finally
+            {
+                selectingEntities = false;
+            }
+
+            SynchronizeEntitySelection(synchronizeList, synchronizeGraph);
+        }
+
+        private void OnMapSelectionChanged(object? sender, EventArgs e)
+        {
+            if (!selectingEntities)
+            {
+                SynchronizeEntitySelection();
+            }
+        }
+
+        private void SynchronizeEntitySelection(bool synchronizeList = true, bool synchronizeGraph = true)
+        {
+            var entities = SelectedNodeRenderer?.SelectedNodes
+                .Select(static node => node.EntityData)
+                .OfType<EntityLump.Entity>()
+                .Distinct()
+                .ToList() ?? [];
+
+            if (Program.MainForm.InvokeRequired)
+            {
+                Program.MainForm.BeginInvoke(() => SynchronizeEntitySelection(entities, synchronizeList, synchronizeGraph));
+                return;
+            }
+
+            SynchronizeEntitySelection(entities, synchronizeList, synchronizeGraph);
+        }
+
+        private void SynchronizeEntitySelection(IReadOnlyCollection<EntityLump.Entity> entities, bool synchronizeList, bool synchronizeGraph)
+        {
+            if (synchronizeList)
+            {
+                entityListForm?.SelectEntities(entities);
+            }
+
+            if (synchronizeGraph)
+            {
+                selectEntitiesInGraph?.Invoke(entities);
+            }
+        }
+
+        private void OnEntityListDoubleClicked(object? sender, EntityLump.Entity entity)
+        {
+            SelectAndFocusEntity(entity);
+            GLControl?.Focus();
+        }
+
+        private void OnEntityListInfoRequested(object? sender, EntityLump.Entity entity)
+        {
+            ShowEntityDetails(entity);
+            entityListForm?.Activate();
         }
 
         private void SetAvailableLayers(IEnumerable<string> worldLayers)
