@@ -215,6 +215,40 @@ namespace ValveResourceFormat.Renderer
             return staticNodes.Find(IsMatchingEntity) ?? dynamicNodes.Find(IsMatchingEntity);
         }
 
+        public List<SceneNode> FindNodesByKeyValuePartial(string keyToFind, string valueToFind)
+        {
+            bool IsMatchingEntity(SceneNode node)
+            {
+                if (node.EntityData == null)
+                {
+                    return false;
+                }
+
+                return node.EntityData.Properties.Properties.TryGetValue(keyToFind, out var value)
+                    && value.Value is string outString
+                    && outString.Contains(valueToFind, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var results = new List<SceneNode>();
+            results.AddRange(staticNodes.FindAll(IsMatchingEntity));
+            results.AddRange(dynamicNodes.FindAll(IsMatchingEntity));
+            return results;
+        }
+
+        public SceneNode? FindNodeByKeyValueSmart(string keyToFind, string valueToFind)
+        {
+            // Try exact match first
+            var exactMatch = FindNodeByKeyValue(keyToFind, valueToFind);
+            if (exactMatch != null)
+            {
+                return exactMatch;
+            }
+
+            // Fall back to partial match
+            var partialMatches = FindNodesByKeyValuePartial(keyToFind, valueToFind);
+            return partialMatches.Count == 1 ? partialMatches[0] : null;
+        }
+
         public void Update(Scene.UpdateContext updateContext)
         {
             foreach (var node in staticNodes)

@@ -98,6 +98,30 @@ partial class RendererControl : UserControl
 
         SetControlLocation(selectionControl);
 
+        var allSelected = false;
+        selectionControl.CheckedListBox.KeyDown += (_, e) =>
+        {
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                var checkedListBox = selectionControl.CheckedListBox;
+                allSelected = !allSelected;
+
+                // Select all items except the last one ("S2V: Render as opaque")
+                var count = allSelected ? checkedListBox.Items.Count - 1 : checkedListBox.Items.Count;
+                for (var i = 0; i < count; i++)
+                {
+                    checkedListBox.SetItemChecked(i, allSelected);
+                }
+
+                if (!allSelected)
+                {
+                    checkedListBox.SetItemChecked(checkedListBox.Items.Count - 1, false);
+                }
+
+                e.Handled = true;
+            }
+        };
+
         selectionControl.CheckedListBox.ItemCheck += (_, e) =>
         {
             // Manually calculate the new checked items since ItemCheck is called before CheckedItems is updated

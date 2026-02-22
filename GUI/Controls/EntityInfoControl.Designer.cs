@@ -34,6 +34,7 @@ namespace GUI.Forms
             var dataGridViewCellStyle1 = new DataGridViewCellStyle();
             var dataGridViewCellStyle2 = new DataGridViewCellStyle();
             var dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            var dataGridViewCellStyle4 = new DataGridViewCellStyle();
             tabControl = new ThemedTabControl();
             tabPageProperties = new ThemedTabPage();
             dataGridProperties = new DataGridView();
@@ -47,15 +48,27 @@ namespace GUI.Forms
             Parameter = new DataGridViewTextBoxColumn();
             Delay = new DataGridViewTextBoxColumn();
             timesToFire = new DataGridViewTextBoxColumn();
+            TargetHammerUniqueId = new DataGridViewTextBoxColumn();
+            tabPageInputs = new ThemedTabPage();
+            dataGridInputs = new DataGridView();
+            SourceHammerUniqueId = new DataGridViewTextBoxColumn();
+            SourceName = new DataGridViewTextBoxColumn();
+            InputOutputName = new DataGridViewTextBoxColumn();
+            InputName = new DataGridViewTextBoxColumn();
+            InputParameter = new DataGridViewTextBoxColumn();
+            InputDelay = new DataGridViewTextBoxColumn();
+            InputTimesToFire = new DataGridViewTextBoxColumn();
             tabControl.SuspendLayout();
             tabPageProperties.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridProperties).BeginInit();
             tabPageOutputs.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridOutputs).BeginInit();
+            tabPageInputs.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dataGridInputs).BeginInit();
             SuspendLayout();
-            // 
+            //
             // tabControl
-            // 
+            //
             tabControl.Controls.Add(tabPageProperties);
             tabControl.Controls.Add(tabPageOutputs);
             tabControl.Dock = DockStyle.Fill;
@@ -64,9 +77,9 @@ namespace GUI.Forms
             tabControl.SelectedIndex = 0;
             tabControl.Size = new System.Drawing.Size(800, 450);
             tabControl.TabIndex = 0;
-            // 
+            //
             // tabPageProperties
-            // 
+            //
             tabPageProperties.Controls.Add(dataGridProperties);
             tabPageProperties.Location = new System.Drawing.Point(4, 24);
             tabPageProperties.Name = "tabPageProperties";
@@ -75,9 +88,9 @@ namespace GUI.Forms
             tabPageProperties.TabIndex = 0;
             tabPageProperties.Text = "Properties";
             tabPageProperties.UseVisualStyleBackColor = true;
-            // 
+            //
             // dataGridProperties
-            // 
+            //
             dataGridProperties.AllowUserToAddRows = false;
             dataGridProperties.AllowUserToDeleteRows = false;
             dataGridProperties.AllowUserToResizeRows = false;
@@ -103,23 +116,23 @@ namespace GUI.Forms
             dataGridProperties.SelectionMode = DataGridViewSelectionMode.CellSelect;
             dataGridProperties.Size = new System.Drawing.Size(786, 416);
             dataGridProperties.TabIndex = 1;
-            // 
+            //
             // ColumnName
-            // 
+            //
             ColumnName.FillWeight = 30F;
             ColumnName.HeaderText = "Name";
             ColumnName.Name = "ColumnName";
             ColumnName.ReadOnly = true;
-            // 
+            //
             // ColumnValue
-            // 
+            //
             ColumnValue.FillWeight = 70F;
             ColumnValue.HeaderText = "Value";
             ColumnValue.Name = "ColumnValue";
             ColumnValue.ReadOnly = true;
-            // 
+            //
             // tabPageOutputs
-            // 
+            //
             tabPageOutputs.Controls.Add(dataGridOutputs);
             tabPageOutputs.Location = new System.Drawing.Point(4, 24);
             tabPageOutputs.Name = "tabPageOutputs";
@@ -128,14 +141,14 @@ namespace GUI.Forms
             tabPageOutputs.TabIndex = 1;
             tabPageOutputs.Text = "Outputs";
             tabPageOutputs.UseVisualStyleBackColor = true;
-            // 
+            //
             // dataGridOutputs
-            // 
+            //
             dataGridOutputs.AllowUserToAddRows = false;
             dataGridOutputs.AllowUserToDeleteRows = false;
             dataGridOutputs.AllowUserToResizeRows = false;
             dataGridOutputs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { Output, TargetEntity, TargetInput, Parameter, Delay, timesToFire });
+            dataGridOutputs.Columns.AddRange(new DataGridViewColumn[] { Output, TargetEntity, TargetInput, Parameter, Delay, timesToFire, TargetHammerUniqueId });
             dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle3.BackColor = System.Drawing.SystemColors.Window;
             dataGridViewCellStyle3.Font = new System.Drawing.Font("Cascadia Mono", 10F);
@@ -149,48 +162,131 @@ namespace GUI.Forms
             dataGridOutputs.Name = "dataGridOutputs";
             dataGridOutputs.ReadOnly = true;
             dataGridOutputs.RowHeadersVisible = false;
-            dataGridOutputs.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            dataGridOutputs.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridOutputs.Size = new System.Drawing.Size(786, 416);
             dataGridOutputs.TabIndex = 0;
-            // 
+            //
             // Output
-            // 
+            //
             Output.HeaderText = "Output";
             Output.Name = "Output";
             Output.ReadOnly = true;
-            // 
+            //
             // TargetEntity
-            // 
+            //
             TargetEntity.HeaderText = "Target Entity";
             TargetEntity.Name = "TargetEntity";
             TargetEntity.ReadOnly = true;
-            // 
+            //
             // TargetInput
-            // 
+            //
             TargetInput.HeaderText = "Target Input";
             TargetInput.Name = "TargetInput";
             TargetInput.ReadOnly = true;
-            // 
+            //
             // Parameter
-            // 
+            //
             Parameter.HeaderText = "Parameter";
             Parameter.Name = "Parameter";
             Parameter.ReadOnly = true;
-            // 
+            //
             // Delay
-            // 
+            //
             Delay.HeaderText = "Delay";
             Delay.Name = "Delay";
             Delay.ReadOnly = true;
-            // 
+            //
             // timesToFire
-            // 
+            //
             timesToFire.HeaderText = "Times To Fire";
             timesToFire.Name = "timesToFire";
             timesToFire.ReadOnly = true;
-            // 
+            //
+            // TargetHammerUniqueId
+            //
+            TargetHammerUniqueId.HeaderText = "Target Id";
+            TargetHammerUniqueId.Name = "TargetHammerUniqueId";
+            TargetHammerUniqueId.ReadOnly = true;
+            //
+            // tabPageInputs
+            //
+            tabPageInputs.Controls.Add(dataGridInputs);
+            tabPageInputs.Location = new System.Drawing.Point(4, 24);
+            tabPageInputs.Name = "tabPageInputs";
+            tabPageInputs.Padding = new Padding(3);
+            tabPageInputs.Size = new System.Drawing.Size(792, 422);
+            tabPageInputs.TabIndex = 2;
+            tabPageInputs.Text = "Inputs";
+            tabPageInputs.UseVisualStyleBackColor = true;
+            //
+            // dataGridInputs
+            //
+            dataGridInputs.AllowUserToAddRows = false;
+            dataGridInputs.AllowUserToDeleteRows = false;
+            dataGridInputs.AllowUserToResizeRows = false;
+            dataGridInputs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dataGridInputs.Columns.AddRange(new DataGridViewColumn[] { SourceHammerUniqueId, SourceName, InputOutputName, InputName, InputParameter, InputDelay, InputTimesToFire });
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle4.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle4.Font = new System.Drawing.Font("Cascadia Mono", 10F);
+            dataGridViewCellStyle4.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle4.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle4.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
+            dataGridInputs.DefaultCellStyle = dataGridViewCellStyle4;
+            dataGridInputs.Dock = DockStyle.Fill;
+            dataGridInputs.Location = new System.Drawing.Point(3, 3);
+            dataGridInputs.Name = "dataGridInputs";
+            dataGridInputs.ReadOnly = true;
+            dataGridInputs.RowHeadersVisible = false;
+            dataGridInputs.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGridInputs.Size = new System.Drawing.Size(786, 416);
+            dataGridInputs.TabIndex = 0;
+            //
+            // SourceHammerUniqueId
+            //
+            SourceHammerUniqueId.HeaderText = "Source Id";
+            SourceHammerUniqueId.Name = "SourceHammerUniqueId";
+            SourceHammerUniqueId.ReadOnly = true;
+            //
+            // SourceName
+            //
+            SourceName.HeaderText = "Source";
+            SourceName.Name = "SourceName";
+            SourceName.ReadOnly = true;
+            //
+            // InputOutputName
+            //
+            InputOutputName.HeaderText = "Output";
+            InputOutputName.Name = "InputOutputName";
+            InputOutputName.ReadOnly = true;
+            //
+            // InputName
+            //
+            InputName.HeaderText = "My Input";
+            InputName.Name = "InputName";
+            InputName.ReadOnly = true;
+            //
+            // InputParameter
+            //
+            InputParameter.HeaderText = "Parameter";
+            InputParameter.Name = "InputParameter";
+            InputParameter.ReadOnly = true;
+            //
+            // InputDelay
+            //
+            InputDelay.HeaderText = "Delay";
+            InputDelay.Name = "InputDelay";
+            InputDelay.ReadOnly = true;
+            //
+            // InputTimesToFire
+            //
+            InputTimesToFire.HeaderText = "Times To Fire";
+            InputTimesToFire.Name = "InputTimesToFire";
+            InputTimesToFire.ReadOnly = true;
+            //
             // EntityInfoControl
-            // 
+            //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(tabControl);
@@ -201,6 +297,8 @@ namespace GUI.Forms
             ((System.ComponentModel.ISupportInitialize)dataGridProperties).EndInit();
             tabPageOutputs.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridOutputs).EndInit();
+            tabPageInputs.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)dataGridInputs).EndInit();
             ResumeLayout(false);
         }
 
@@ -217,6 +315,16 @@ namespace GUI.Forms
         private DataGridViewTextBoxColumn Parameter;
         private DataGridViewTextBoxColumn Delay;
         private DataGridViewTextBoxColumn timesToFire;
+        private DataGridViewTextBoxColumn TargetHammerUniqueId;
+        private TabPage tabPageInputs;
+        private DataGridView dataGridInputs;
+        private DataGridViewTextBoxColumn SourceHammerUniqueId;
+        private DataGridViewTextBoxColumn SourceName;
+        private DataGridViewTextBoxColumn InputOutputName;
+        private DataGridViewTextBoxColumn InputName;
+        private DataGridViewTextBoxColumn InputParameter;
+        private DataGridViewTextBoxColumn InputDelay;
+        private DataGridViewTextBoxColumn InputTimesToFire;
         private ThemedTabControl tabControl;
     }
 }

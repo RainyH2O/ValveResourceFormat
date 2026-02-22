@@ -22,6 +22,8 @@ namespace ValveResourceFormat.Renderer
         private readonly Vector2 SelectedNodeNameOffset = new(0, -20);
         public string ScreenDebugText { get; set; } = string.Empty;
 
+        public SceneNode? SelectedNode => selectedNodes.Count > 0 ? selectedNodes[0] : null;
+
         public SelectedNodeRenderer(RendererContext rendererContext)
         {
             shader = rendererContext.ShaderLoader.LoadShader("vrf.default");

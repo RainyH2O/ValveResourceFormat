@@ -389,5 +389,18 @@ namespace ValveResourceFormat.IO
                 gameFileLoader.EnsureStringTokenGameKeys();
             }
         }
+
+        /// <summary>
+        /// Extracts entities from a map resource.
+        /// </summary>
+        public static List<ResourceTypes.EntityLump.Entity> ExtractEntities(Resource resource, IFileLoader fileLoader)
+        {
+            if (resource.ResourceType is ResourceType.Map or ResourceType.World)
+            {
+                return new MapExtract(resource, fileLoader).ToEntities();
+            }
+
+            return [];
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
 using GUI.Types.Viewers;
@@ -12,6 +13,7 @@ namespace GUI.Forms
     partial class EntityInfoControl : UserControl
     {
         public DataGridView OutputsGrid => dataGridOutputs;
+        public DataGridView InputsGrid => dataGridInputs;
 
         public EntityInfoControl()
         {
@@ -54,10 +56,38 @@ namespace GUI.Forms
             }
         }
 
+        public void ShowInputsTabIfAnyData()
+        {
+            if (dataGridInputs.RowCount > 0)
+            {
+                if (tabPageInputs.Parent == null)
+                {
+                    // Insert after Outputs tab (index 2) if it exists, otherwise at end
+                    var insertIndex = tabControl.TabPages.IndexOf(tabPageOutputs);
+                    if (insertIndex >= 0)
+                    {
+                        tabControl.TabPages.Insert(insertIndex + 1, tabPageInputs);
+                    }
+                    else
+                    {
+                        tabControl.TabPages.Add(tabPageInputs);
+                    }
+                }
+            }
+            else
+            {
+                if (tabPageInputs.Parent != null)
+                {
+                    tabControl.TabPages.Remove(tabPageInputs);
+                }
+            }
+        }
+
         public void Clear()
         {
             dataGridProperties.Rows.Clear();
             dataGridOutputs.Rows.Clear();
+            dataGridInputs.Rows.Clear();
         }
 
         public void PopulateFromEntity(Entity entity)
@@ -89,6 +119,7 @@ namespace GUI.Forms
             var parameter = connectionData.GetStringProperty("m_overrideParam");
             var delay = connectionData.GetFloatProperty("m_flDelay");
             var timesToFire = connectionData.GetInt32Property("m_nTimesToFire");
+            var targetHammerId = connectionData.GetProperty<string>("m_targetHammerUniqueId") ?? string.Empty;
 
             var stimesToFire = timesToFire switch
             {
@@ -103,8 +134,129 @@ namespace GUI.Forms
                 inputName,
                 parameter,
                 delay,
+                stimesToFire,
+                targetHammerId
+            ]);
+        }
+
+        public void AddInputConnection(KVObject connectionData)
+        {
+            var sourceHammerId = connectionData.GetProperty<string>("sourceHammerUniqueId") ?? string.Empty;
+            var sourceName = connectionData.GetProperty<string>("sourceName") ?? string.Empty;
+            var outputName = connectionData.GetStringProperty("m_outputName");
+            var inputName = connectionData.GetStringProperty("m_inputName");
+            var parameter = connectionData.GetStringProperty("m_overrideParam");
+            var delay = connectionData.GetFloatProperty("m_flDelay");
+            var timesToFire = connectionData.GetInt32Property("m_nTimesToFire");
+
+            var stimesToFire = timesToFire switch
+            {
+                1 => "Only Once",
+                >= 2 => $"Only {timesToFire} Times",
+                _ => "Infinite",
+            };
+
+            dataGridInputs.Rows.Add([
+                sourceHammerId,
+                sourceName,
+                outputName,
+                inputName,
+                parameter,
+                delay,
                 stimesToFire
             ]);
+        }
+
+        public void SortConnections()
+        {
+            SortDataGridView(dataGridOutputs, ["TargetHammerUniqueId", "Delay"]);
+            SortDataGridView(dataGridInputs, ["SourceHammerUniqueId", "InputDelay"]);
+        }
+
+        private static void SortDataGridView(DataGridView grid, string[] columnNames)
+        {
+            if (grid.RowCount <= 1)
+            {
+                return;
+            }
+
+            var comparer = new MultiColumnNumericStringComparer(ListSortDirection.Ascending, columnNames);
+            var rows = grid.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).ToList();
+            rows.Sort((a, b) => comparer.Compare(a, b));
+
+            grid.Rows.Clear();
+            foreach (var row in rows)
+            {
+                grid.Rows.Add(row);
+            }
+        }
+
+        public void SelectTableRow(DataGridView targetGrid, DataGridViewRow sourceRow)
+        {
+            if (targetGrid == dataGridOutputs)
+            {
+                if (tabPageOutputs.Parent != null)
+                {
+                    tabControl.SelectedTab = tabPageOutputs;
+                }
+
+                SelectOutputRowFromInput(sourceRow);
+            }
+            else if (targetGrid == dataGridInputs)
+            {
+                if (tabPageInputs.Parent != null)
+                {
+                    tabControl.SelectedTab = tabPageInputs;
+                }
+
+                SelectInputRowFromOutput(sourceRow);
+            }
+        }
+
+        private void SelectOutputRowFromInput(DataGridViewRow inputRow)
+        {
+            var outputName = inputRow.Cells[2].Value?.ToString() ?? string.Empty;
+            var inputName = inputRow.Cells[3].Value?.ToString() ?? string.Empty;
+            var parameter = inputRow.Cells[4].Value?.ToString() ?? string.Empty;
+            var delay = inputRow.Cells[5].Value?.ToString() ?? string.Empty;
+
+            for (var i = 0; i < dataGridOutputs.Rows.Count; i++)
+            {
+                var row = dataGridOutputs.Rows[i];
+                if (row.Cells[0].Value?.ToString() == outputName &&
+                    row.Cells[2].Value?.ToString() == inputName &&
+                    row.Cells[3].Value?.ToString() == parameter &&
+                    row.Cells[4].Value?.ToString() == delay)
+                {
+                    dataGridOutputs.ClearSelection();
+                    dataGridOutputs.Rows[i].Selected = true;
+                    dataGridOutputs.FirstDisplayedScrollingRowIndex = i;
+                    break;
+                }
+            }
+        }
+
+        private void SelectInputRowFromOutput(DataGridViewRow outputRow)
+        {
+            var output = outputRow.Cells[0].Value?.ToString() ?? string.Empty;
+            var targetInput = outputRow.Cells[2].Value?.ToString() ?? string.Empty;
+            var parameter = outputRow.Cells[3].Value?.ToString() ?? string.Empty;
+            var delay = outputRow.Cells[4].Value?.ToString() ?? string.Empty;
+
+            for (var i = 0; i < dataGridInputs.Rows.Count; i++)
+            {
+                var row = dataGridInputs.Rows[i];
+                if (row.Cells[2].Value?.ToString() == output &&
+                    row.Cells[3].Value?.ToString() == targetInput &&
+                    row.Cells[4].Value?.ToString() == parameter &&
+                    row.Cells[5].Value?.ToString() == delay)
+                {
+                    dataGridInputs.ClearSelection();
+                    dataGridInputs.Rows[i].Selected = true;
+                    dataGridInputs.FirstDisplayedScrollingRowIndex = i;
+                    break;
+                }
+            }
         }
 
         private void AddDataGridExternalRefAction(VrfGuiContext vrfGuiContext, DataGridView dataGrid, string columnName)
