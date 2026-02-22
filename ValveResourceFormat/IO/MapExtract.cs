@@ -1563,6 +1563,60 @@ public sealed class MapExtract
     }
 
     #endregion Entities
+
+    /// <summary>
+    /// Extracts all entities from this map's entity lumps.
+    /// </summary>
+    public List<Entity> ToEntities()
+    {
+        var allEntities = new List<Entity>();
+
+        foreach (var entityLumpName in EntityLumpNames)
+        {
+            if (entityLumpName == null)
+            {
+                continue;
+            }
+
+            using var resource = FileLoader.LoadFileCompiled(entityLumpName);
+            if (resource == null)
+            {
+                continue;
+            }
+
+            var entityLump = resource.DataBlock as EntityLump;
+            if (entityLump == null)
+            {
+                continue;
+            }
+
+            CollectEntitiesFromLump(entityLump, allEntities);
+        }
+
+        return allEntities;
+    }
+
+    private void CollectEntitiesFromLump(EntityLump entityLump, List<Entity> allEntities)
+    {
+        allEntities.AddRange(entityLump.GetEntities());
+
+        foreach (var childName in entityLump.GetChildEntityNames())
+        {
+            using var childResource = FileLoader.LoadFileCompiled(childName);
+            if (childResource?.DataBlock is EntityLump childLump)
+            {
+                CollectEntitiesFromLump(childLump, allEntities);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Serializes entities to JSON.
+    /// </summary>
+    public static string SerializeEntities(List<Entity> entities)
+    {
+        return ValveResourceFormat.Serialization.KeyValues.KVJsonSerializer.SerializeEntities(entities);
+    }
 }
 
 /// <summary>
