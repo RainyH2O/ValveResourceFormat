@@ -331,10 +331,51 @@ namespace ValveResourceFormat.Renderer
             return staticNodes.Find(IsMatchingEntity) ?? dynamicNodes.Find(IsMatchingEntity);
         }
 
+        /// <summary>Returns all scene nodes whose entity data contains a key with a value that partially matches the given string.</summary>
+        /// <param name="keyToFind">The entity property key to search for.</param>
+        /// <param name="valueToFind">The substring to match against the property value.</param>
+        public List<SceneNode> FindNodesByKeyValuePartial(string keyToFind, string valueToFind)
+        {
+            bool IsMatchingEntity(SceneNode node)
+            {
+                if (node.EntityData == null)
+                {
+                    return false;
+                }
+
+                return node.EntityData.Properties.Properties.TryGetValue(keyToFind, out var value)
+                    && value.Value is string outString
+                    && outString.Contains(valueToFind, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var results = new List<SceneNode>();
+            results.AddRange(staticNodes.FindAll(IsMatchingEntity));
+            results.AddRange(dynamicNodes.FindAll(IsMatchingEntity));
+            return results;
+        }
+
+        /// <summary>Finds a node by key-value, trying an exact match first and falling back to a partial match if exactly one result is found.</summary>
+        /// <param name="keyToFind">The entity property key to search for.</param>
+        /// <param name="valueToFind">The value to match against.</param>
+        public SceneNode? FindNodeByKeyValueSmart(string keyToFind, string valueToFind)
+        {
+            // Try exact match first
+            var exactMatch = FindNodeByKeyValue(keyToFind, valueToFind);
+            if (exactMatch != null)
+            {
+                return exactMatch;
+            }
+
+            // Fall back to partial match
+            var partialMatches = FindNodesByKeyValuePartial(keyToFind, valueToFind);
+            return partialMatches.Count == 1 ? partialMatches[0] : null;
+        }
+
         /// <summary>
         /// Updates all scene nodes for the current frame, advancing animations and rebuilding octrees and GPU buffers if the scene changed.
         /// </summary>
         /// <param name="updateContext">Per-frame context data including camera and timestep.</param>
+
         public void Update(Scene.UpdateContext updateContext)
         {
             foreach (var node in staticNodes)

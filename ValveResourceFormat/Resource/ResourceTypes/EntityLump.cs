@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using ValveResourceFormat.Serialization.KeyValues;
 using KVValueType = ValveKeyValue.KVValueType;
@@ -31,6 +32,34 @@ namespace ValveResourceFormat.ResourceTypes
             /// Gets or initializes the parent entity lump that contains this entity.
             /// </summary>
             public required EntityLump ParentLump { get; init; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj)
+            {
+                if (obj is not Entity other)
+                {
+                    return false;
+                }
+
+                if (Properties.Properties.TryGetValue("hammeruniqueid", out var thisId)
+                    && other.Properties.Properties.TryGetValue("hammeruniqueid", out var otherId))
+                {
+                    return Equals(thisId.Value, otherId.Value);
+                }
+
+                return ReferenceEquals(this, other);
+            }
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+            {
+                if (Properties.Properties.TryGetValue("hammeruniqueid", out var id))
+                {
+                    return id.Value?.GetHashCode() ?? 0;
+                }
+
+                return RuntimeHelpers.GetHashCode(this);
+            }
 
             /// <summary>
             /// Gets a strongly-typed property value by name, returning a default value if not found or on error.

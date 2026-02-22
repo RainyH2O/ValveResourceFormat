@@ -27,8 +27,12 @@ namespace ValveResourceFormat.Renderer
         /// <summary>Gets or sets optional debug text rendered in the top-left corner of the viewport.</summary>
         public string ScreenDebugText { get; set; } = string.Empty;
 
+        /// <summary>Gets the primary selected node, or <see langword="null"/> if nothing is selected.</summary>
+        public SceneNode? SelectedNode => selectedNodes.Count > 0 ? selectedNodes[0] : null;
+
         /// <summary>Initializes the selected node renderer and creates GPU resources.</summary>
         /// <param name="rendererContext">Renderer context for loading shaders.</param>
+
         public SelectedNodeRenderer(RendererContext rendererContext)
         {
             shader = rendererContext.ShaderLoader.LoadShader("vrf.default");

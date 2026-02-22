@@ -587,6 +587,7 @@ namespace GUI
                 toolStripSeparator5.Visible = canExport || tabIndex == 0;
                 exportAsIsToolStripMenuItem.Visible = canExport;
                 decompileExportToolStripMenuItem.Visible = canExport;
+                exportEntitiesTabToolStripMenuItem.Visible = canExport;
 
                 clearConsoleToolStripMenuItem.Visible = tabIndex == 0;
 
