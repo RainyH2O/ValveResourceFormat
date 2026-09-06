@@ -1,21 +1,29 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Forms;
+using Sigstore;
 
 namespace GUI.Utils;
 
 /// <summary>
-/// Downloads the build offered by <see cref="UpdateChecker"/>, verifies it against the manifest,
-/// and swaps it in place of the running executable.
+/// Downloads the build offered by <see cref="UpdateChecker"/>, verifies it against the manifest
+/// and against the build provenance attested by the CI, and swaps it in place of the running executable.
 /// </summary>
 static class UpdateInstaller
 {
     private const string ReplacedSuffix = ".old";
+    private const string Repository = "ValveResourceFormat/ValveResourceFormat";
+    private const string Workflow = ".github/workflows/build.yml";
+
+    // Keeps the Sigstore trust root cached between verifications
+    private static readonly SigstoreVerifier Verifier = new();
 
     // A single file publish has nothing but the bundle on disk. A debug build has the managed
     // assembly next to its apphost, and cannot be replaced by a single downloaded file.
@@ -70,10 +78,23 @@ static class UpdateInstaller
         {
             dialog.OnProcess = async cancellationToken =>
             {
+                using var httpClient = new HttpClient
+                {
+                    // Downloads can take a while on a slow connection, the dialog's cancel button is the way out
+                    Timeout = Timeout.InfiniteTimeSpan,
+                };
+                httpClient.DefaultRequestHeaders.Add("User-Agent", $"Source2Viewer/{Program.ProductVersion} (+https://github.com/{Repository})");
+
                 try
                 {
-                    var (size, hash) = await DownloadAsync(url, downloadPath, dialog, cancellationToken).ConfigureAwait(false);
+                    var (size, hash) = await DownloadAsync(httpClient, url, downloadPath, dialog, cancellationToken).ConfigureAwait(false);
+
+                    dialog.SetProgress("Verifying…");
                     Verify(downloadPath, size, hash, expectedHash);
+
+                    dialog.SetProgress("Verifying build provenance…");
+                    await VerifyProvenanceAsync(httpClient, hash, cancellationToken).ConfigureAwait(false);
+
                     downloaded = true;
                 }
                 catch
@@ -182,15 +203,8 @@ static class UpdateInstaller
         }
     }
 
-    private static async Task<(long Size, string Hash)> DownloadAsync(string url, string downloadPath, GenericProgressForm dialog, CancellationToken cancellationToken)
+    private static async Task<(long Size, string Hash)> DownloadAsync(HttpClient httpClient, string url, string downloadPath, GenericProgressForm dialog, CancellationToken cancellationToken)
     {
-        using var httpClient = new HttpClient
-        {
-            // Downloads can take a while on a slow connection, the dialog's cancel button is the way out
-            Timeout = Timeout.InfiniteTimeSpan,
-        };
-        httpClient.DefaultRequestHeaders.Add("User-Agent", $"Source2Viewer/{Program.ProductVersion} (+https://github.com/ValveResourceFormat/ValveResourceFormat)");
-
         using var response = await httpClient.GetAsync(new Uri(url), HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
@@ -221,9 +235,70 @@ static class UpdateInstaller
 
         await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
 
-        dialog.SetProgress("Verifying…");
-
         return (destination.BytesWritten, destination.GetHash());
+    }
+
+    // The manifest server only tells us which file to fetch. Whether that file really came out of this
+    // repository's CI is proven by the provenance attestation GitHub stores for its hash, which is signed
+    // through Sigstore with the identity of the workflow run that produced it.
+    private static async Task VerifyProvenanceAsync(HttpClient httpClient, string hash, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(new Uri($"https://api.github.com/repos/{Repository}/attestations/sha256:{hash}"), cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            throw new InvalidDataException("No build provenance was found for the downloaded file.");
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        // Dev builds are attested on the branch, releases on their tag
+        var expectedRef = UpdateChecker.IsNewVersionStableBuild ? $"refs/tags/{UpdateChecker.NewVersion}" : "refs/heads/master";
+        var policy = new VerificationPolicy
+        {
+            CertificateIdentity = new CertificateIdentity
+            {
+                Issuer = "https://token.actions.githubusercontent.com",
+                SubjectAlternativeName = $"https://github.com/{Repository}/{Workflow}@{expectedRef}",
+                Extensions = new CertificateExtensionPolicy
+                {
+                    SourceRepositoryUri = $"https://github.com/{Repository}",
+                    SourceRepositoryRef = expectedRef,
+                    RunnerEnvironment = "github-hosted",
+                },
+            },
+        };
+
+        var hashBytes = Convert.FromHexString(hash);
+        string? failure = null;
+
+        foreach (var attestation in document.RootElement.GetProperty("attestations").EnumerateArray())
+        {
+            var bundle = SigstoreBundle.Deserialize(attestation.GetProperty("bundle").GetRawText());
+
+            // The library proves who signed the statement, the statement itself must still name our file
+            var statement = bundle.DsseEnvelope?.GetStatement();
+
+            if (statement?.Subject.Any(subject => subject.Digest.TryGetValue("sha256", out var digest) && digest.Equals(hash, StringComparison.OrdinalIgnoreCase)) != true)
+            {
+                failure = "The attestation does not describe the downloaded file.";
+                continue;
+            }
+
+            var (success, result) = await Verifier.TryVerifyDigestAsync(hashBytes, HashAlgorithmType.Sha256, bundle, policy, cancellationToken).ConfigureAwait(false);
+
+            if (success)
+            {
+                Log.Info(nameof(UpdateInstaller), $"Verified build provenance signed by {result?.SignerIdentity}");
+                return;
+            }
+
+            failure = result?.FailureReason;
+        }
+
+        throw new InvalidDataException($"The build provenance of the downloaded file could not be verified. {failure}");
     }
 
     private static void Verify(string downloadPath, long actualSize, string actualHash, string expectedHash)
