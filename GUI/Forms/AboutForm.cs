@@ -68,9 +68,9 @@ namespace GUI.Forms
 
         private void OnUpdateChecked()
         {
-            var newVersion = UpdateChecker.IsNewVersionStableBuild ? UpdateChecker.NewVersion : $"dev build {UpdateChecker.NewVersion}";
+            var newVersion = UpdateChecker.NewVersionText;
 
-            if (!string.IsNullOrEmpty(UpdateChecker.NewVersion))
+            if (!string.IsNullOrEmpty(newVersion))
             {
                 newVersionLabel.Text = newVersion;
             }
@@ -134,9 +134,28 @@ namespace GUI.Forms
             OpenUrl(UpdateChecker.ReleaseNotesUrl ?? "https://github.com/ValveResourceFormat/ValveResourceFormat/releases");
         }
 
-        private void OnDownloadButtonClick(object sender, EventArgs e)
+        private async void OnDownloadButtonClick(object sender, EventArgs e)
         {
-            OpenUrl(UpdateChecker.DownloadUrl ?? "https://valveresourceformat.github.io/");
+            downloadButton.Enabled = false;
+
+            try
+            {
+                if (!await UpdateInstaller.InstallAsync(this).ConfigureAwait(true))
+                {
+                    OpenUrl(UpdateChecker.DownloadUrl ?? "https://valveresourceformat.github.io/");
+                }
+            }
+            catch (Exception ex)
+            {
+                Program.ShowError(ex);
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    downloadButton.Enabled = true;
+                }
+            }
         }
 
         private void OnCheckForUpdatesCheckboxChanged(object sender, EventArgs e)

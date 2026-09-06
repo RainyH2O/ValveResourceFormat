@@ -81,6 +81,8 @@ namespace GUI
 
             DisplayVersion = FormatDisplayVersion(ProductVersion);
 
+            UpdateInstaller.CleanupPreviousInstall();
+
             MainForm = new MainForm(args);
 
             Application.Run(MainForm);

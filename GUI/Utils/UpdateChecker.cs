@@ -85,6 +85,8 @@ static partial class UpdateChecker
     /// <summary>Whether the offered version is from a different channel than the running build, rather than a newer build of the same channel.</summary>
     public static bool IsChannelSwitch { get; private set; }
     public static string? NewVersion { get; private set; }
+    /// <summary>The offered version as shown to the user, e.g. "20.0" or "dev build 7125".</summary>
+    public static string? NewVersionText { get; private set; }
     public static string? ReleaseNotesUrl { get; private set; }
     public static string? ReleaseNotesVersion { get; private set; }
     public static string? DownloadUrl { get; private set; }
@@ -176,8 +178,9 @@ static partial class UpdateChecker
         {
             Settings.Config.Update.UpdateAvailable = false;
             IsNewVersionAvailable = false;
-            IsNewVersionStableBuild = true; // So that the label does not read as a dev build
+            IsNewVersionStableBuild = true;
             NewVersion = ":)";
+            NewVersionText = NewVersion;
             return; // This was not built on the CI
         }
 
@@ -214,6 +217,7 @@ static partial class UpdateChecker
         NewVersion = IsNewVersionStableBuild
             ? stableVersion
             : (manifest.Dev?.BuildNumber ?? 0).ToString(CultureInfo.InvariantCulture);
+        NewVersionText = IsNewVersionStableBuild ? NewVersion : $"dev build {NewVersion}";
 
         var assets = IsNewVersionStableBuild ? stable?.Assets : manifest.Dev?.Assets;
         var asset = assets?.GetValueOrDefault(RuntimeInformation.RuntimeIdentifier);
