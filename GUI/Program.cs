@@ -20,6 +20,17 @@ namespace GUI
         public static string DisplayVersion { get; private set; }
 #nullable enable
 
+        /// <summary>Whether this build was produced by the CI for a tagged stable release.</summary>
+        public const bool IsReleaseBuild =
+#if CI_RELEASE_BUILD // For CI builds, it is set in Directory.Build.props
+            true;
+#else
+            false;
+#endif
+
+        /// <summary>The update channel that produced this build.</summary>
+        public static Settings.UpdateChannel BuildChannel => IsReleaseBuild ? Settings.UpdateChannel.Stable : Settings.UpdateChannel.Dev;
+
         /// <summary>
         /// The main entry point for the application.
         /// </summary>

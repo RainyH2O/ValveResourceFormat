@@ -108,9 +108,10 @@ namespace GUI
                 {
                     versionDisplay = string.Concat("v", version);
 
-#if !CI_RELEASE_BUILD // Set in Directory.Build.props
-                    versionDisplay += "-dev";
-#endif
+                    if (!Program.IsReleaseBuild)
+                    {
+                        versionDisplay += "-dev";
+                    }
                 }
 
 #if DEBUG

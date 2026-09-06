@@ -39,6 +39,8 @@ namespace GUI.Forms
             licenses = new ThemedButton();
             copyVersion = new ThemedButton();
             checkForUpdatesCheckbox = new CheckBox();
+            updateChannelLabel = new Label();
+            updateChannelComboBox = new ThemedComboBox();
             downloadButton = new ThemedButton();
             viewReleaseNotesButton = new ThemedButton();
             newVersionLabelText = new Label();
@@ -175,12 +177,31 @@ namespace GUI.Forms
             checkForUpdatesCheckbox.Location = new System.Drawing.Point(16, 136);
             checkForUpdatesCheckbox.Name = "checkForUpdatesCheckbox";
             checkForUpdatesCheckbox.Padding = new Padding(3, 0, 0, 0);
-            checkForUpdatesCheckbox.Size = new System.Drawing.Size(618, 30);
+            checkForUpdatesCheckbox.Size = new System.Drawing.Size(300, 30);
             checkForUpdatesCheckbox.TabIndex = 14;
             checkForUpdatesCheckbox.Text = "Automatically check for updates daily";
             checkForUpdatesCheckbox.UseVisualStyleBackColor = true;
             checkForUpdatesCheckbox.CheckedChanged += OnCheckForUpdatesCheckboxChanged;
-            // 
+            //
+            // updateChannelLabel
+            //
+            updateChannelLabel.AutoSize = true;
+            updateChannelLabel.Location = new System.Drawing.Point(330, 142);
+            updateChannelLabel.Name = "updateChannelLabel";
+            updateChannelLabel.Size = new System.Drawing.Size(113, 19);
+            updateChannelLabel.TabIndex = 21;
+            updateChannelLabel.Text = "Update channel:";
+            //
+            // updateChannelComboBox
+            //
+            updateChannelComboBox.DrawMode = DrawMode.OwnerDrawFixed;
+            updateChannelComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            updateChannelComboBox.Location = new System.Drawing.Point(449, 138);
+            updateChannelComboBox.Name = "updateChannelComboBox";
+            updateChannelComboBox.Size = new System.Drawing.Size(188, 26);
+            updateChannelComboBox.TabIndex = 22;
+            updateChannelComboBox.SelectedIndexChanged += OnUpdateChannelSelectedIndexChanged;
+            //
             // downloadButton
             // 
             downloadButton.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -285,6 +306,8 @@ namespace GUI.Forms
             groupBox2.Controls.Add(currentVersionLabelText);
             groupBox2.Controls.Add(copyVersion);
             groupBox2.Controls.Add(checkForUpdatesCheckbox);
+            groupBox2.Controls.Add(updateChannelLabel);
+            groupBox2.Controls.Add(updateChannelComboBox);
             groupBox2.Controls.Add(newVersionLabelText);
             groupBox2.CornerRadius = 5;
             groupBox2.FlatStyle = FlatStyle.Flat;
@@ -363,6 +386,8 @@ namespace GUI.Forms
         private Label label3;
         private PictureBox icon;
         private CheckBox checkForUpdatesCheckbox;
+        private Label updateChannelLabel;
+        private ThemedComboBox updateChannelComboBox;
         private Label newVersionLabelText;
         private Label currentVersionLabelText;
         private ThemedGroupBox groupBox1;

@@ -10,7 +10,7 @@ namespace GUI.Utils
     /// </summary>
     static class Settings
     {
-        private const int SettingsFileCurrentVersion = 16;
+        private const int SettingsFileCurrentVersion = 17;
         private const int RecentFilesLimit = 20;
 
         /// <summary>
@@ -26,12 +26,25 @@ namespace GUI.Utils
         }
 
         /// <summary>
+        /// The channel that application updates are offered from.
+        /// </summary>
+        public enum UpdateChannel : int
+        {
+            /// <summary>Tagged stable releases.</summary>
+            Stable = 0,
+            /// <summary>Automated builds of the master branch.</summary>
+            Dev = 1,
+        }
+
+        /// <summary>
         /// Holds state related to automatic application update checks.
         /// </summary>
         public class AppUpdateState
         {
             /// <summary>Gets or sets whether to automatically check for updates on startup.</summary>
             public bool CheckAutomatically { get; set; }
+            /// <summary>Gets or sets the channel that updates are offered from.</summary>
+            public UpdateChannel Channel { get; set; }
             /// <summary>Gets or sets whether a newer version of the application is available.</summary>
             public bool UpdateAvailable { get; set; }
             /// <summary>Gets or sets the timestamp of the last update check.</summary>
@@ -232,6 +245,11 @@ namespace GUI.Utils
             Config.TextViewerFontSize = Math.Clamp(Config.TextViewerFontSize, 8, 24);
             Config.PackageGridSize = Math.Clamp(Config.PackageGridSize, 0, Enum.GetValues<Types.PackageViewer.ThumbnailRenderers.ThumbnailSizes>().Length - 1);
 
+            if (!Enum.IsDefined(Config.Update.Channel))
+            {
+                Config.Update.Channel = UpdateChannel.Stable;
+            }
+
             if (currentVersion < 2) // version 2: added anti aliasing samples
             {
                 Config.AntiAliasingSamples = 8;
@@ -291,6 +309,12 @@ namespace GUI.Utils
             if (currentVersion < 16) // version 16: added viewmodel field of view
             {
                 Config.ViewmodelFieldOfView = 64;
+            }
+
+            if (currentVersion < 17) // version 17: added update channel
+            {
+                // Anyone already running a dev build stays on dev builds
+                Config.Update.Channel = Program.BuildChannel;
             }
 
             if (currentVersion > 0 && currentVersion != SettingsFileCurrentVersion)

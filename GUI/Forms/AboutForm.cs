@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Types.GLViewers;
@@ -37,11 +38,22 @@ namespace GUI.Forms
             }
 
             currentVersionLabel.Text = Program.DisplayVersion;
-            newVersionLabel.Text = "Checking for updates…";
 
             checkForUpdatesCheckbox.Checked = Settings.Config.Update.CheckAutomatically;
 
-            UpdateChecker.CheckForUpdates().ContinueWith(_ =>
+            updateChannelComboBox.Items.AddRange(Enum.GetNames<Settings.UpdateChannel>());
+            updateChannelComboBox.SelectedIndex = (int)Settings.Config.Update.Channel;
+
+            CheckForUpdates();
+        }
+
+        private void CheckForUpdates()
+        {
+            newVersionLabel.Text = "Checking for updates…";
+            downloadButton.Enabled = false;
+
+            // Offloaded so that the request setup does not run on the ui thread
+            Task.Run(UpdateChecker.CheckForUpdates).ContinueWith(_ =>
             {
                 if (InvokeRequired)
                 {
@@ -56,12 +68,21 @@ namespace GUI.Forms
 
         private void OnUpdateChecked()
         {
+            var newVersion = UpdateChecker.IsNewVersionStableBuild ? UpdateChecker.NewVersion : $"dev build {UpdateChecker.NewVersion}";
+
             if (!string.IsNullOrEmpty(UpdateChecker.NewVersion))
             {
-                newVersionLabel.Text = UpdateChecker.IsNewVersionStableBuild ? UpdateChecker.NewVersion : $"Dev build {UpdateChecker.NewVersion}";
+                newVersionLabel.Text = newVersion;
             }
 
-            if (!UpdateChecker.IsNewVersionAvailable)
+            if (UpdateChecker.IsNewVersionAvailable)
+            {
+                downloadButton.Text = UpdateChecker.IsChannelSwitch
+                    ? $"Switch to {(UpdateChecker.IsNewVersionStableBuild ? "stable " : "")}{newVersion}"
+                    : $"Download {newVersion}";
+                downloadButton.Enabled = true;
+            }
+            else
             {
                 downloadButton.Text = "Up to date";
                 downloadButton.Enabled = false;
@@ -115,7 +136,7 @@ namespace GUI.Forms
 
         private void OnDownloadButtonClick(object sender, EventArgs e)
         {
-            OpenUrl("https://valveresourceformat.github.io/");
+            OpenUrl(UpdateChecker.DownloadUrl ?? "https://valveresourceformat.github.io/");
         }
 
         private void OnCheckForUpdatesCheckboxChanged(object sender, EventArgs e)
@@ -126,6 +147,18 @@ namespace GUI.Forms
             }
 
             ToggleAutomaticUpdateCheck(checkForUpdatesCheckbox.Checked);
+        }
+
+        private void OnUpdateChannelSelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            UpdateChecker.SetChannel((Settings.UpdateChannel)updateChannelComboBox.SelectedIndex);
+
+            CheckForUpdates();
         }
 
         private static void ToggleAutomaticUpdateCheck(bool enabled = true)
