@@ -160,12 +160,23 @@ jobs:
     name: Source2Viewer (win-x64)
     runs-on: windows-latest
 
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup-dotnet-cache
 
     - name: Publish
       run: dotnet publish --configuration Release --self-contained --runtime win-x64 ${{ env.SKIP_ANALYSIS }} ${{ env.PUBLISH_ARGS }} GUI/GUI.csproj
+
+    - name: Attest build provenance
+      if: github.event_name != 'pull_request'
+      uses: actions/attest-build-provenance@v4
+      with:
+        subject-path: GUI/bin/Release/win-x64/publish/Source2Viewer.exe
 
     - name: Upload
       uses: actions/upload-artifact@v7
@@ -195,7 +206,8 @@ jobs:
     permissions:
       contents: write # create the draft release
       actions: read # signpath reads the artifact to be signed
-      id-token: write # oidc for signpath and nuget login
+      id-token: write # oidc for signpath, nuget login and sigstore
+      attestations: write
 
     steps:
     - name: Download artifacts
@@ -204,8 +216,6 @@ jobs:
         path: artifacts
 
     - name: Rename Source2Viewer artifact folder
-      # Non-archived artifacts are downloaded into a folder named after the file,
-      # signpath expects the folder name that the archived artifact used to have
       run: mv artifacts/Source2Viewer.exe artifacts/Source2Viewer
 
     - name: Display artifacts folder structure
@@ -259,6 +269,12 @@ jobs:
     - name: Display structure of archived files
       run: ls -Rl
       working-directory: release
+
+    - name: Attest build provenance
+      # Signing changed the viewer executable, so the release files are attested again here
+      uses: actions/attest-build-provenance@v4
+      with:
+        subject-path: release/*
 
     - name: Release
       uses: softprops/action-gh-release@v3
