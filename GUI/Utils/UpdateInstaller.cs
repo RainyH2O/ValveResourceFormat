@@ -19,6 +19,7 @@ namespace GUI.Utils;
 static class UpdateInstaller
 {
     private const string ReplacedSuffix = ".old";
+    private const string PendingSuffix = ".new";
     private const string Repository = "ValveResourceFormat/ValveResourceFormat";
     private const string Workflow = ".github/workflows/build.yml";
 
@@ -30,7 +31,7 @@ static class UpdateInstaller
     private static bool IsSingleFileBundle(string exePath) => !File.Exists(Path.ChangeExtension(exePath, ".dll"));
 
     /// <summary>
-    /// Removes the executable that a previous update replaced.
+    /// Removes the executable that a previous update replaced, and any download that never got swapped in.
     /// </summary>
     public static void CleanupPreviousInstall()
     {
@@ -41,13 +42,20 @@ static class UpdateInstaller
             return;
         }
 
+        // The previous instance may still be exiting, it will be gone by the next launch
+        TryDelete(exePath + ReplacedSuffix);
+        TryDelete(exePath + PendingSuffix);
+    }
+
+    private static void TryDelete(string path)
+    {
         try
         {
-            File.Delete(exePath + ReplacedSuffix);
+            File.Delete(path);
         }
         catch (IOException)
         {
-            // The previous instance may still be exiting, it will be gone by the next launch
+            //
         }
         catch (UnauthorizedAccessException)
         {
@@ -123,7 +131,17 @@ static class UpdateInstaller
             return true;
         }
 
-        Swap(exePath, downloadPath);
+        try
+        {
+            Swap(exePath, downloadPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            TryDelete(downloadPath);
+            TryDelete(exePath + PendingSuffix);
+
+            throw new IOException($"The update was verified but could not be installed over {exePath}. {e.Message}", e);
+        }
 
         var restartButton = new TaskDialogButton("Restart now");
         var page = new TaskDialogPage
@@ -138,6 +156,9 @@ static class UpdateInstaller
 
         if (await TaskDialog.ShowDialogAsync(owner, page).ConfigureAwait(true) == restartButton)
         {
+            // The new instance reads the settings as soon as it starts, before this one gets to save them on close
+            Settings.Save();
+
             Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
             Program.MainForm.Close();
         }
@@ -340,6 +361,7 @@ static class UpdateInstaller
     private static void Swap(string exePath, string downloadPath)
     {
         var replacedPath = exePath + ReplacedSuffix;
+        var pendingPath = exePath + PendingSuffix;
 
         try
         {
@@ -350,11 +372,15 @@ static class UpdateInstaller
             throw new IOException("A previous update is still in use, restart the viewer and try again.", e);
         }
 
+        // Bring the download next to the executable first, so that the copy from the temp folder and any
+        // permission problem in the install folder surface before the running executable is touched.
+        // What remains are two renames on the same volume.
+        File.Move(downloadPath, pendingPath, overwrite: true);
         File.Move(exePath, replacedPath);
 
         try
         {
-            File.Move(downloadPath, exePath);
+            File.Move(pendingPath, exePath);
         }
         catch
         {

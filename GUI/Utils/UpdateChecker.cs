@@ -102,7 +102,25 @@ static partial class UpdateChecker
             manifestTask = ManifestTask ??= GetManifestAsync();
         }
 
-        var manifest = await manifestTask.ConfigureAwait(false);
+        UpdateManifest? manifest;
+
+        try
+        {
+            manifest = await manifestTask.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Let the next check retry instead of remembering the failure for the rest of the session
+            using (CheckLock.EnterScope())
+            {
+                if (ManifestTask == manifestTask)
+                {
+                    ManifestTask = null;
+                }
+            }
+
+            throw;
+        }
 
         Evaluate(manifest, Settings.Config.Update.Channel);
     }
@@ -147,10 +165,19 @@ static partial class UpdateChecker
 
         Settings.Config.Update.LastCheck = now.ToString("s", CultureInfo.InvariantCulture);
 
-        // Offloaded so that the request setup does not run on the ui thread
-        await Task.Run(CheckForUpdates).ConfigureAwait(false);
+        try
+        {
+            // Offloaded so that the request setup does not run on the ui thread
+            await Task.Run(CheckForUpdates).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // Being offline should not interrupt startup, a manual check from the About dialog reports its errors
+            Log.Error(nameof(UpdateChecker), $"Failed to check for updates: {e.Message}");
+            return false;
+        }
 
-        return IsNewVersionAvailable;
+        return IsNewVersionAvailable && !IsChannelSwitch;
     }
 
     private static Version GetCurrentVersion()
@@ -186,7 +213,7 @@ static partial class UpdateChecker
 
         if (manifest == null)
         {
-            return; // The fetch failed and the error has been shown
+            return;
         }
 
         var stable = manifest.Stable;
@@ -202,7 +229,7 @@ static partial class UpdateChecker
         // Switching channels always offers that channel's latest build, even when it is older than the running one
         if (IsChannelSwitch)
         {
-            IsNewVersionAvailable = true;
+            IsNewVersionAvailable = IsNewVersionStableBuild ? stable?.Version != null : manifest.Dev?.BuildNumber > 0;
         }
         else if (IsNewVersionStableBuild)
         {
@@ -222,13 +249,15 @@ static partial class UpdateChecker
         var assets = IsNewVersionStableBuild ? stable?.Assets : manifest.Dev?.Assets;
         var asset = assets?.GetValueOrDefault(RuntimeInformation.RuntimeIdentifier);
 
-        DownloadUrl = asset?.Url;
+        // The file is verified after download, but the request itself should not go out in the clear either
+        DownloadUrl = asset?.Url?.StartsWith("https://", StringComparison.Ordinal) == true ? asset.Url : null;
         DownloadSize = asset?.Size;
         DownloadSha256 = asset?.Sha256;
 
         if (Settings.Config.Update.CheckAutomatically)
         {
-            Settings.Config.Update.UpdateAvailable = IsNewVersionAvailable;
+            // A channel switch is only offered from the About dialog, remembering it would nag on every launch
+            Settings.Config.Update.UpdateAvailable = IsNewVersionAvailable && !IsChannelSwitch;
         }
     }
 
@@ -239,28 +268,14 @@ static partial class UpdateChecker
             return null; // Local builds have nothing to compare against
         }
 
-        try
-        {
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", $"Source2Viewer/{Program.ProductVersion} (+https://github.com/ValveResourceFormat/ValveResourceFormat)");
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("User-Agent", $"Source2Viewer/{Program.ProductVersion} (+https://github.com/ValveResourceFormat/ValveResourceFormat)");
 
-            var response = await httpClient.GetAsync(new Uri(ManifestUrl)).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+        using var response = await httpClient.GetAsync(new Uri(ManifestUrl)).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
 
-            using var jsonStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var jsonStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-            return await JsonSerializer.DeserializeAsync(jsonStream, SourceGenerationContext.Default.UpdateManifest).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            Log.Error(nameof(UpdateChecker), $"Failed to check for updates: {e.Message}");
-
-            await Program.MainForm.InvokeAsync(() =>
-            {
-                Program.ShowError(e);
-            }).ConfigureAwait(false);
-
-            return null;
-        }
+        return await JsonSerializer.DeserializeAsync(jsonStream, SourceGenerationContext.Default.UpdateManifest).ConfigureAwait(false);
     }
 }

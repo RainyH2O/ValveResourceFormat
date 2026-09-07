@@ -47,23 +47,31 @@ namespace GUI.Forms
             CheckForUpdates();
         }
 
-        private void CheckForUpdates()
+        private async void CheckForUpdates()
         {
             newVersionLabel.Text = "Checking for updates…";
             downloadButton.Enabled = false;
 
-            // Offloaded so that the request setup does not run on the ui thread
-            Task.Run(UpdateChecker.CheckForUpdates).ContinueWith(_ =>
+            try
             {
-                if (InvokeRequired)
+                // Offloaded so that the request setup does not run on the ui thread
+                await Task.Run(UpdateChecker.CheckForUpdates).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed)
                 {
-                    Invoke(OnUpdateChecked);
+                    newVersionLabel.Text = "Failed to check for updates";
                 }
-                else
-                {
-                    OnUpdateChecked();
-                }
-            });
+
+                Program.ShowError(ex);
+                return;
+            }
+
+            if (!IsDisposed)
+            {
+                OnUpdateChecked();
+            }
         }
 
         private void OnUpdateChecked()
@@ -184,7 +192,7 @@ namespace GUI.Forms
         {
             Settings.Config.Update.CheckAutomatically = enabled;
             Settings.Config.Update.LastCheck = string.Empty;
-            Settings.Config.Update.UpdateAvailable = UpdateChecker.IsNewVersionAvailable && Settings.Config.Update.CheckAutomatically;
+            Settings.Config.Update.UpdateAvailable = UpdateChecker.IsNewVersionAvailable && !UpdateChecker.IsChannelSwitch && Settings.Config.Update.CheckAutomatically;
         }
 
         private static void OpenUrl(string url)
