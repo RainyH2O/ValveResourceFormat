@@ -189,9 +189,14 @@ namespace GUI.Forms
 
         private static void OpenUrl(string url)
         {
-            Process.Start(new ProcessStartInfo("cmd", $"/c start {url}")
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             {
-                CreateNoWindow = true,
+                throw new ArgumentException($"Refusing to open \"{url}\".", nameof(url));
+            }
+
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri)
+            {
+                UseShellExecute = true,
             });
         }
 
