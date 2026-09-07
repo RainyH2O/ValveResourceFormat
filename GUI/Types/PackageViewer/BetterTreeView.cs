@@ -9,7 +9,7 @@ using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Forms;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 namespace GUI.Types.PackageViewer
 {

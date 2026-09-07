@@ -2,8 +2,8 @@ using System.Drawing;
 using System.IO;
 using System.Threading;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
 using Svg.Skia;
+using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 

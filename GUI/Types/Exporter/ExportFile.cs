@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Types.PackageViewer;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat.IO;
 using Resource = ValveResourceFormat.Resource;
 

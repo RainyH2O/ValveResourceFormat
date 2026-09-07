@@ -533,7 +533,6 @@ namespace ValveResourceFormat.Renderer.Materials
             }
         }
 
-
         /// <summary>
         /// Whether a format has to be decompressed before it can be uploaded to a <see cref="TextureTarget.Texture3D"/>.
         /// Of the block compressed formats only BPTC is specified to work with 3D textures, as a stack of

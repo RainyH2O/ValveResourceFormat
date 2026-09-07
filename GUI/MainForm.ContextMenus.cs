@@ -11,7 +11,7 @@ using GUI.Types.Exporter;
 using GUI.Types.GLViewers;
 using GUI.Types.PackageViewer;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 namespace GUI
 {

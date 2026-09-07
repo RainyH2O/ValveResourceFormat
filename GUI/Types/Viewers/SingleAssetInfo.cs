@@ -5,8 +5,8 @@ using System.Text;
 using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
 using ValveKeyValue;
+using ValvePak;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.IO;
 

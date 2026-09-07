@@ -2,7 +2,7 @@ using System.Drawing;
 using System.Threading;
 using GUI.Utils;
 using SkiaSharp;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 

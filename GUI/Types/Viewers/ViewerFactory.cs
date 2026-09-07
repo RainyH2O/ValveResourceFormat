@@ -1,7 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat.IO;
 
 namespace GUI.Types.Viewers;

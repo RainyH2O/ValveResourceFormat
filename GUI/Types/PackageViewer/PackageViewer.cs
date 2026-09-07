@@ -8,7 +8,7 @@ using System.Windows.Forms;
 using GUI.Forms;
 using GUI.Types.Viewers;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.Blocks.ResourceEditInfoStructs;
 using ValveResourceFormat.IO;
@@ -28,7 +28,7 @@ namespace GUI.Types.PackageViewer
 
         public static bool IsAccepted(uint magic)
         {
-            return magic == SteamDatabase.ValvePak.Package.MAGIC;
+            return magic == ValvePak.Package.MAGIC;
         }
 
         public Control CreateEmpty()
@@ -126,7 +126,7 @@ namespace GUI.Types.PackageViewer
                 directory = Path.Join(prefix, directory);
             }
 
-            directory = directory.Replace('\\', SteamDatabase.ValvePak.Package.DirectorySeparatorChar);
+            directory = directory.Replace('\\', ValvePak.Package.DirectorySeparatorChar);
 
             TreeView?.AddFolderNode(directory);
         }
@@ -468,13 +468,13 @@ namespace GUI.Types.PackageViewer
                                 var dirName = Path.GetDirectoryName(filepath);
                                 if (dirName != null)
                                 {
-                                    newEntry.DirectoryName = dirName.Replace('\\', SteamDatabase.ValvePak.Package.DirectorySeparatorChar);
+                                    newEntry.DirectoryName = dirName.Replace('\\', ValvePak.Package.DirectorySeparatorChar);
                                 }
                                 newEntry.FileName = Path.GetFileNameWithoutExtension(filepath);
                             }
                             else
                             {
-                                newEntry.DirectoryName += string.Concat(SteamDatabase.ValvePak.Package.DirectorySeparatorChar, resource.ResourceType);
+                                newEntry.DirectoryName += string.Concat(ValvePak.Package.DirectorySeparatorChar, resource.ResourceType);
                             }
                         }
                         catch (Exception ex)

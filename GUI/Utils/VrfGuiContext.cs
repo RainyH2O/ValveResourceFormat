@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GUI.Types.GLViewers;
 using Microsoft.Extensions.Logging;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.Renderer;

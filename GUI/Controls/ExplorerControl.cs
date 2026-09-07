@@ -877,7 +877,7 @@ namespace GUI.Controls
             Debug.Assert(stream != null);
             using var ms = new MemoryStream((int)stream.Length);
 
-            using var package = new SteamDatabase.ValvePak.Package();
+            using var package = new ValvePak.Package();
             stream.CopyTo(ms);
             var file = package.AddFile(name, ms.ToArray());
 

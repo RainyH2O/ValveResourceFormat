@@ -1,5 +1,5 @@
 using System.Windows.Forms;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 namespace GUI.Types.PackageViewer
 {

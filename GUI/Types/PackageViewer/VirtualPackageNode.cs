@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 namespace GUI.Types.PackageViewer
 {

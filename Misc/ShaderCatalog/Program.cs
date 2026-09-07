@@ -1,5 +1,5 @@
 using System.Text;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat.CompiledShader;
 using ValveResourceFormat.IO;
 

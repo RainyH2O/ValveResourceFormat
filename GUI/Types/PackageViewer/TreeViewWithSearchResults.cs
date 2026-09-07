@@ -12,7 +12,7 @@ using GUI.Controls;
 using GUI.Forms;
 using GUI.Types.PackageViewer.ThumbnailRenderers;
 using GUI.Utils;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat.IO;
 using Windows.Win32;
 

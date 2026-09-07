@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 namespace ValveResourceFormat.CompiledShader;
 
