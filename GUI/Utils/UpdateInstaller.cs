@@ -21,7 +21,9 @@ static class UpdateInstaller
     private const string ReplacedSuffix = ".old";
     private const string PendingSuffix = ".new";
     private const string Repository = "ValveResourceFormat/ValveResourceFormat";
+    private const string RepositoryId = "42366054";
     private const string Workflow = ".github/workflows/build.yml";
+    private const string ProvenancePredicateType = "https://slsa.dev/provenance/v1";
 
     // Keeps the Sigstore trust root cached between verifications
     private static readonly SigstoreVerifier Verifier = new();
@@ -264,7 +266,8 @@ static class UpdateInstaller
     // through Sigstore with the identity of the workflow run that produced it.
     private static async Task VerifyProvenanceAsync(HttpClient httpClient, string hash, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.GetAsync(new Uri($"https://api.github.com/repos/{Repository}/attestations/sha256:{hash}"), cancellationToken).ConfigureAwait(false);
+        var url = $"https://api.github.com/repositories/{RepositoryId}/attestations/sha256:{hash}?per_page=100&predicate_type={Uri.EscapeDataString(ProvenancePredicateType)}";
+        using var response = await httpClient.GetAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -286,6 +289,7 @@ static class UpdateInstaller
                 Extensions = new CertificateExtensionPolicy
                 {
                     SourceRepositoryUri = $"https://github.com/{Repository}",
+                    SourceRepositoryIdentifier = RepositoryId,
                     SourceRepositoryRef = expectedRef,
                     RunnerEnvironment = "github-hosted",
                 },
@@ -293,33 +297,62 @@ static class UpdateInstaller
         };
 
         var hashBytes = Convert.FromHexString(hash);
-        string? failure = null;
+        var failure = "No build provenance was found for the downloaded file.";
 
         foreach (var attestation in document.RootElement.GetProperty("attestations").EnumerateArray())
         {
-            var bundle = SigstoreBundle.Deserialize(attestation.GetProperty("bundle").GetRawText());
-
-            // The library proves who signed the statement, the statement itself must still name our file
-            var statement = bundle.DsseEnvelope?.GetStatement();
-
-            if (statement?.Subject.Any(subject => subject.Digest.TryGetValue("sha256", out var digest) && digest.Equals(hash, StringComparison.OrdinalIgnoreCase)) != true)
+            // One unusable attestation must not stop the others from being tried
+            try
             {
-                failure = "The attestation does not describe the downloaded file.";
-                continue;
+                var bundle = await LoadBundleAsync(httpClient, attestation, cancellationToken).ConfigureAwait(false);
+
+                // The library proves who signed the statement, the statement itself must still be
+                // build provenance that names our file
+                var statement = bundle.DsseEnvelope?.GetStatement();
+
+                if (statement?.PredicateType != ProvenancePredicateType)
+                {
+                    failure = "The attestation is not build provenance.";
+                    continue;
+                }
+
+                if (!statement.Subject.Any(subject => subject.Digest.TryGetValue("sha256", out var digest) && digest.Equals(hash, StringComparison.OrdinalIgnoreCase)))
+                {
+                    failure = "The attestation does not describe the downloaded file.";
+                    continue;
+                }
+
+                var (success, result) = await Verifier.TryVerifyDigestAsync(hashBytes, HashAlgorithmType.Sha256, bundle, policy, cancellationToken).ConfigureAwait(false);
+
+                if (success)
+                {
+                    Log.Info(nameof(UpdateInstaller), $"Verified build provenance signed by {result?.SignerIdentity}");
+                    return;
+                }
+
+                failure = result?.FailureReason;
             }
-
-            var (success, result) = await Verifier.TryVerifyDigestAsync(hashBytes, HashAlgorithmType.Sha256, bundle, policy, cancellationToken).ConfigureAwait(false);
-
-            if (success)
+            catch (Exception e) when (e is not OperationCanceledException)
             {
-                Log.Info(nameof(UpdateInstaller), $"Verified build provenance signed by {result?.SignerIdentity}");
-                return;
+                failure = e.Message;
             }
-
-            failure = result?.FailureReason;
         }
 
         throw new InvalidDataException($"The build provenance of the downloaded file could not be verified. {failure}");
+    }
+
+    // The bundle is usually inlined, but the API also offers it as a separate download
+    private static async Task<SigstoreBundle> LoadBundleAsync(HttpClient httpClient, JsonElement attestation, CancellationToken cancellationToken)
+    {
+        if (attestation.TryGetProperty("bundle", out var inline) && inline.ValueKind == JsonValueKind.Object)
+        {
+            return SigstoreBundle.Deserialize(inline.GetRawText());
+        }
+
+        var bundleUrl = attestation.GetProperty("bundle_url").GetString() ?? throw new InvalidDataException("The attestation has no bundle.");
+        var json = await httpClient.GetStringAsync(new Uri(bundleUrl), cancellationToken).ConfigureAwait(false);
+
+        return SigstoreBundle.Deserialize(json);
     }
 
     private static void Verify(string downloadPath, long actualSize, string actualHash, string expectedHash)
