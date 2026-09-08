@@ -54,17 +54,18 @@ namespace GUI.Forms
 
             try
             {
-                // Offloaded so that the request setup does not run on the ui thread
-                await Task.Run(UpdateChecker.CheckForUpdates).ConfigureAwait(true);
+                await UpdateChecker.CheckForUpdates().ConfigureAwait(true);
             }
             catch (Exception ex)
             {
+                var message = $"Failed to check for updates: {ex.Message}";
+                Log.Error(nameof(AboutForm), message);
+
                 if (!IsDisposed)
                 {
-                    newVersionLabel.Text = "Failed to check for updates";
+                    newVersionLabel.Text = message;
                 }
 
-                Program.ShowError(ex);
                 return;
             }
 
@@ -76,25 +77,32 @@ namespace GUI.Forms
 
         private void OnUpdateChecked()
         {
+            var installed = UpdateInstaller.InstalledVersionText;
             var newVersion = UpdateChecker.NewVersionText;
 
-            if (!string.IsNullOrEmpty(newVersion))
+            if (installed != null)
+            {
+                newVersionLabel.Text = $"{installed} (installed)";
+                downloadButton.Text = "Restart to update";
+                downloadButton.Enabled = true;
+            }
+            else if (UpdateChecker.IsNewVersionAvailable)
             {
                 newVersionLabel.Text = newVersion;
-            }
-
-            if (UpdateChecker.IsNewVersionAvailable)
-            {
-                downloadButton.Text = UpdateChecker.IsChannelSwitch
-                    ? $"Switch to {(UpdateChecker.IsNewVersionStableBuild ? "stable " : "")}{newVersion}"
-                    : $"Download {newVersion}";
+                downloadButton.Text = UpdateChecker.IsNewer
+                    ? $"Download {newVersion}"
+                    : $"Switch to {(UpdateChecker.IsNewVersionStableBuild ? "stable " : "")}{newVersion}";
                 downloadButton.Enabled = true;
             }
             else
             {
-                downloadButton.Text = "Up to date";
+                newVersionLabel.Text = newVersion;
+                downloadButton.Text = UpdateChecker.NewVersion == null ? "Not available" : "Up to date";
                 downloadButton.Enabled = false;
             }
+
+            // Switching channels would not change what the pending restart installs
+            updateChannelComboBox.Enabled = installed == null;
 
             if (!string.IsNullOrEmpty(UpdateChecker.ReleaseNotesUrl))
             {
@@ -144,6 +152,12 @@ namespace GUI.Forms
 
         private async void OnDownloadButtonClick(object sender, EventArgs e)
         {
+            if (UpdateInstaller.InstalledVersionText != null)
+            {
+                UpdateInstaller.Restart();
+                return;
+            }
+
             downloadButton.Enabled = false;
 
             try
@@ -161,7 +175,7 @@ namespace GUI.Forms
             {
                 if (!IsDisposed)
                 {
-                    downloadButton.Enabled = true;
+                    OnUpdateChecked();
                 }
             }
         }
@@ -173,7 +187,8 @@ namespace GUI.Forms
                 return;
             }
 
-            ToggleAutomaticUpdateCheck(checkForUpdatesCheckbox.Checked);
+            Settings.Config.Update.CheckAutomatically = checkForUpdatesCheckbox.Checked;
+            Settings.Config.Update.NextCheck = string.Empty;
         }
 
         private void OnUpdateChannelSelectedIndexChanged(object sender, EventArgs e)
@@ -183,16 +198,9 @@ namespace GUI.Forms
                 return;
             }
 
-            UpdateChecker.SetChannel((Settings.UpdateChannel)updateChannelComboBox.SelectedIndex);
+            Settings.Config.Update.Channel = (Settings.UpdateChannel)updateChannelComboBox.SelectedIndex;
 
             CheckForUpdates();
-        }
-
-        private static void ToggleAutomaticUpdateCheck(bool enabled = true)
-        {
-            Settings.Config.Update.CheckAutomatically = enabled;
-            Settings.Config.Update.LastCheck = string.Empty;
-            Settings.Config.Update.UpdateAvailable = UpdateChecker.IsNewVersionAvailable && !UpdateChecker.IsChannelSwitch && Settings.Config.Update.CheckAutomatically;
         }
 
         private static void OpenUrl(string url)

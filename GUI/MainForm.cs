@@ -592,8 +592,7 @@ namespace GUI
 
         private void OnAboutItemClick(object sender, EventArgs e)
         {
-            using var form = new AboutForm();
-            form.ShowDialog(this);
+            mainFormBottomPanel.ShowAboutDialog();
         }
 
         private void OnSettingsItemClick(object sender, EventArgs e)
@@ -1075,10 +1074,9 @@ namespace GUI
 
         private async void CheckForUpdatesIfNecessary()
         {
-            if (await UpdateChecker.CheckForUpdatesIfNecessary().ConfigureAwait(true))
-            {
-                mainFormBottomPanel.SetNewVersionAvailable();
-            }
+            await UpdateChecker.CheckForUpdatesIfNecessary().ConfigureAwait(true);
+
+            mainFormBottomPanel.RefreshUpdateState();
         }
 
 #if DEBUG

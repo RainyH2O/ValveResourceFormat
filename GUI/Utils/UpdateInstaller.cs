@@ -28,6 +28,9 @@ static class UpdateInstaller
     // Keeps the Sigstore trust root cached between verifications
     private static readonly SigstoreVerifier Verifier = new();
 
+    /// <summary>The version that has been installed and takes effect on the next start, or null.</summary>
+    public static string? InstalledVersionText { get; private set; }
+
     // A single file publish has nothing but the bundle on disk. A debug build has the managed
     // assembly next to its apphost, and cannot be replaced by a single downloaded file.
     private static bool IsSingleFileBundle(string exePath) => !File.Exists(Path.ChangeExtension(exePath, ".dll"));
@@ -44,24 +47,30 @@ static class UpdateInstaller
             return;
         }
 
-        // The previous instance may still be exiting, it will be gone by the next launch
-        TryDelete(exePath + ReplacedSuffix);
         TryDelete(exePath + PendingSuffix);
+        _ = DeleteReplacedAsync(exePath + ReplacedSuffix);
     }
 
-    private static void TryDelete(string path)
+    // The previous instance is usually still exiting when this one starts, so keep trying for a while.
+    // Whatever is still in use after that is removed by a later launch.
+    private static async Task DeleteReplacedAsync(string path)
+    {
+        for (var attempt = 0; attempt < 30 && !TryDelete(path); attempt++)
+        {
+            await Task.Delay(1000).ConfigureAwait(false);
+        }
+    }
+
+    private static bool TryDelete(string path)
     {
         try
         {
             File.Delete(path);
+            return true;
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            //
-        }
-        catch (UnauthorizedAccessException)
-        {
-            //
+            return false;
         }
     }
 
@@ -145,11 +154,13 @@ static class UpdateInstaller
             throw new IOException($"The update was verified but could not be installed over {exePath}. {e.Message}", e);
         }
 
+        InstalledVersionText = UpdateChecker.NewVersionText;
+
         var restartButton = new TaskDialogButton("Restart now");
         var page = new TaskDialogPage
         {
             Caption = "Update installed",
-            Heading = $"Source 2 Viewer {UpdateChecker.NewVersionText} has been installed",
+            Heading = $"Source 2 Viewer {InstalledVersionText} has been installed",
             Text = "It will be used the next time the viewer starts.",
             Icon = TaskDialogIcon.ShieldSuccessGreenBar,
             Buttons = { restartButton, new TaskDialogButton("Later") },
@@ -158,14 +169,28 @@ static class UpdateInstaller
 
         if (await TaskDialog.ShowDialogAsync(owner, page).ConfigureAwait(true) == restartButton)
         {
-            // The new instance reads the settings as soon as it starts, before this one gets to save them on close
-            Settings.Save();
-
-            Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
-            Program.MainForm.Close();
+            Restart();
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Closes this instance and starts the installed executable.
+    /// </summary>
+    public static void Restart()
+    {
+        var exePath = Environment.ProcessPath!;
+
+        // Closing the main window saves the settings, so the new instance starts from the final state
+        Program.MainForm.Close();
+
+        if (!Program.MainForm.IsDisposed)
+        {
+            return; // Closing was cancelled
+        }
+
+        Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
     }
 
     // Hashes and counts what passes through on the way to the file, so the download is verified
@@ -400,7 +425,7 @@ static class UpdateInstaller
         {
             File.Delete(replacedPath);
         }
-        catch (IOException e)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             throw new IOException("A previous update is still in use, restart the viewer and try again.", e);
         }

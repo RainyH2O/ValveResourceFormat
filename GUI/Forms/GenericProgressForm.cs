@@ -160,7 +160,10 @@ namespace GUI.Forms
                     {
                         foreach (var exception in t.Exception.Flatten().InnerExceptions)
                         {
-                            Program.ShowError(exception);
+                            if (exception is not OperationCanceledException)
+                            {
+                                Program.ShowError(exception);
+                            }
                         }
                     }
 

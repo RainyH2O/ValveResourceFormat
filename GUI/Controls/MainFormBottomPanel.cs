@@ -50,15 +50,34 @@ public partial class MainFormBottomPanel : Panel
         versionLabel.Text = text;
     }
 
-    public void SetNewVersionAvailable()
+    public void RefreshUpdateState()
     {
-        newVersionAvailableToolStripMenuItem.Visible = true;
+        if (IsDisposed)
+        {
+            return; // The About dialog restarted the application
+        }
+
+        if (UpdateInstaller.InstalledVersionText != null)
+        {
+            newVersionAvailableToolStripMenuItem.Text = "Restart to update";
+            newVersionAvailableToolStripMenuItem.Visible = true;
+            return;
+        }
+
+        newVersionAvailableToolStripMenuItem.Visible = Settings.Config.Update.CheckAutomatically && Settings.Config.Update.UpdateAvailable;
+    }
+
+    public void ShowAboutDialog()
+    {
+        using var form = new AboutForm();
+        form.ShowDialog(this);
+
+        RefreshUpdateState();
     }
 
     private void OnAboutItemClick(object sender, EventArgs e)
     {
-        using var form = new AboutForm();
-        form.ShowDialog(this);
+        ShowAboutDialog();
     }
 
     public void UpdateKeybindings(List<KeybindingInfo> keybindings)

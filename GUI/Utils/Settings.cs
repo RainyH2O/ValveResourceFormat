@@ -47,8 +47,8 @@ namespace GUI.Utils
             public UpdateChannel Channel { get; set; }
             /// <summary>Gets or sets whether a newer version of the application is available.</summary>
             public bool UpdateAvailable { get; set; }
-            /// <summary>Gets or sets the timestamp of the last update check.</summary>
-            public string LastCheck { get; set; } = string.Empty;
+            /// <summary>Gets or sets when the next automatic update check is due.</summary>
+            public string NextCheck { get; set; } = string.Empty;
             /// <summary>Gets or sets the application version recorded the last time settings were loaded, used to detect version changes and reset update state.</summary>
             public string Version { get; set; } = string.Empty;
         }
@@ -311,12 +311,6 @@ namespace GUI.Utils
                 Config.ViewmodelFieldOfView = 64;
             }
 
-            if (currentVersion < 17) // version 17: added update channel
-            {
-                // Anyone already running a dev build stays on dev builds
-                Config.Update.Channel = Program.BuildChannel;
-            }
-
             if (currentVersion > 0 && currentVersion != SettingsFileCurrentVersion)
             {
                 Log.Info(nameof(Settings), $"Settings version changed: {currentVersion} -> {SettingsFileCurrentVersion}");
@@ -327,7 +321,10 @@ namespace GUI.Utils
             {
                 Config.Update.Version = Program.ProductVersion;
                 Config.Update.UpdateAvailable = false;
-                Config.Update.LastCheck = string.Empty;
+                Config.Update.NextCheck = string.Empty;
+
+                // Installing a build, whether through the updater or by hand, is choosing its channel
+                Config.Update.Channel = Program.BuildChannel;
             }
 
             Config._VERSION_DO_NOT_MODIFY = SettingsFileCurrentVersion;

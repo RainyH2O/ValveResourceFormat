@@ -76,14 +76,17 @@ static partial class UpdateChecker
     }
 
     private const string ManifestUrl = "https://update.s2v.app/v1/latest.json";
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromDays(1);
+    private static readonly TimeSpan FailedCheckRetryDelay = TimeSpan.FromMinutes(30);
 
     // The manifest describes both channels, so it is fetched once and re-evaluated when the channel changes
     private static Task<UpdateManifest?>? ManifestTask;
     private static readonly Lock CheckLock = new();
+    /// <summary>Whether the selected channel offers a build to install, either newer or a switch to that channel.</summary>
     public static bool IsNewVersionAvailable { get; private set; }
+    /// <summary>Whether the offered build is newer than the running one.</summary>
+    public static bool IsNewer { get; private set; }
     public static bool IsNewVersionStableBuild { get; private set; }
-    /// <summary>Whether the offered version is from a different channel than the running build, rather than a newer build of the same channel.</summary>
-    public static bool IsChannelSwitch { get; private set; }
     public static string? NewVersion { get; private set; }
     /// <summary>The offered version as shown to the user, e.g. "20.0" or "dev build 7125".</summary>
     public static string? NewVersionText { get; private set; }
@@ -99,7 +102,8 @@ static partial class UpdateChecker
 
         using (CheckLock.EnterScope())
         {
-            manifestTask = ManifestTask ??= GetManifestAsync();
+            // Offloaded so that the request setup does not run on the ui thread
+            manifestTask = ManifestTask ??= Task.Run(GetManifestAsync);
         }
 
         UpdateManifest? manifest;
@@ -126,58 +130,34 @@ static partial class UpdateChecker
     }
 
     /// <summary>
-    /// Switches the update channel. The next check evaluates the already fetched manifest against the new channel.
+    /// Performs the automatic update check if it is enabled and due. The outcome is persisted in the settings.
     /// </summary>
-    public static void SetChannel(Settings.UpdateChannel channel)
+    public static async Task CheckForUpdatesIfNecessary()
     {
-        Settings.Config.Update.Channel = channel;
-        Settings.Config.Update.UpdateAvailable = false;
-    }
-
-    /// <summary>
-    /// Performs the automatic update check if it is enabled and has not been performed recently.
-    /// Returns true if a new version is available, either remembered from an earlier check or found by checking now.
-    /// </summary>
-    public static async Task<bool> CheckForUpdatesIfNecessary()
-    {
-        if (!Settings.Config.Update.CheckAutomatically)
+        if (!Settings.Config.Update.CheckAutomatically || Settings.Config.Update.UpdateAvailable)
         {
-            return false;
-        }
-
-        if (Settings.Config.Update.UpdateAvailable)
-        {
-            return true;
+            return;
         }
 
         var now = DateTime.UtcNow;
 
-        if (DateTime.TryParseExact(Settings.Config.Update.LastCheck, "s", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lastCheck))
+        if (DateTime.TryParseExact(Settings.Config.Update.NextCheck, "s", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var nextCheck) && now < nextCheck)
         {
-            var diff = now.Subtract(lastCheck);
-
-            // Perform auto update check once a day
-            if (diff.TotalDays < 1)
-            {
-                return false;
-            }
+            return;
         }
-
-        Settings.Config.Update.LastCheck = now.ToString("s", CultureInfo.InvariantCulture);
 
         try
         {
-            // Offloaded so that the request setup does not run on the ui thread
-            await Task.Run(CheckForUpdates).ConfigureAwait(false);
+            await CheckForUpdates().ConfigureAwait(false);
+
+            Settings.Config.Update.NextCheck = (now + CheckInterval).ToString("s", CultureInfo.InvariantCulture);
         }
         catch (Exception e)
         {
             // Being offline should not interrupt startup, a manual check from the About dialog reports its errors
             Log.Error(nameof(UpdateChecker), $"Failed to check for updates: {e.Message}");
-            return false;
+            Settings.Config.Update.NextCheck = (now + FailedCheckRetryDelay).ToString("s", CultureInfo.InvariantCulture);
         }
-
-        return IsNewVersionAvailable && !IsChannelSwitch;
     }
 
     private static Version GetCurrentVersion()
@@ -217,36 +197,40 @@ static partial class UpdateChecker
         }
 
         var stable = manifest.Stable;
-        var stableVersion = stable?.Version ?? "0.0";
+        var dev = manifest.Dev;
 
         // Release notes are always for the stable release, no matter which channel is selected
         ReleaseNotesUrl = stable?.ReleaseNotesUrl;
-        ReleaseNotesVersion = stableVersion;
+        ReleaseNotesVersion = stable?.Version;
 
         IsNewVersionStableBuild = channel == Settings.UpdateChannel.Stable;
-        IsChannelSwitch = channel != Program.BuildChannel;
+        IsNewer = false;
+        NewVersion = null;
+        Dictionary<string, UpdateAsset>? assets = null;
 
-        // Switching channels always offers that channel's latest build, even when it is older than the running one
-        if (IsChannelSwitch)
+        if (IsNewVersionStableBuild)
         {
-            IsNewVersionAvailable = IsNewVersionStableBuild ? stable?.Version != null : manifest.Dev?.BuildNumber > 0;
+            if (stable is { Version.Length: > 0 })
+            {
+                NewVersion = stable.Version;
+                var releaseVersion = Version.TryParse(NewVersion, out var parsed) ? parsed : new Version(0, 0);
+                IsNewer = releaseVersion > new Version(currentVersion.Major, currentVersion.Minor);
+                assets = stable.Assets;
+            }
         }
-        else if (IsNewVersionStableBuild)
+        else if (dev is { BuildNumber: > 0 })
         {
-            var releaseVersion = Version.TryParse(stableVersion, out var parsed) ? parsed : new Version(0, 0);
-            IsNewVersionAvailable = releaseVersion > new Version(currentVersion.Major, currentVersion.Minor);
-        }
-        else
-        {
-            IsNewVersionAvailable = (manifest.Dev?.BuildNumber ?? 0) > currentVersion.Build;
+            NewVersion = dev.BuildNumber.ToString(CultureInfo.InvariantCulture);
+
+            // Tag and branch builds share one run number sequence, so this compares across channels too
+            IsNewer = dev.BuildNumber > currentVersion.Build;
+            assets = dev.Assets;
         }
 
-        NewVersion = IsNewVersionStableBuild
-            ? stableVersion
-            : (manifest.Dev?.BuildNumber ?? 0).ToString(CultureInfo.InvariantCulture);
-        NewVersionText = IsNewVersionStableBuild ? NewVersion : $"dev build {NewVersion}";
+        // An older or equal build on the other channel is offered from the About dialog, but never announced
+        IsNewVersionAvailable = IsNewer || (NewVersion != null && channel != Program.BuildChannel);
+        NewVersionText = NewVersion == null ? "Not available" : IsNewVersionStableBuild ? NewVersion : $"dev build {NewVersion}";
 
-        var assets = IsNewVersionStableBuild ? stable?.Assets : manifest.Dev?.Assets;
         var asset = assets?.GetValueOrDefault(RuntimeInformation.RuntimeIdentifier);
 
         // The file is verified after download, but the request itself should not go out in the clear either
@@ -254,11 +238,7 @@ static partial class UpdateChecker
         DownloadSize = asset?.Size;
         DownloadSha256 = asset?.Sha256;
 
-        if (Settings.Config.Update.CheckAutomatically)
-        {
-            // A channel switch is only offered from the About dialog, remembering it would nag on every launch
-            Settings.Config.Update.UpdateAvailable = IsNewVersionAvailable && !IsChannelSwitch;
-        }
+        Settings.Config.Update.UpdateAvailable = IsNewer;
     }
 
     private static async Task<UpdateManifest?> GetManifestAsync()
