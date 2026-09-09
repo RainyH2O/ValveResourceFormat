@@ -96,6 +96,39 @@ static partial class UpdateChecker
     public static long? DownloadSize { get; private set; }
     public static string? DownloadSha256 { get; private set; }
 
+    /// <summary>
+    /// The newest dev build known from this session's check, if it is newer than the running build, regardless of the selected channel.
+    /// Never performs a request, so it is safe to consult from error handlers.
+    /// </summary>
+    public static int? NewerDevBuild
+    {
+        get
+        {
+            Task<UpdateManifest?>? manifestTask;
+
+            using (CheckLock.EnterScope())
+            {
+                manifestTask = ManifestTask;
+            }
+
+            if (manifestTask is not { IsCompletedSuccessfully: true })
+            {
+                return null;
+            }
+
+            var currentVersion = GetCurrentVersion();
+
+            if (IsLocalBuild(currentVersion))
+            {
+                return null;
+            }
+
+            var dev = manifestTask.Result?.Dev;
+
+            return dev is { BuildNumber: > 0 } && dev.BuildNumber > currentVersion.Build ? dev.BuildNumber : null;
+        }
+    }
+
     public static async Task CheckForUpdates()
     {
         Task<UpdateManifest?> manifestTask;

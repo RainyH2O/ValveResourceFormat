@@ -13,6 +13,7 @@ public partial class MainFormBottomPanel : Panel
         if (!DesignMode)
         {
             newVersionAvailableToolStripMenuItem.Visible = false;
+            newVersionAvailableToolStripMenuItem.Highlighted = true;
         }
 
         ResizeRedraw = true;
@@ -64,7 +65,26 @@ public partial class MainFormBottomPanel : Panel
             return;
         }
 
+        newVersionAvailableToolStripMenuItem.Text = "Update Available";
         newVersionAvailableToolStripMenuItem.Visible = Settings.Config.Update.CheckAutomatically && Settings.Config.Update.UpdateAvailable;
+    }
+
+    /// <summary>
+    /// Points at a build that may already contain a fix for an error that was just shown.
+    /// Uses only the update state already in memory, and reverts to the regular state once the About dialog is opened.
+    /// </summary>
+    public void ShowUpdateAfterError()
+    {
+        RefreshUpdateState();
+
+        if (IsDisposed || newVersionAvailableToolStripMenuItem.Visible || UpdateChecker.NewerDevBuild == null)
+        {
+            return;
+        }
+
+        // A stable channel user is not offered dev builds, but the fix is most likely there
+        newVersionAvailableToolStripMenuItem.Text = "Newer dev build available";
+        newVersionAvailableToolStripMenuItem.Visible = true;
     }
 
     public void ShowAboutDialog()

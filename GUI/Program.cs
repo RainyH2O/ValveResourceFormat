@@ -168,6 +168,8 @@ namespace GUI
                 //
             }
 
+            ShowUpdateAfterError();
+
             var page = new TaskDialogPage
             {
                 Caption = $"Unhandled exception: {exception.GetType()}",
@@ -201,6 +203,25 @@ namespace GUI
                 {
                     AppClipboard.SetText(outputText);
                 }
+            }
+        }
+
+        private static void ShowUpdateAfterError()
+        {
+            var mainForm = MainForm;
+
+            if (mainForm is not { IsHandleCreated: true, IsDisposed: false })
+            {
+                return;
+            }
+
+            try
+            {
+                mainForm.BeginInvoke(mainForm.ShowUpdateAfterError);
+            }
+            catch (InvalidOperationException)
+            {
+                // The window is being destroyed
             }
         }
 

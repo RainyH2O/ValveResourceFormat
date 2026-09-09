@@ -1079,6 +1079,11 @@ namespace GUI
             mainFormBottomPanel.RefreshUpdateState();
         }
 
+        public void ShowUpdateAfterError()
+        {
+            mainFormBottomPanel.ShowUpdateAfterError();
+        }
+
 #if DEBUG
         private static void ValidateShaders()
         {

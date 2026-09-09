@@ -33,6 +33,18 @@ public class ThemedToolStripMenuItem : ToolStripMenuItem
         }
     }
 
+    /// <summary>Renders the item on the theme's attention background.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool Highlighted
+    {
+        get => field;
+        set
+        {
+            field = value;
+            Invalidate();
+        }
+    }
+
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public override Image? Image
     {
