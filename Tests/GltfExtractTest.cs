@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -57,6 +58,7 @@ namespace Tests
                 var rootMotionNode = root.LogicalNodes.Single(n => n.Name == "root_motion");
                 var sampler = anim.FindTranslationChannel(rootMotionNode)?.GetTranslationSampler();
                 await Assert.That(sampler).IsNotNull().Because("root_motion bone should have a translation channel");
+                Debug.Assert(sampler is not null);
 
                 var keys = sampler.GetLinearKeys().ToArray();
                 var displacement = keys[^1].Value - keys[0].Value;

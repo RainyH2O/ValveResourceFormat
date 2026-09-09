@@ -46,6 +46,7 @@ namespace Tests
 
             var sentence = soundData.Sentence;
             await Assert.That(sentence).IsNotNull();
+            Debug.Assert(sentence is not null);
 
             using (Assert.Multiple())
             {

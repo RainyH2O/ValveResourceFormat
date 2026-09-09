@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using ValveResourceFormat;
@@ -16,6 +17,7 @@ namespace Tests
             var model = (Model)resource.DataBlock!;
             var phys = model.GetEmbeddedPhys();
             await Assert.That(phys).IsNotNull();
+            Debug.Assert(phys is not null);
 
             var hull = phys.Parts[0].Shape.Hulls[0].Shape;
 
