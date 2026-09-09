@@ -48,6 +48,7 @@ export default defineConfig({
                 { text: "Introduction", link: "/" },
                 { text: "Reporting Issues", link: "/guides/reporting-issues" },
                 { text: "Help Write Guides", link: "/guides/contributing" },
+                { text: "Privacy", link: "/guides/privacy" },
                 {
                     text: "Source 2 Viewer",
                     items: [

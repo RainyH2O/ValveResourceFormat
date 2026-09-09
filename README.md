@@ -30,10 +30,6 @@ If you are interested in helping, take a look at the
 and join our Discord. See [CONTRIBUTING.md](CONTRIBUTING.md)
 and [AGENTS.md](AGENTS.md) for more information.
 
-## GUI
-
-Source 2 Viewer keeps its settings in `%LocalAppData%/Source2Viewer/settings.vdf`.
-
 ## License
 
 Contents of this repository are available under [MIT license](LICENSE), except for `Tests/Files` folder which contains files that have likely come from Valve's games.
