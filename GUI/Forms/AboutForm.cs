@@ -162,10 +162,7 @@ namespace GUI.Forms
 
             try
             {
-                if (!await UpdateInstaller.InstallAsync(this).ConfigureAwait(true))
-                {
-                    OpenUrl(UpdateChecker.DownloadUrl ?? "https://s2v.app/");
-                }
+                await UpdateInstaller.InstallAsync(this).ConfigureAwait(true);
             }
             catch (Exception ex)
             {

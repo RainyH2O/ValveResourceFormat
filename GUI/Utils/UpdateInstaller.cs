@@ -76,17 +76,17 @@ static class UpdateInstaller
 
     /// <summary>
     /// Downloads and installs the offered build behind a progress dialog.
-    /// Returns false when self updating is not possible so the caller can fall back to the website.
     /// </summary>
-    public static async Task<bool> InstallAsync(IWin32Window owner)
+    public static async Task InstallAsync(IWin32Window owner)
     {
         var url = UpdateChecker.DownloadUrl;
         var expectedHash = UpdateChecker.DownloadSha256;
-        var exePath = Environment.ProcessPath;
+        var exePath = Environment.ProcessPath ?? throw new InvalidOperationException("Could not determine the path of the running executable.");
 
-        if (url == null || expectedHash == null || exePath == null || !OperatingSystem.IsWindows())
+        // Only a download that can be verified is ever offered, there is no unverified fallback
+        if (url == null || expectedHash == null)
         {
-            return false;
+            throw new InvalidOperationException("The update does not provide a verifiable download.");
         }
 
         // A random name in the user's own temp folder cannot be planted ahead of time by anyone else
@@ -129,7 +129,7 @@ static class UpdateInstaller
 
         if (!downloaded)
         {
-            return true;
+            return;
         }
 
         if (!IsSingleFileBundle(exePath))
@@ -139,7 +139,7 @@ static class UpdateInstaller
                 $"The update was downloaded and verified, but this build cannot replace itself.{Environment.NewLine}{Environment.NewLine}{downloadPath}",
                 "Update downloaded").ConfigureAwait(true);
 
-            return true;
+            return;
         }
 
         try
@@ -171,8 +171,6 @@ static class UpdateInstaller
         {
             Restart();
         }
-
-        return true;
     }
 
     /// <summary>
