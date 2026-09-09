@@ -1823,7 +1823,7 @@ namespace CLI
             info.Append(" (");
             info.Append(RuntimeInformation.OSArchitecture.ToString());
             info.AppendLine(")");
-            info.AppendLine("Website: https://valveresourceformat.github.io");
+            info.AppendLine("Website: https://s2v.app");
             info.Append("GitHub: https://github.com/ValveResourceFormat/ValveResourceFormat");
             return info.ToString();
         }

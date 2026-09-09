@@ -36,7 +36,7 @@
     <Copyright>Copyright © ValveResourceFormat Contributors</Copyright>
     <RepositoryUrl>https://github.com/ValveResourceFormat/ValveResourceFormat</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://valveresourceformat.github.io/</PackageProjectUrl>
+    <PackageProjectUrl>https://s2v.app/</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 

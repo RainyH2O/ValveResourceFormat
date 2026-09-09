@@ -1,12 +1,11 @@
 # VRF / Valve Resource Format
-## [🔗 View VRF website](https://valveresourceformat.github.io)
 
 Valve's Source 2 resource file format parser, decompiler, and exporter.
 Source 2 files usually end with `_c`, for example `.vmdl_c`.
 
 ## ⚠️ Breaking Changes Notice
 
-**The primary user of this library is the [Source 2 Viewer](https://valveresourceformat.github.io).** As such, updates may contain breaking changes and backwards incompatible API changes, as the viewer does not require backwards compatibility with older library versions. Additionally, Source 2 games themselves may update and change file formats at any time, which may necessitate breaking changes in this library. **If you need to support newer file formats, you will need to update the library.** That said, we do aim to support older file formats going back to the very first Source 2 project.
+**The primary user of this library is the [Source 2 Viewer](https://s2v.app).** As such, updates may contain breaking changes and backwards incompatible API changes, as the viewer does not require backwards compatibility with older library versions. Additionally, Source 2 games themselves may update and change file formats at any time, which may necessitate breaking changes in this library. **If you need to support newer file formats, you will need to update the library.** That said, we do aim to support older file formats going back to the very first Source 2 project.
 
 ## Basic usage
 

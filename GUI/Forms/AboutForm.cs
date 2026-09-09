@@ -112,7 +112,7 @@ namespace GUI.Forms
 
         public void OnWebsiteClick(object sender, EventArgs e)
         {
-            OpenUrl("https://valveresourceformat.github.io/");
+            OpenUrl("https://s2v.app/");
         }
 
         private void OnGithubClick(object sender, EventArgs e)
@@ -164,7 +164,7 @@ namespace GUI.Forms
             {
                 if (!await UpdateInstaller.InstallAsync(this).ConfigureAwait(true))
                 {
-                    OpenUrl(UpdateChecker.DownloadUrl ?? "https://valveresourceformat.github.io/");
+                    OpenUrl(UpdateChecker.DownloadUrl ?? "https://s2v.app/");
                 }
             }
             catch (Exception ex)
