@@ -49,8 +49,12 @@ namespace ValveResourceFormat.Renderer.World
         /// <summary>The first world node encountered during loading.</summary>
         public WorldNode? MainWorldNode { get; private set; }
 
+        // Kept apart from world_layer_base so the world geometry can be hidden while collision stays visible.
+        // Always enabled, the physics group filter decides what actually draws.
+        private const string PhysicsDebugLayerName = "Physics Visualization Layer";
+
         /// <summary>Layer names that should be visible by default, populated during loading.</summary>
-        public HashSet<string> DefaultEnabledLayers { get; } = ["No layer", "Entities", EditorEntityNode.LayerName, "Particles"];
+        public HashSet<string> DefaultEnabledLayers { get; } = ["No layer", "Entities", EditorEntityNode.LayerName, "Particles", PhysicsDebugLayerName];
 
         /// <summary>Names of info_camera_link entities found in the world.</summary>
         public List<string> CameraNames { get; } = [];
@@ -429,7 +433,7 @@ namespace ValveResourceFormat.Renderer.World
 
                 foreach (var physSceneNode in PhysSceneNode.CreatePhysSceneNodes(scene, phys, physResource.FileName[..^2]))
                 {
-                    physSceneNode.LayerName = "world_layer_base";
+                    physSceneNode.LayerName = PhysicsDebugLayerName;
                     scene.Add(physSceneNode, true);
                 }
 
