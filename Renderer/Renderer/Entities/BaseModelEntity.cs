@@ -120,4 +120,42 @@ public abstract class BaseModelEntity : BaseEntity
 
         return ModelNode ?? base.CreateRootNode();
     }
+
+    /// <summary>Tints the model with <c>"R G B"</c> in 0-255.</summary>
+    [EntityInput("Color")]
+    protected void InputColor(EntityInputData data)
+    {
+        if (ModelNode is not { } node)
+        {
+            return;
+        }
+
+        if (data.Parameter == null || !EntityTransformHelper.TryParseVector3(data.Parameter.Trim(), out var color))
+        {
+            EntitySystem.Logger.LogWarning("{Classname} '{TargetName}' cannot take Color \"{Value}\", which is not \"R G B\"", Classname, TargetName, data.Parameter);
+            return;
+        }
+
+        node.Tint = new Vector4(Vector3.Clamp(color / 255f, Vector3.Zero, Vector3.One), node.Tint.W);
+    }
+
+    /// <summary>Sets the model's alpha from 0-255.</summary>
+    [EntityInput("Alpha")]
+    protected void InputAlpha(EntityInputData data)
+    {
+        if (ModelNode is not { } node)
+        {
+            return;
+        }
+
+        var alpha = data.Float(float.NaN);
+
+        if (float.IsNaN(alpha))
+        {
+            EntitySystem.Logger.LogWarning("{Classname} '{TargetName}' cannot take Alpha \"{Value}\", which is not a number", Classname, TargetName, data.Parameter);
+            return;
+        }
+
+        node.Tint = node.Tint with { W = Math.Clamp(alpha / 255f, 0f, 1f) };
+    }
 }
