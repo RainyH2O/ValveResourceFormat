@@ -80,6 +80,7 @@ namespace ValveResourceFormat.Renderer.Particles
             SetupRenderers(simulation.Definition.GetArray("m_Renderers") ?? [], scene);
 
             simulation.RenderState.SequenceDurations = CollectSequenceDurations();
+            simulation.RenderState.Lighting = scene.LightingInfo;
 
             foreach (var childSimulation in simulation.Children)
             {
@@ -146,6 +147,12 @@ namespace ValveResourceFormat.Renderer.Particles
 
             foreach (var renderer in renderers)
             {
+                if (renderer.OnlyRenderInEffectsBloomPass)
+                {
+                    // todo: add bloom effects pass
+                    continue;
+                }
+
                 passes |= renderer.OnlyRenderInEffectsWaterPass
                     ? CustomRenderPasses.WaterEffects
                     : renderer.Pass == RenderPass.Opaque
@@ -244,9 +251,9 @@ namespace ValveResourceFormat.Renderer.Particles
 
             foreach (var renderer in renderers)
             {
-                var inPass = depthPass
+                var inPass = !renderer.OnlyRenderInEffectsBloomPass && (depthPass
                     ? renderer.CanRenderDepth
-                    : renderer.Pass == pass && renderer.OnlyRenderInEffectsWaterPass == waterEffectsLayer;
+                    : renderer.Pass == pass && renderer.OnlyRenderInEffectsWaterPass == waterEffectsLayer);
 
                 if (!inPass || renderer.GetOperatorRunStrength(Simulation.RenderState) <= 0.0f)
                 {

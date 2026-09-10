@@ -69,6 +69,9 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
         /// <summary>Whether this renderer draws only into the water effects map, never into the scene.</summary>
         public bool OnlyRenderInEffectsWaterPass { get; }
 
+        /// <summary>Render in the bloom effects.</summary>
+        public bool OnlyRenderInEffectsBloomPass { get; }
+
         /// <summary>Whether what this renderer draws is an image; the water effects map takes data instead.</summary>
         protected bool OutputIsColor => !OnlyRenderInEffectsWaterPass;
 
@@ -90,6 +93,7 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
         protected ParticleFunctionRenderer(ParticleDefinitionParser parse) : base(parse)
         {
             OnlyRenderInEffectsWaterPass = parse.Boolean("m_bOnlyRenderInEffectsWaterPass", false);
+            OnlyRenderInEffectsBloomPass = parse.Boolean("m_bOnlyRenderInEffectsBloomPass", false);
             RadiusScale = parse.NumberProvider("m_flRadiusScale", RadiusScale);
             AlphaScale = parse.NumberProvider("m_flAlphaScale", AlphaScale);
             ColorScale = parse.VectorProvider("m_vecColorScale", ColorScale);

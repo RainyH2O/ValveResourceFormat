@@ -3,6 +3,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using OpenTK.Graphics.OpenGL;
+using ValveResourceFormat.Particles;
 using ValveResourceFormat.Renderer.SceneEnvironment;
 using ValveResourceFormat.ResourceTypes;
 
@@ -43,7 +44,7 @@ namespace ValveResourceFormat.Renderer.World
     /// <summary>
     /// Scene lighting data including lightmaps, reflection probes, and shadow maps.
     /// </summary>
-    public class WorldLightingInfo(Scene scene)
+    public class WorldLightingInfo(Scene scene) : IParticleLighting
     {
         /// <summary>Gets the lightmap textures indexed by uniform name.</summary>
         public Dictionary<string, RenderTexture> Lightmaps { get; } = [];

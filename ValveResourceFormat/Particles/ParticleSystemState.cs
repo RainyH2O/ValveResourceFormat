@@ -71,6 +71,9 @@ namespace ValveResourceFormat.Particles
         /// </summary>
         public float[]? SequenceDurations { get; set; }
 
+        /// <summary>The scene lighting</summary>
+        public IParticleLighting Lighting { get; set; } = IParticleLighting.Unlit;
+
         /// <summary>Whether the system stops at <see cref="EndTime"/> rather than running until it empties.</summary>
         public bool EndEarly { get; set; }
 
