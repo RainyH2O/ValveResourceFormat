@@ -37,6 +37,9 @@ public sealed class FuncButton : BaseToggle
         /// <summary>Sparks while out. Not simulated.</summary>
         SparkIfOff = 4096,
 
+        /// <summary>Can be pressed but never blocks the player.</summary>
+        NonSolid = 16384,
+
         /// <summary>Every flag that names a way to press the button.</summary>
         AnyActivation = TouchActivates | DamageActivates | UseActivates,
     }
@@ -135,6 +138,7 @@ public sealed class FuncButton : BaseToggle
 
         // Touch activation needs the button to report what is inside it, without giving up being solid
         IsTrigger = HasSpawnFlags(SpawnFlag.TouchActivates);
+        IsSolid = !HasSpawnFlags(SpawnFlag.NonSolid);
 
         positionOut = Origin;
         positionIn = positionOut + MoveDirection * GetTravelDistance();
@@ -167,9 +171,9 @@ public sealed class FuncButton : BaseToggle
 
         if (State == ButtonState.AtTop)
         {
-            // Only a toggle button comes back out on a second press
             if (HasSpawnFlags(SpawnFlag.Toggle) && !staysPushed)
             {
+                EntitySystem.TriggerOutput(this, "OnPressed", lastActivator);
                 ButtonReturn();
             }
 
@@ -224,7 +228,7 @@ public sealed class FuncButton : BaseToggle
     private void InputEnable(EntityInputData data)
     {
         IsDisabled = false;
-        IsSolid = true;
+        IsSolid = !HasSpawnFlags(SpawnFlag.NonSolid);
         IsDrawn = true;
     }
 
@@ -267,6 +271,8 @@ public sealed class FuncButton : BaseToggle
             return;
         }
 
+        EntitySystem.TriggerOutput(this, "OnPressed", lastActivator);
+
         State = ButtonState.GoingUp;
         moveDoneFunction = MoveDoneFunction.TriggerAndWait;
 
@@ -278,7 +284,6 @@ public sealed class FuncButton : BaseToggle
     {
         State = ButtonState.AtTop;
 
-        EntitySystem.TriggerOutput(this, "OnPressed", lastActivator);
         EntitySystem.TriggerOutput(this, "OnIn", lastActivator);
 
         if (staysPushed || HasSpawnFlags(SpawnFlag.Toggle))
