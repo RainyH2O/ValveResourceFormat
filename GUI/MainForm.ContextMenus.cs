@@ -57,7 +57,7 @@ namespace GUI
                 throw new InvalidDataException("Context menu tag is not a Point");
             }
 
-            return tabs.Cast<TabPage>().Where((t, i) => tabControl.GetTabRect(i).Contains(location)).First();
+            return tabs.Cast<TabPage>().Where((t, i) => tabControl.GetDisplayTabRect(i).Contains(location)).First();
         }
 
         private void CloseToolStripMenuItem_Click(object sender, EventArgs e)
