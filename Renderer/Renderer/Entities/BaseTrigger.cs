@@ -1,3 +1,5 @@
+using ValveResourceFormat.Serialization.KeyValues;
+
 namespace ValveResourceFormat.Renderer.Entities;
 
 /// <summary>
@@ -34,6 +36,9 @@ public abstract class BaseTrigger : BaseModelEntity
         AllowAll = 64,
     }
 
+    /// <summary>Gets whether the trigger reacts to anything.</summary>
+    public bool IsEnabled { get; private set; } = true;
+
     /// <summary>
     /// Initializes a trigger from its keyvalues.
     /// </summary>
@@ -49,7 +54,17 @@ public abstract class BaseTrigger : BaseModelEntity
     {
         IsSolid = false;
         IsTrigger = true;
+        IsEnabled = !KeyValues.GetBooleanProperty("startdisabled");
     }
+
+    /// <summary>Switches the trigger on; anything already inside is touched on the next tick.</summary>
+    [EntityInput("Enable")] protected void InputEnable(EntityInputData data) => IsEnabled = true;
+
+    /// <summary>Switches the trigger off; anything inside stops touching it on the next tick.</summary>
+    [EntityInput("Disable")] protected void InputDisable(EntityInputData data) => IsEnabled = false;
+
+    /// <summary>Switches the trigger on if it is off, and off if it is on.</summary>
+    [EntityInput("Toggle")] protected void InputToggle(EntityInputData data) => IsEnabled = !IsEnabled;
 
     /// <summary>
     /// Whether <paramref name="other"/> is the kind of thing this trigger reacts to, from its spawnflags.
@@ -64,6 +79,11 @@ public abstract class BaseTrigger : BaseModelEntity
     /// <returns><see langword="true"/> when the touch should register.</returns>
     protected override bool AcceptsTouchFrom(BaseEntity other)
     {
+        if (!IsEnabled)
+        {
+            return false;
+        }
+
         if (HasSpawnFlags(SpawnFlag.AllowAll))
         {
             return true;
