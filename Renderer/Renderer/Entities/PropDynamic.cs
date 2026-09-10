@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using ValveResourceFormat.ResourceTypes.ModelAnimation;
 using ValveResourceFormat.Serialization.KeyValues;
@@ -44,6 +46,12 @@ public sealed class PropDynamic : BaseModelEntity
         // than not blocking at all
         hasCollision = KeyValues.GetInt32Property("solid", 6) != 0 && EntityScale == Vector3.One;
         IsSolid = hasCollision && !HasSpawnFlags(SpawnFlag.StartCollisionDisabled);
+
+        // HL:A only
+        if (KeyValues.GetInt32Property("setbodygroup") is > 0 and var bodyGroupChoice)
+        {
+            SetBodyGroup(bodyGroupChoice.ToString(CultureInfo.InvariantCulture));
+        }
 
         // Replayed over what BaseModelEntity posed, which neither knows the loop mode nor plays a held
         // animation through before stopping on its last frame
@@ -126,6 +134,113 @@ public sealed class PropDynamic : BaseModelEntity
     [EntityInput("EnableCollision")] private void InputEnableCollision(EntityInputData data) => IsSolid = hasCollision;
 
     [EntityInput("DisableCollision")] private void InputDisableCollision(EntityInputData data) => IsSolid = false;
+
+    [EntityInput("SetBodyGroup")] private void InputSetBodyGroup(EntityInputData data) => SetBodyGroup(data.Parameter);
+
+    [EntityInput("Skin")]
+    private void InputSkin(EntityInputData data)
+    {
+        if (ModelNode is not { } node || NonEmpty(data.Parameter?.Trim()) is not { } value)
+        {
+            return;
+        }
+
+        var skins = node.GetMaterialGroups().ToList();
+        string? skin;
+
+        // A number is the skin's position, as the input is typed, even where a group is named like one:
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+        {
+            // Every model has a skin 0, whether or not it names any groups
+            if (index == 0 && skins.Count == 0)
+            {
+                return;
+            }
+
+            skin = index >= 0 && index < skins.Count ? skins[index] : null;
+        }
+        else
+        {
+            skin = skins.Find(name => name.Equals(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (skin == null)
+        {
+            EntitySystem.Logger.LogWarning("{Classname} '{TargetName}' has no skin \"{Skin}\" on {Model}, which has [{Skins}]",
+                Classname, TargetName, value, ModelName, string.Join(", ", skins));
+            return;
+        }
+
+        node.SetMaterialGroup(skin);
+    }
+
+    // "<bodygroup>,<choice>", the choice by index or by the name modern models give it.
+    private void SetBodyGroup(string? value)
+    {
+        if (ModelNode is not { } node || NonEmpty(value?.Trim()) is not { } parameter)
+        {
+            return;
+        }
+
+        var choices = node.GetMeshGroups().Select(ParseBodyGroupChoice).OfType<BodyGroupChoice>().ToList();
+
+        var comma = parameter.IndexOf(',', StringComparison.Ordinal);
+        var bodyGroup = comma < 0 ? null : parameter[..comma].Trim();
+        var choiceText = comma < 0 ? parameter : parameter[(comma + 1)..].Trim();
+
+        if (comma < 0)
+        {
+            var bodyGroups = choices.Select(static choice => choice.BodyGroup).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            bodyGroup = bodyGroups.Count == 1 ? bodyGroups[0] : null;
+        }
+
+        var isIndex = int.TryParse(choiceText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index);
+
+        var match = bodyGroup == null ? null : choices.Find(choice =>
+            choice.BodyGroup.Equals(bodyGroup, StringComparison.OrdinalIgnoreCase)
+            && (isIndex ? choice.Index == index : string.Equals(choice.Name, choiceText, StringComparison.OrdinalIgnoreCase)));
+
+        if (match == null)
+        {
+            EntitySystem.Logger.LogWarning("{Classname} '{TargetName}' has no body group choice \"{Value}\" on {Model}, which has [{Choices}]",
+                Classname, TargetName, parameter, ModelName, string.Join(", ", choices.Select(static choice => choice.MeshGroup)));
+            return;
+        }
+
+        var active = node.GetActiveMeshGroups()
+            .Where(meshGroup => ParseBodyGroupChoice(meshGroup) is not { } choice
+                || !choice.BodyGroup.Equals(match.BodyGroup, StringComparison.OrdinalIgnoreCase))
+            .Append(match.MeshGroup)
+            .ToList();
+
+        node.SetActiveMeshGroups(active);
+    }
+
+    private sealed record BodyGroupChoice(string MeshGroup, string BodyGroup, int Index, string? Name);
+
+    private static BodyGroupChoice? ParseBodyGroupChoice(string meshGroup)
+    {
+        // HL:A "<bodygroup>_@<index>"
+        // CS2  "<bodygroup>_@<index>_#&<choice name>"
+
+        var joiner = meshGroup.IndexOf("_@", StringComparison.Ordinal);
+
+        if (joiner <= 0)
+        {
+            return null;
+        }
+
+        var rest = meshGroup[(joiner + 2)..];
+        var nameJoiner = rest.IndexOf("_#&", StringComparison.Ordinal);
+        var indexText = nameJoiner < 0 ? rest : rest[..nameJoiner];
+
+        if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
+        {
+            return null;
+        }
+
+        return new BodyGroupChoice(meshGroup, meshGroup[..joiner], index, nameJoiner < 0 ? null : rest[(nameJoiner + 3)..]);
+    }
 
     private void PlayForcedAnimation(EntityInputData data, bool? looping, bool restart)
     {

@@ -660,6 +660,10 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         public IEnumerable<string> GetMeshGroups()
             => meshGroups;
 
+        /// <summary>Returns the material group (skin) names defined by this model, in skin number order.</summary>
+        public IEnumerable<string> GetMaterialGroups()
+            => materialGroups.Select(static group => group.Name);
+
         /// <summary>Returns the set of currently active mesh group names.</summary>
         public ICollection<string> GetActiveMeshGroups()
             => activeMeshGroups;
