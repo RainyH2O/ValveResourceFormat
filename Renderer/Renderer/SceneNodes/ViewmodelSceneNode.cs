@@ -286,21 +286,27 @@ public class ViewmodelSceneNode : ModelSceneNode
     private const string RifleAttackSound = "Weapon_M4A1.Silenced";      // weapon_m4a1_silencer
     private const string PistolAttackSound = "Weapon_USP.SilencedShot";  // weapon_usp_silencer
     private const float AttackSoundVolume = 0.5f;
-    private const string KnifeSlashSound = "Weapon_Knife.Slash";
-    private const string KnifeHeavySwishSound = "Weapon_Knife.Swish.Heavy";
     private const string KnifeHitWallSound = "Weapon_Knife.HitWall";
+    private const string KnifeLightHitSound = "Weapon_Knife.Hit.Slice";
+    private const string KnifeHeavyHitSound = "Weapon_Knife.Hit.Heavy";
     private const float KnifeLightRange = 48f;
     private const float KnifeHeavyRange = 32f;
+    private const float KnifeRangePadding = 18f;
 
-    // Retry a missed line trace with a swept "head hull", making the swipe radial
-    private static readonly AABB KnifeSwingHull = AABB.FromCenteredSize(new Vector3(32f, 32f, 36f));
+    // Both knife buttons share one timer, which a swing that connects pushes back further
+    private const float KnifeHitDelay = 0.1f;
+
+    // A missed line trace is retried with swept spheres shrinking from 14 to 2 units, each ending that much
+    // short, keeping the smallest that still connects. We are currently missing sphere traces, so cubes stand in.
+    private const float KnifeSweepMaxRadius = 14f;
+    private const float KnifeSweepRadiusStep = 3f;
 
     private static readonly string[] AttackSounds = [
         RifleAttackSound,
         PistolAttackSound,
-        KnifeSlashSound,
-        KnifeHeavySwishSound,
         KnifeHitWallSound,
+        KnifeLightHitSound,
+        KnifeHeavyHitSound,
         JumpThrowSound,
     ];
 
@@ -319,43 +325,73 @@ public class ViewmodelSceneNode : ModelSceneNode
         }
     }
 
-    private void PlayAttackSound(UserInput input, bool heavyKnifeAttack)
+    // Returns whether a knife swing connected
+    private bool PlayAttackSound(UserInput input, bool heavyKnifeAttack)
     {
         switch (SelectedItemIndex)
         {
             case 1:
                 Sound.Play(RifleAttackSound, volume: AttackSoundVolume);
-                break;
+                return false;
 
             case 2:
                 Sound.Play(PistolAttackSound, volume: AttackSoundVolume);
-                break;
+                return false;
 
             case KnifeItemIndex:
                 var camera = input.Camera;
-                var range = heavyKnifeAttack ? KnifeHeavyRange : KnifeLightRange;
-                var from = camera.Location;
-                var to = from + camera.Forward * range;
+                var range = (heavyKnifeAttack ? KnifeHeavyRange : KnifeLightRange) + KnifeRangePadding;
 
-                var trace = input.PhysicsWorld?.TraceRay(from, to);
-
-                if (trace is not { Hit: true })
+                if (TraceKnifeSwing(input.PhysicsWorld, camera.Location, camera.Forward, range) is not { } hitPosition)
                 {
-                    trace = input.PhysicsWorld?.TraceAABB(from, to, KnifeSwingHull, string.Empty);
+                    return false;
                 }
 
-                if (trace is { Hit: true } hit)
-                {
-                    // this is played in-ear but i'd like to keep it positional
-                    Sound.Play(KnifeHitWallSound, hit.HitPosition - new Vector3(0, 0, 60), volume: AttackSoundVolume);
-                }
-                else
-                {
-                    Sound.Play(heavyKnifeAttack ? KnifeHeavySwishSound : KnifeSlashSound);
-                }
+                // this is played in-ear but i'd like to keep it positional
+                Sound.Play(KnifeHitWallSound, hitPosition - new Vector3(0, 0, 60), volume: AttackSoundVolume);
+                Sound.Play(heavyKnifeAttack ? KnifeHeavyHitSound : KnifeLightHitSound);
+                return true;
 
-                break;
+            default:
+                return false;
         }
+    }
+
+    private static Vector3? TraceKnifeSwing(Rubikon? physics, Vector3 from, Vector3 forward, float range)
+    {
+        if (physics == null)
+        {
+            return null;
+        }
+
+        var to = from + forward * range;
+        var trace = physics.TraceRay(from, to);
+
+        if (trace.Hit)
+        {
+            return trace.HitPosition;
+        }
+
+        Vector3? hitPosition = null;
+
+        for (var radius = KnifeSweepMaxRadius; radius > 0f; radius -= KnifeSweepRadiusStep)
+        {
+            var sweep = physics.TraceAABB(from, to - forward * radius, new Vector3(radius), string.Empty);
+
+            if (!sweep.Hit)
+            {
+                break;
+            }
+
+            hitPosition = sweep.HitPosition;
+        }
+
+        return hitPosition;
+    }
+
+    private void SetKnifeCooldown(float delay, bool connected)
+    {
+        attackCooldown = alternateAttackCooldown = delay + (connected ? KnifeHitDelay : 0f);
     }
 
     private const float GrenadeThrowVelocity = 750f;
@@ -639,7 +675,7 @@ public class ViewmodelSceneNode : ModelSceneNode
         {
             1 => (0.1f, 2f),
             2 => (0.1f, 2f),
-            KnifeItemIndex => (0.3f, 1f),
+            KnifeItemIndex => (0.4f, 1f),
             _ => (0.1f, 2f),
         };
 
@@ -1279,9 +1315,14 @@ public class ViewmodelSceneNode : ModelSceneNode
             if (requestedFire && attackCooldown <= 0f)
             {
                 SetState(AnimationState.Attack);
-                PlayAttackSound(input, heavyKnifeAttack: false);
+                var connected = PlayAttackSound(input, heavyKnifeAttack: false);
                 attackCooldown = fireDelay;
-                if (!IsKnifeSelected && muzzleFlashParticle != null)
+
+                if (IsKnifeSelected)
+                {
+                    SetKnifeCooldown(fireDelay, connected);
+                }
+                else if (muzzleFlashParticle != null)
                 {
                     muzzleFlashParticle.Restart();
                 }
@@ -1289,13 +1330,12 @@ public class ViewmodelSceneNode : ModelSceneNode
             else if (input.Holding(TrackedKeys.MouseRight) && alternateAttackCooldown <= 0f && Deployed)
             {
                 SetState(AnimationState.AlternateAttack);
+                alternateAttackCooldown = altFireDelay;
 
                 if (IsKnifeSelected)
                 {
-                    PlayAttackSound(input, heavyKnifeAttack: true);
+                    SetKnifeCooldown(altFireDelay, PlayAttackSound(input, heavyKnifeAttack: true));
                 }
-
-                alternateAttackCooldown = altFireDelay;
             }
         }
 
