@@ -147,7 +147,7 @@ namespace ValveResourceFormat.Particles
                     particle.SecondSequenceNumber = (int)value;
                     break;
                 case ParticleField.ManualAnimationFrame:
-                    particle.ManualAnimationFrame = (int)value;
+                    particle.ManualAnimationFrame = value;
                     break;
                 case ParticleField.ParticleId:
                     particle.ParticleId = (int)value;
@@ -193,7 +193,7 @@ namespace ValveResourceFormat.Particles
             {
                 ParticleField.SequenceNumber => particle.SequenceNumber,
                 ParticleField.SecondSequenceNumber => particle.SecondSequenceNumber,
-                ParticleField.ManualAnimationFrame => particle.ManualAnimationFrame,
+                ParticleField.ManualAnimationFrame => (int)particle.ManualAnimationFrame,
                 ParticleField.ParentParticleIndex => particle.ParentParticleIndex,
                 ParticleField.ParentParticleId => particle.ParentParticleId,
                 ParticleField.RopeSegmentId => particle.RopeSegmentId,

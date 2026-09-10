@@ -29,6 +29,9 @@ namespace ValveResourceFormat.Renderer
         /// <summary>Gets the depth of the texture (number of slices for 3D or array textures).</summary>
         public int Depth { get; }
 
+        /// <summary>Gets how far, in texels, a motion vector sheet displaces per frame at full deflection.</summary>
+        public short MotionVectorsMaxDistance { get; }
+
         /// <summary>Gets the number of mip levels.</summary>
         public int NumMipLevels { get; private set; }
 
@@ -57,6 +60,7 @@ namespace ValveResourceFormat.Renderer
             Width = data.Width;
             Height = data.Height;
             Depth = data.Depth;
+            MotionVectorsMaxDistance = data.MotionVectorsMaxDistance;
             NumMipLevels = data.NumMipLevels;
             SpriteSheetData = data.GetSpriteSheetData();
             Reflectivity = data.Reflectivity;

@@ -243,26 +243,26 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
             var totalTime = sequence.EffectiveTotalTime;
             var lastFrame = frameCount - 1;
 
+            float passes;
+
             if (animationType == ParticleAnimationType.ANIMATION_TYPE_MANUAL_FRAMES)
             {
-                var manualFrame = sequence.Clamp
-                    ? Math.Clamp(particle.ManualAnimationFrame, 0, lastFrame)
-                    : ((particle.ManualAnimationFrame % frameCount) + frameCount) % frameCount;
-
-                return (manualFrame, manualFrame, 0f);
+                passes = particle.ManualAnimationFrame;
             }
-
-            // The animation time is chosen by type first; animating in FPS only changes how the
-            // rate is interpreted afterwards, it does not replace the type
-            var animationTime = animationType switch
+            else
             {
-                ParticleAnimationType.ANIMATION_TYPE_FIT_LIFETIME => particle.NormalizedAge,
-                _ => particle.Age,
-            };
+                // The animation time is chosen by type first; animating in FPS only changes how the
+                // rate is interpreted afterwards, it does not replace the type
+                var animationTime = animationType switch
+                {
+                    ParticleAnimationType.ANIMATION_TYPE_FIT_LIFETIME => particle.NormalizedAge,
+                    _ => particle.Age,
+                };
 
-            var passes = animateInFps
-                ? animationTime * animationRate / totalTime
-                : animationTime * animationRate;
+                passes = animateInFps
+                    ? animationTime * animationRate / totalTime
+                    : animationTime * animationRate;
+            }
 
             var position = totalTime * (sequence.Clamp
                 ? Math.Clamp(passes, 0f, 1f)

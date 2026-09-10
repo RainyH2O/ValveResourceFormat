@@ -61,13 +61,16 @@ uniform int uLayerChannels[MAX_TEXTURE_LAYERS];
 uniform int uLayerBlendMode[MAX_TEXTURE_LAYERS];
 uniform float uLayerBlend[MAX_TEXTURE_LAYERS];
 
-// SpriteCardTextureType_t, for the values that are effect modes. NORMALMAP and ANIMMOTIONVEC never reach
-// the shader: the renderer keeps them out of the colour chain entirely.
+// SpriteCardTextureType_t, for the values that are effect modes. NORMALMAP never reaches the shader: the
+// renderer keeps it out of the chain entirely.
 #define SPRITECARD_TEXTURE_ZOOM             1
 #define SPRITECARD_TEXTURE_1D_COLOR_LOOKUP  2
 #define SPRITECARD_TEXTURE_UVDISTORTION      3
 #define SPRITECARD_TEXTURE_UVDISTORTION_ZOOM 4
+#define SPRITECARD_TEXTURE_ANIMMOTIONVEC     6
 uniform int uLayerEffectMode[MAX_TEXTURE_LAYERS];
+
+uniform vec2 uMotionVectorScale = vec2(0.0);
 
 // m_flDistortion and m_flZoomScale from each layer's m_TextureControls.
 uniform float uLayerDistortion[MAX_TEXTURE_LAYERS];
@@ -131,11 +134,11 @@ vec4 ZoomSample(int layer, vec2 uv, float rate)
 
 // A distortion layer never shows its own texture: its red and green drive an offset that the layer
 // beneath it is re-sampled through, so what reaches the accumulator is the layer below, warped.
-vec4 DistortPrevious(int layer, vec4 source, vec2 previousUv, float strength)
+vec4 DistortPrevious(int previousLayer, vec4 source, vec2 previousUv, float strength)
 {
     vec2 offset = (SrgbLinearToGamma(source.rgb).xy - vec2(0.5)) * 2.0;
 
-    return SampleLayer(max(layer - 1, 0), previousUv - (offset * (strength * 0.125 * source.a)));
+    return SampleLayer(previousLayer, previousUv - (offset * (strength * 0.125 * source.a)));
 }
 
 
@@ -207,25 +210,72 @@ vec3 ApplyHsvShift(vec3 sourceColor)
     return vec3(satVal.y, p, q) * overbright;
 }
 
+// A layer's placed coordinates for the frame it is on (xy) and the one after it (zw). Layer 0 rides the
+// card's own pair; every layer past it brings one of its own.
+vec4 LayerUvs(int layer)
+{
+#if S_TEXTURE_LAYERS > 0
+    if (layer > 0)
+    {
+        return vLayerUvOut[layer - 1];
+    }
+#endif
+
+    return vec4(vTexCoordOut, vTexCoordNextFrameOut);
+}
+
+// A motion vector layer's flow at a coordinate. The vectors ride green and alpha, signed about a half.
+vec2 SampleFlow(int layer, vec2 uv)
+{
+    return ((SampleLayer(layer, uv).yw * 2.0) - vec2(1.0)) * uMotionVectorScale;
+}
+
 void main(void) {
     // Each layer is folded into an accumulator seeded to white. Layer 0 is the base texture, so with one
     // layer and the default MULTIPLY this collapses to a straight sample.
     vec4 accum = vec4(1.0);
     vec2 previousUv = vTexCoordOut;
+    int previousLayer = 0;
+
+    vec2 flow = vec2(0.0);
+    vec2 flowNext = vec2(0.0);
+
+    for (int i = 1; i < uLayerCount; ++i)
+    {
+        if (uLayerEffectMode[i] == SPRITECARD_TEXTURE_ANIMMOTIONVEC)
+        {
+            vec4 motionUvs = LayerUvs(i);
+            flow = SampleFlow(i, motionUvs.xy) * vFrameBlendOut;
+            flowNext = SampleFlow(i, motionUvs.zw) * (1.0 - vFrameBlendOut);
+            break;
+        }
+    }
+
+    int colourLayers = 0;
 
     for (int i = 0; i < uLayerCount; ++i)
     {
+        int effectMode = uLayerEffectMode[i];
+
+        if (effectMode == SPRITECARD_TEXTURE_ANIMMOTIONVEC)
+        {
+            continue;
+        }
+
         // Each layer cross-fades between its own sheet's current and next frame rects; layers whose
         // rects are constant (one-frame sequences, plain textures) mix two identical samples.
-        vec2 layerUv = vTexCoordOut;
-        vec2 layerUvNext = vTexCoordNextFrameOut;
-#if S_TEXTURE_LAYERS > 0
-        if (i > 0)
+        vec4 uvs = LayerUvs(i);
+        vec2 layerUv = uvs.xy;
+        vec2 layerUvNext = uvs.zw;
+
+        // Only the first two colour layers warp; the reference carries no flow for the ones past them.
+        if (colourLayers < 2)
         {
-            layerUv = vLayerUvOut[i - 1].xy;
-            layerUvNext = vLayerUvOut[i - 1].zw;
+            layerUv -= flow;
+            layerUvNext += flowNext;
         }
-#endif
+
+        colourLayers++;
 
         vec4 layer = SampleLayer(i, layerUv);
 
@@ -247,8 +297,6 @@ void main(void) {
             }
         }
 
-        int effectMode = uLayerEffectMode[i];
-
         if (effectMode == SPRITECARD_TEXTURE_ZOOM || effectMode == SPRITECARD_TEXTURE_UVDISTORTION_ZOOM)
         {
             layer = ZoomSample(i, layerUv, uLayerZoomScale[i]);
@@ -256,10 +304,11 @@ void main(void) {
 
         if (effectMode == SPRITECARD_TEXTURE_UVDISTORTION || effectMode == SPRITECARD_TEXTURE_UVDISTORTION_ZOOM)
         {
-            layer = DistortPrevious(i, layer, previousUv, uLayerDistortion[i]);
+            layer = DistortPrevious(previousLayer, layer, previousUv, uLayerDistortion[i]);
         }
 
         previousUv = layerUv;
+        previousLayer = i;
 
         int maskMode = uLayerChannels[i];
 

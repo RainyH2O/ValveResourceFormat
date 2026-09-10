@@ -80,6 +80,13 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
                 shader.SetUniform1(EffectModeNames[layer], (int)source.EffectMode);
                 shader.SetUniform1(DistortionNames[layer], source.Distortion.NextNumber(systemState));
                 shader.SetUniform1(ZoomScaleNames[layer], source.ZoomScale.NextNumber(systemState));
+
+                if (source.EffectMode == SpriteCardTextureType.SPRITECARD_TEXTURE_ANIMMOTIONVEC)
+                {
+                    shader.SetUniform2("uMotionVectorScale", new Vector2(
+                        source.Texture.MotionVectorsMaxDistance / (float)source.Texture.Width,
+                        source.Texture.MotionVectorsMaxDistance / (float)source.Texture.Height));
+                }
             }
         }
 
@@ -104,7 +111,9 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
         {
             for (var layer = 0; layer < layers.Length; layer++)
             {
-                var transform = layers[layer].ResolveUvTransform(systemState);
+                var transform = (layers[layer].EffectMode == SpriteCardTextureType.SPRITECARD_TEXTURE_ANIMMOTIONVEC
+                    ? layers[0]
+                    : layers[layer]).ResolveUvTransform(systemState);
 
                 shader.SetUniform4(UvScaleOffsetNames[layer], new Vector4(transform.Scale, transform.Offset.X, transform.Offset.Y));
                 shader.SetUniform1(UvRotationNames[layer], transform.Rotation);
@@ -183,12 +192,13 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
                     continue;
                 }
 
-                // Normal maps and motion vector sheets are not colour: compositing them into the chain
-                // would tint the card with a tangent-space basis or a flow field.
+                // A normal map is not colour: compositing it into the chain would tint the card with a
+                // tangent-space basis. A motion vector sheet is not colour either, but it stays a layer --
+                // the shader reads its mode, takes flow from it and composites nothing.
                 var textureType = textureInput.Enum("m_nTextureType", SpriteCardTextureType.SPRITECARD_TEXTURE_DIFFUSE);
+                var isMotionVectors = textureType == SpriteCardTextureType.SPRITECARD_TEXTURE_ANIMMOTIONVEC;
 
-                if (textureType is SpriteCardTextureType.SPRITECARD_TEXTURE_NORMALMAP
-                    or SpriteCardTextureType.SPRITECARD_TEXTURE_ANIMMOTIONVEC)
+                if (textureType == SpriteCardTextureType.SPRITECARD_TEXTURE_NORMALMAP)
                 {
                     continue;
                 }
@@ -216,8 +226,14 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
                         layerTextureName = defaultTextureName;
                     }
 
-                    firstTextureName ??= layerTextureName;
-                    layerTexture = rendererContext.MaterialLoader.GetTexture(layerTextureName, srgbRead, streaming: true);
+                    // The vectors are signed data packed about a half, and a gamma decode would bend the flow
+                    // field, so a motion sheet is never read as colour. It does not name the card either.
+                    if (!isMotionVectors)
+                    {
+                        firstTextureName ??= layerTextureName;
+                    }
+
+                    layerTexture = rendererContext.MaterialLoader.GetTexture(layerTextureName, srgbRead && !isMotionVectors, streaming: true);
                 }
 
                 var controls = textureInput.Data.GetSubCollection("m_TextureControls");
