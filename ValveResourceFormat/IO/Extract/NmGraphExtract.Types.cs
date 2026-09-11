@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using ValveKeyValue;
 using ValveResourceFormat.Graphs;
 using ValveResourceFormat.Serialization.KeyValues;

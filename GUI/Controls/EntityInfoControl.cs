@@ -1,7 +1,6 @@
 using System.Windows.Forms;
 using GUI.Utils;
 using ValveKeyValue;
-using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
 namespace GUI.Forms

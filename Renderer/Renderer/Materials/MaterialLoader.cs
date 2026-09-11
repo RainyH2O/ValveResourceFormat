@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.IO.Hashing;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;

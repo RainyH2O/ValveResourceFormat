@@ -14,7 +14,6 @@ using GUI.Utils;
 using ValveKeyValue;
 using ValveResourceFormat;
 using ValveResourceFormat.Blocks;
-using ValveResourceFormat.Graphs;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.Particles;
 using ValveResourceFormat.Renderer;

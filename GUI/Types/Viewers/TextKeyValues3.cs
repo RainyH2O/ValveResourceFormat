@@ -8,7 +8,6 @@ using GUI.Types.GLViewers;
 using GUI.Types.Graphs;
 using GUI.Utils;
 using ValveKeyValue;
-using ValveResourceFormat.Graphs;
 using ValveResourceFormat.Renderer;
 using ValveResourceFormat.Serialization.KeyValues;
 

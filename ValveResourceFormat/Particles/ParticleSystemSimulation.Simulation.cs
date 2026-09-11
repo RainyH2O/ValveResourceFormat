@@ -1,18 +1,4 @@
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using Microsoft.Extensions.Logging;
-using ValveKeyValue;
-using ValveResourceFormat.Blocks;
-using ValveResourceFormat.Particles.Constraints;
-using ValveResourceFormat.Particles.Emitters;
-using ValveResourceFormat.Particles.ForceGenerators;
-using ValveResourceFormat.Particles.Initializers;
-using ValveResourceFormat.Particles.Operators;
-using ValveResourceFormat.Particles.PreEmissionOperators;
 using ValveResourceFormat.Particles.Utils;
-using ValveResourceFormat.ResourceTypes;
-using ValveResourceFormat.Serialization.KeyValues;
 
 namespace ValveResourceFormat.Particles
 {

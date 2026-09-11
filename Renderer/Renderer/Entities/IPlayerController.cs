@@ -1,5 +1,3 @@
-using ValveResourceFormat.Renderer.Input;
-
 namespace ValveResourceFormat.Renderer.Entities;
 
 /// <summary>

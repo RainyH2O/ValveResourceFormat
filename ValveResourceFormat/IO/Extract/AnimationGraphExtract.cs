@@ -5,7 +5,6 @@ using System.Text;
 using ValveKeyValue;
 using ValveResourceFormat.Graphs;
 using ValveResourceFormat.ResourceTypes;
-using ValveResourceFormat.ResourceTypes.ModelData.Attachments;
 using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.IO.KVHelpers;
 

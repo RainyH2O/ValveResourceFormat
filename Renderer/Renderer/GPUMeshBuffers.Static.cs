@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using OpenTK.Graphics.OpenGL;
 namespace ValveResourceFormat.Renderer;
 
 public partial class GPUMeshBufferCache

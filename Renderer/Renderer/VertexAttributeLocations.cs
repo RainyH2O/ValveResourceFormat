@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using ValveResourceFormat.Blocks;

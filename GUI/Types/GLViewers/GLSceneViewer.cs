@@ -12,7 +12,6 @@ using ValveResourceFormat.Renderer.Audio;
 using ValveResourceFormat.Renderer.Input;
 using ValveResourceFormat.Renderer.Materials;
 using ValveResourceFormat.Renderer.SceneNodes;
-using ValveResourceFormat.Renderer.Utils;
 using static ValveResourceFormat.Renderer.PickingTexture;
 
 namespace GUI.Types.GLViewers

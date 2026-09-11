@@ -3,7 +3,6 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.Renderer.Audio.Decoders;
-using ValveResourceFormat.ResourceTypes;
 
 namespace ValveResourceFormat.Renderer.Audio;
 

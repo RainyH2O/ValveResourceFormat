@@ -4,7 +4,6 @@ using System.IO;
 using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Utils;
-using ValveKeyValue;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.Particles;
 using ValveResourceFormat.Particles.Upgrade;

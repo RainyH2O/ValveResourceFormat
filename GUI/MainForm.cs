@@ -1,9 +1,6 @@
 //#define SCREENSHOT_MODE // Uncomment to hide version, keep title bar static, set an exact window size
 
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -16,12 +13,10 @@ using GUI.Types.GLViewers;
 using GUI.Types.PackageViewer;
 using GUI.Utils;
 using OpenTK.Windowing.Desktop;
-using Svg.Skia;
 using ValvePak;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.TextureDecoders;
 using Windows.Win32;
-using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.WindowsAndMessaging;
 using ResourceViewMode = GUI.Types.Viewers.ResourceViewMode;
 

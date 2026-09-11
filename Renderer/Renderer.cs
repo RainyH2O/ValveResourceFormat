@@ -1,9 +1,6 @@
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using OpenTK.Graphics.OpenGL;
-using ValveResourceFormat.CompiledShader;
-using ValveResourceFormat.Renderer.Materials;
 using ValveResourceFormat.Renderer.PostProcess;
 using ValveResourceFormat.Renderer.SceneEnvironment;
 using ValveResourceFormat.Renderer.World;

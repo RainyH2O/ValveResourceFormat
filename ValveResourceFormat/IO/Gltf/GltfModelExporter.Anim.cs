@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using SharpGLTF.Schema2;
-using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.ResourceTypes.ModelAnimation;
 using ValveResourceFormat.ResourceTypes.ModelFlex;
 using VAnim = ValveResourceFormat.ResourceTypes.ModelAnimation.Animation;

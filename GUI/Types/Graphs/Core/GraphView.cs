@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Windows.Forms;
 using SkiaSharp;
 using ValveResourceFormat.Graphs;

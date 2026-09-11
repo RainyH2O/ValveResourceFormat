@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
 using ValveKeyValue;
-using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.ResourceTypes.ModelAnimation2;
 using ValveResourceFormat.Serialization.KeyValues;
 

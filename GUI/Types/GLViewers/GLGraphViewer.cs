@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
 using GUI.Controls;
-using GUI.Types.Graphs;
 using GUI.Types.Graphs.Core;
 using GUI.Utils;
 using OpenTK.Graphics.OpenGL;

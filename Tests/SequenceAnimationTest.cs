@@ -1,13 +1,11 @@
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Tasks;
 using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.ResourceTypes.ModelAnimation;
-using ValveResourceFormat.Serialization.KeyValues;
 
 namespace Tests
 {

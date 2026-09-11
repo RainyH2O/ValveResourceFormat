@@ -1,6 +1,4 @@
 using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Logging;
-using ValveResourceFormat.Renderer.SceneNodes;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using Entity = ValveResourceFormat.ResourceTypes.EntityLump.Entity;

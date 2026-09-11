@@ -2,7 +2,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
-using ValveResourceFormat.Utils;
 
 namespace Tests
 {

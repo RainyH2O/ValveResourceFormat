@@ -1,5 +1,4 @@
 using System.Linq;
-using OpenTK.Graphics.OpenGL;
 using ValveResourceFormat.ResourceTypes.ModelAnimation;
 using ValveResourceFormat.ResourceTypes.ModelData;
 

@@ -1,4 +1,3 @@
-using System.Linq;
 using ValveResourceFormat.Particles;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;

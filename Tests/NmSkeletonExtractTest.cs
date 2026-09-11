@@ -1,6 +1,5 @@
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Tasks;
 using TUnit.Assertions.Enums;
 using ValveResourceFormat;

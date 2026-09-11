@@ -1,5 +1,3 @@
-using OpenTK.Graphics.OpenGL;
-
 namespace ValveResourceFormat.Renderer.SceneNodes
 {
     /// <summary>

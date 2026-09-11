@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Types.GLViewers;

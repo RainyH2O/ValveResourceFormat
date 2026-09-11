@@ -1,7 +1,5 @@
-using ValveResourceFormat.IO;
 using ValveResourceFormat.Renderer.Entities;
 using ValveResourceFormat.Renderer.SceneNodes;
-using ValveResourceFormat.ResourceTypes;
 
 namespace ValveResourceFormat.Renderer.Input;
 

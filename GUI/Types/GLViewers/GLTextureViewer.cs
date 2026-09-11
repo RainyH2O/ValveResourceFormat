@@ -11,7 +11,6 @@ using OpenTK.Graphics.OpenGL;
 using SkiaSharp;
 using Svg.Skia;
 using ValveResourceFormat;
-using ValveResourceFormat.Graphs;
 using ValveResourceFormat.Renderer;
 using ValveResourceFormat.Renderer.Input;
 using ValveResourceFormat.Renderer.Materials;

@@ -1,9 +1,7 @@
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using ValveKeyValue;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.Particles;
-using ValveResourceFormat.Particles.Utils;
 using ValveResourceFormat.Renderer.Particles.Renderers;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;

@@ -1,7 +1,6 @@
 using System.Linq;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
-using ValveResourceFormat.Utils;
 using Connection = ValveResourceFormat.ResourceTypes.EntityLump.Connection;
 
 namespace ValveResourceFormat.Graphs;
