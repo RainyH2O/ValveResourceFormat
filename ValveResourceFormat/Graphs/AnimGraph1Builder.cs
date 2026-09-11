@@ -50,16 +50,16 @@ internal sealed class AnimGraph1Builder : IDisposable
     }
 
     private readonly KVObject animGraphData;
-    private IReadOnlyList<KVObject> compiledNodes = Array.Empty<KVObject>();
-    private readonly Dictionary<int, Node> nodeMap = new();
-    private readonly Dictionary<int, KVObject> parameterIndexToObject = new();
-    private readonly Dictionary<KVObject, List<Node>> parameterConsumers = new();
-    private readonly Dictionary<int, string> parameterIndexToName = new();
-    private readonly Dictionary<KVObject, int> parameterObjectToIndex = new();
-    private readonly Dictionary<string, List<KVObject>> typeToParameters = new();
-    private List<KVObject> tags = new();
-    private Dictionary<int, string> tagIndexToName = new();
-    private List<KVObject> components = new();
+    private IReadOnlyList<KVObject> compiledNodes = [];
+    private readonly Dictionary<int, Node> nodeMap = [];
+    private readonly Dictionary<int, KVObject> parameterIndexToObject = [];
+    private readonly Dictionary<KVObject, List<Node>> parameterConsumers = [];
+    private readonly Dictionary<int, string> parameterIndexToName = [];
+    private readonly Dictionary<KVObject, int> parameterObjectToIndex = [];
+    private readonly Dictionary<string, List<KVObject>> typeToParameters = [];
+    private readonly List<KVObject> tags = [];
+    private readonly Dictionary<int, string> tagIndexToName = [];
+    private readonly List<KVObject> components = [];
 
     private readonly IFileLoader fileLoader;
     private readonly AnimGraphModelInfo modelInfo;
@@ -252,7 +252,7 @@ internal sealed class AnimGraph1Builder : IDisposable
         ["CFootPinningUpdateNode"] = new(StringComparer.Ordinal) { "m_poseOpFixedData", "m_eTimingSource", "m_params", "m_bResetChild" },
     };
 
-    private static readonly string[] ChildProperties = { "m_pChildNode", "m_pChild1", "m_pChild2", "m_pChild" };
+    private static readonly string[] ChildProperties = ["m_pChildNode", "m_pChild1", "m_pChild2", "m_pChild"];
 
     private void BuildGraph(GraphDocument document)
     {
@@ -279,7 +279,7 @@ internal sealed class AnimGraph1Builder : IDisposable
         LoadComponents(document);
 
         var nodesContainer = ResolveContainer("m_nodes");
-        compiledNodes = nodesContainer?.GetArray("m_nodes") ?? Array.Empty<KVObject>();
+        compiledNodes = nodesContainer?.GetArray("m_nodes") ?? [];
 
         CreateGraph(document);
         AddParameterAndTagNodes(document);
@@ -697,7 +697,9 @@ internal sealed class AnimGraph1Builder : IDisposable
         {
             var sharedData = animGraphData.GetSubCollection("m_pSharedData");
             if (sharedData.ContainsKey(key))
+            {
                 return sharedData;
+            }
         }
 
         return animGraphData.ContainsKey(key) ? animGraphData : null;
@@ -711,13 +713,17 @@ internal sealed class AnimGraph1Builder : IDisposable
 
         var paramListUpdater = ResolveContainer("m_pParamListUpdater")?.GetSubCollection("m_pParamListUpdater");
         if (paramListUpdater == null)
+        {
             return;
+        }
 
         if (!paramListUpdater.ContainsKey("m_parameters"))
+        {
             return;
+        }
 
         var parameters = paramListUpdater.GetArray("m_parameters");
-        for (int i = 0; i < parameters.Count; i++)
+        for (var i = 0; i < parameters.Count; i++)
         {
             var param = parameters[i];
             var name = param.GetStringProperty("m_name");
@@ -746,13 +752,17 @@ internal sealed class AnimGraph1Builder : IDisposable
 
         var tagManager = ResolveContainer("m_pTagManagerUpdater")?.GetSubCollection("m_pTagManagerUpdater");
         if (tagManager == null)
+        {
             return;
+        }
 
         if (!tagManager.ContainsKey("m_tags"))
+        {
             return;
+        }
 
         var tagList = tagManager.GetArray("m_tags");
-        for (int i = 0; i < tagList.Count; i++)
+        for (var i = 0; i < tagList.Count; i++)
         {
             var tagObj = tagList[i];
             tags.Add(tagObj);
@@ -767,7 +777,10 @@ internal sealed class AnimGraph1Builder : IDisposable
     private string GetTagName(int tagIndex)
     {
         if (tagIndex < 0 || tagIndex >= tags.Count)
+        {
             return $"Tag {tagIndex}";
+        }
+
         return tagIndexToName.TryGetValue(tagIndex, out var name) ? name : $"Tag {tagIndex}";
     }
 
@@ -777,7 +790,9 @@ internal sealed class AnimGraph1Builder : IDisposable
 
         var componentUpdaters = ResolveContainer("m_components");
         if (componentUpdaters == null)
+        {
             return;
+        }
 
         components.AddRange(componentUpdaters.GetArray("m_components"));
     }
@@ -785,12 +800,17 @@ internal sealed class AnimGraph1Builder : IDisposable
     private Resource? LoadModel()
     {
         if (modelResourceLoaded)
+        {
             return modelResource;
+        }
+
         modelResourceLoaded = true;
 
         var modelName = animGraphData.GetStringProperty("m_modelName");
         if (string.IsNullOrEmpty(modelName))
+        {
             return null;
+        }
 
         modelResource = fileLoader.LoadFileCompiled(modelName);
         return modelResource;
@@ -826,7 +846,9 @@ internal sealed class AnimGraph1Builder : IDisposable
     private static string ClassNameToParamType(string className)
     {
         if (string.IsNullOrEmpty(className))
+        {
             return "UNKNOWN";
+        }
 
         return className switch
         {
@@ -845,20 +867,28 @@ internal sealed class AnimGraph1Builder : IDisposable
     private KVObject? ResolveParameterHandle(KVObject handle)
     {
         if (handle == null)
+        {
             return null;
+        }
 
         var type = handle.GetStringProperty("m_type");
         var index = handle.GetInt32Property("m_index", -1);
 
         if (string.IsNullOrEmpty(type) || index < 0 || index == 255)
+        {
             return null;
+        }
 
         var typeName = type.Replace("ANIMPARAM_", "", StringComparison.Ordinal);
         if (!typeToParameters.TryGetValue(typeName, out var paramList))
+        {
             return null;
+        }
 
         if (index < paramList.Count)
+        {
             return paramList[index];
+        }
 
         return null;
     }
@@ -866,12 +896,20 @@ internal sealed class AnimGraph1Builder : IDisposable
     private string GetParameterDescriptionFromIndex(int index)
     {
         if (index < 0 || index == 255)
+        {
             return "None";
+        }
 
         if (parameterIndexToObject.TryGetValue(index, out var paramObj))
+        {
             return GetParameterDescriptionFromObject(paramObj);
+        }
+
         if (parameterIndexToName.TryGetValue(index, out var name))
+        {
             return name;
+        }
+
         return $"Param {index}";
     }
 
@@ -890,7 +928,10 @@ internal sealed class AnimGraph1Builder : IDisposable
             {
                 var optStr = string.Join(", ", enumOptions.Take(4));
                 if (enumOptions.Length > 4)
+                {
                     optStr += ", ...";
+                }
+
                 result += $" [ {optStr} ]";
             }
         }
@@ -909,9 +950,13 @@ internal sealed class AnimGraph1Builder : IDisposable
         {
             var def = paramObj["m_defaultValue"];
             if (def.ValueType == KVValueType.Int32 || def.ValueType == KVValueType.UInt32)
+            {
                 result += $" (default: {def.ToInt32()})";
+            }
             else if (def.ValueType == KVValueType.Array && def.ToArray().Length > 0)
+            {
                 result += $" (default: {string.Join(", ", def.ToArray().Select(v => v.ToString()))})";
+            }
         }
 
         return result;
@@ -920,7 +965,9 @@ internal sealed class AnimGraph1Builder : IDisposable
     private string GetParameterDescriptionFromHandle(KVObject handle)
     {
         if (handle == null)
+        {
             return "?";
+        }
 
         var paramObj = ResolveParameterHandle(handle);
         if (paramObj != null)
@@ -939,7 +986,7 @@ internal sealed class AnimGraph1Builder : IDisposable
     private void DisplayUniversalParameters(KVObject compiledNode, Node node)
     {
         string[] paramFields =
-        {
+        [
             "m_paramIndex",
             "m_paramX",
             "m_paramY",
@@ -947,19 +994,21 @@ internal sealed class AnimGraph1Builder : IDisposable
             "m_hParameter",
             "m_hBlendParameter",
             "m_hParam",
-        };
+        ];
 
-        foreach (string field in paramFields)
+        foreach (var field in paramFields)
         {
             if (!compiledNode.ContainsKey(field))
+            {
                 continue;
+            }
 
             var value = compiledNode[field];
 
             if (value.ValueType == KVValueType.Int32 || value.ValueType == KVValueType.UInt32)
             {
-                int index = value.ToInt32();
-                string display = GetParameterDescriptionFromIndex(index);
+                var index = value.ToInt32();
+                var display = GetParameterDescriptionFromIndex(index);
                 node.AddText($"{field}: {display}");
 
                 if (parameterIndexToObject.TryGetValue(index, out var paramFromIndex))
@@ -975,7 +1024,7 @@ internal sealed class AnimGraph1Builder : IDisposable
                 var handle = compiledNode.GetSubCollection(field);
                 if (handle != null)
                 {
-                    string info = GetParameterDescriptionFromHandle(handle);
+                    var info = GetParameterDescriptionFromHandle(handle);
                     node.AddText($"{field}: {info}");
                     RecordParameterConsumer(ResolveParameterHandle(handle), node);
                 }
@@ -984,9 +1033,11 @@ internal sealed class AnimGraph1Builder : IDisposable
 
             if (value.ValueType == KVValueType.String)
             {
-                string name = value.ToString();
+                var name = value.ToString();
                 if (!string.IsNullOrEmpty(name))
+                {
                     node.AddText($"{field}: {name}");
+                }
             }
         }
     }
@@ -994,7 +1045,9 @@ internal sealed class AnimGraph1Builder : IDisposable
     private static (float x, float y) ParseVector2(KVObject obj, string key)
     {
         if (!obj.ContainsKey(key))
+        {
             return (0f, 0f);
+        }
 
         var value = obj[key];
 
@@ -1002,7 +1055,9 @@ internal sealed class AnimGraph1Builder : IDisposable
         {
             var array = obj.GetFloatArray(key);
             if (array != null && array.Length >= 2)
+            {
                 return (array[0], array[1]);
+            }
         }
 
         if (value.ValueType == KVValueType.Collection)
@@ -1010,8 +1065,8 @@ internal sealed class AnimGraph1Builder : IDisposable
             var sub = obj.GetSubCollection(key);
             if (sub != null)
             {
-                float x = sub.GetFloatProperty("0", 0f);
-                float y = sub.GetFloatProperty("1", 0f);
+                var x = sub.GetFloatProperty("0", 0f);
+                var y = sub.GetFloatProperty("1", 0f);
                 return (x, y);
             }
         }
@@ -1026,25 +1081,33 @@ internal sealed class AnimGraph1Builder : IDisposable
     private static int GetChildNodeIndex(KVObject child)
     {
         if (child.ValueType == KVValueType.Collection && child.ContainsKey("m_nodeIndex"))
+        {
             return child.GetInt32Property("m_nodeIndex");
+        }
+
         if (child.ValueType == KVValueType.Int32)
+        {
             return child.ToInt32();
+        }
+
         return -1;
     }
 
     private void CreateGraph(GraphDocument document)
     {
         if (compiledNodes == null || compiledNodes.Count == 0)
+        {
             return;
+        }
 
-        for (int i = 0; i < compiledNodes.Count; i++)
+        for (var i = 0; i < compiledNodes.Count; i++)
         {
             var compiledNode = compiledNodes[i];
             var node = CreateNode(document, compiledNode, i);
             nodeMap[i] = node;
         }
 
-        for (int i = 0; i < compiledNodes.Count; i++)
+        for (var i = 0; i < compiledNodes.Count; i++)
         {
             var compiledNode = compiledNodes[i];
             var parentNode = nodeMap[i];
@@ -1055,7 +1118,9 @@ internal sealed class AnimGraph1Builder : IDisposable
             void AddConnection(int idx, string label)
             {
                 if (idx >= 0)
+                {
                     connections.Add((idx, label));
+                }
             }
 
             if (compiledNode.ContainsKey("m_children"))
@@ -1063,7 +1128,7 @@ internal sealed class AnimGraph1Builder : IDisposable
                 var children = compiledNode.GetArray("m_children");
                 foreach (var child in children)
                 {
-                    int idx = GetChildNodeIndex(child);
+                    var idx = GetChildNodeIndex(child);
                     AddConnection(idx, $"Child {idx}");
                 }
             }
@@ -1075,7 +1140,7 @@ internal sealed class AnimGraph1Builder : IDisposable
                     var childRef = compiledNode[prop];
                     if (childRef.ValueType == KVValueType.Collection && childRef.ContainsKey("m_nodeIndex"))
                     {
-                        int idx = childRef.GetInt32Property("m_nodeIndex");
+                        var idx = childRef.GetInt32Property("m_nodeIndex");
                         AddConnection(idx, $"Child {idx}");
                     }
                 }
@@ -1084,7 +1149,7 @@ internal sealed class AnimGraph1Builder : IDisposable
             if (className == "CBlend2DUpdateNode" && compiledNode.ContainsKey("m_items"))
             {
                 var items = compiledNode.GetArray("m_items");
-                for (int itemIdx = 0; itemIdx < items.Count; itemIdx++)
+                for (var itemIdx = 0; itemIdx < items.Count; itemIdx++)
                 {
                     var item = items[itemIdx];
                     if (item.ContainsKey("m_pChild"))
@@ -1092,13 +1157,13 @@ internal sealed class AnimGraph1Builder : IDisposable
                         var childRef = item.GetSubCollection("m_pChild");
                         if (childRef.ContainsKey("m_nodeIndex"))
                         {
-                            int idx = childRef.GetInt32Property("m_nodeIndex");
+                            var idx = childRef.GetInt32Property("m_nodeIndex");
                             if (idx >= 0)
                             {
-                                int seqIdx = item.GetInt32Property("m_hSequence", -1);
-                                string seqDisplay = seqIdx >= 0 ? GetSequenceName(seqIdx) : "None";
+                                var seqIdx = item.GetInt32Property("m_hSequence", -1);
+                                var seqDisplay = seqIdx >= 0 ? GetSequenceName(seqIdx) : "None";
                                 var pos = ParseVector2(item, "m_vPos");
-                                string label = $"Item {itemIdx} (Seq: {seqDisplay}) ({pos.x:F1}, {pos.y:F1})";
+                                var label = $"Item {itemIdx} (Seq: {seqDisplay}) ({pos.x:F1}, {pos.y:F1})";
                                 AddConnection(idx, label);
                             }
                         }
@@ -1132,12 +1197,12 @@ internal sealed class AnimGraph1Builder : IDisposable
                         return childRef.ContainsKey("m_nodeIndex") ? childRef.GetInt32Property("m_nodeIndex") : -1;
                     }
 
-                    for (int s = 0; s < stateDataArray.Count; s++)
+                    for (var s = 0; s < stateDataArray.Count; s++)
                     {
-                        int idx = StateChildNodeIndex(s);
+                        var idx = StateChildNodeIndex(s);
                         if (idx >= 0)
                         {
-                            string stateName = states[s].GetStringProperty("m_name", $"State {s}");
+                            var stateName = states[s].GetStringProperty("m_name", $"State {s}");
                             AddConnection(idx, stateName);
                         }
                     }
@@ -1167,17 +1232,17 @@ internal sealed class AnimGraph1Builder : IDisposable
             if (className == "CChoiceUpdateNode" && compiledNode.ContainsKey("m_children"))
             {
                 var children = compiledNode.GetArray("m_children");
-                float[]? weights = compiledNode.ContainsKey("m_weights") ? compiledNode.GetFloatArray("m_weights") : null;
-                float[]? blendTimes = compiledNode.ContainsKey("m_blendTimes") ? compiledNode.GetFloatArray("m_blendTimes") : null;
+                var weights = compiledNode.ContainsKey("m_weights") ? compiledNode.GetFloatArray("m_weights") : null;
+                var blendTimes = compiledNode.ContainsKey("m_blendTimes") ? compiledNode.GetFloatArray("m_blendTimes") : null;
 
                 var newConnections = new List<(int, string)>();
-                for (int c = 0; c < children.Count; c++)
+                for (var c = 0; c < children.Count; c++)
                 {
-                    int idx = GetChildNodeIndex(children[c]);
+                    var idx = GetChildNodeIndex(children[c]);
                     if (idx >= 0)
                     {
-                        float w = (weights != null && c < weights.Length) ? weights[c] : 1.0f;
-                        float bt = (blendTimes != null && c < blendTimes.Length) ? blendTimes[c] : 0.0f;
+                        var w = (weights != null && c < weights.Length) ? weights[c] : 1.0f;
+                        var bt = (blendTimes != null && c < blendTimes.Length) ? blendTimes[c] : 0.0f;
                         newConnections.Add((idx, $"Item {c} (W:{w:F2} BT:{bt:F2})"));
                     }
                 }
@@ -1188,9 +1253,13 @@ internal sealed class AnimGraph1Builder : IDisposable
             {
                 KVObject? paramHandle = null;
                 if (compiledNode.ContainsKey("m_hParameter"))
+                {
                     paramHandle = compiledNode.GetSubCollection("m_hParameter");
+                }
                 else if (compiledNode.ContainsKey("m_param"))
+                {
                     paramHandle = compiledNode.GetSubCollection("m_param");
+                }
 
                 if (paramHandle != null)
                 {
@@ -1202,12 +1271,12 @@ internal sealed class AnimGraph1Builder : IDisposable
                         {
                             var children = compiledNode.GetArray("m_children");
                             var newConnections = new List<(int, string)>();
-                            for (int c = 0; c < children.Count; c++)
+                            for (var c = 0; c < children.Count; c++)
                             {
-                                int idx = GetChildNodeIndex(children[c]);
+                                var idx = GetChildNodeIndex(children[c]);
                                 if (idx >= 0)
                                 {
-                                    string label = (c < enumOptions.Length) ? enumOptions[c] : $"Option {c}";
+                                    var label = (c < enumOptions.Length) ? enumOptions[c] : $"Option {c}";
                                     newConnections.Add((idx, label));
                                 }
                             }
@@ -1220,7 +1289,9 @@ internal sealed class AnimGraph1Builder : IDisposable
             foreach (var (childIdx, label) in connections)
             {
                 if (!nodeMap.TryGetValue(childIdx, out var childNode))
+                {
                     continue;
+                }
 
                 var outputSocket = childNode.GetOrAddOutput(string.Empty, PoseHue);
                 var inputSocket = parentNode.AddInput(label, PoseHue, allowMultiple: true);
@@ -1241,13 +1312,17 @@ internal sealed class AnimGraph1Builder : IDisposable
     private static void AddIndexedName(Node node, KVObject obj, string key, string label, Func<int, string> resolver)
     {
         if (obj.ContainsKey(key))
+        {
             node.AddText(FormatIndexed(label, obj.GetInt32Property(key), resolver));
+        }
     }
 
     private static void ApplyNetworkMode(Node node, KVObject obj)
     {
         if (obj.GetStringProperty("m_networkMode", "").Equals("ClientSimulate", StringComparison.Ordinal))
+        {
             node.BodyTint = GraphHue.Purple;
+        }
     }
 
     private static string FormatDamping(KVObject damping)
@@ -1260,19 +1335,21 @@ internal sealed class AnimGraph1Builder : IDisposable
     private Node CreateNode(GraphDocument document, KVObject compiledNode, int index)
     {
         var className = compiledNode.GetStringProperty("_class");
-        string displayName = ClassDisplayName.TryGetValue(className, out var display)
+        var displayName = ClassDisplayName.TryGetValue(className, out var display)
             ? display
             : className?.Replace("UpdateNode", "", StringComparison.Ordinal) ?? "Unknown";
 
-        string nodeName = compiledNode.GetStringProperty("m_name");
+        var nodeName = compiledNode.GetStringProperty("m_name");
         if (string.IsNullOrEmpty(nodeName))
+        {
             nodeName = displayName;
+        }
 
         if (className is "CSequenceUpdateNode" or "CSingleFrameUpdateNode" or "CCycleControlClipUpdateNode")
         {
             if (compiledNode.ContainsKey("m_hSequence"))
             {
-                int seqIdx = compiledNode.GetInt32Property("m_hSequence");
+                var seqIdx = compiledNode.GetInt32Property("m_hSequence");
                 if (seqIdx >= 0)
                 {
                     var seqName = GetSequenceName(seqIdx);
@@ -1288,15 +1365,16 @@ internal sealed class AnimGraph1Builder : IDisposable
         {
             Name = $"({index}) {nodeName}",
             NodeType = displayName,
+            Category = className != null ? HueOfClass(className) : PoseHue
         };
-
-        node.Category = className != null ? HueOfClass(className) : PoseHue;
 
         ApplyNetworkMode(node, compiledNode);
 
         HashSet<string>? skipKeys = null;
         if (className != null)
+        {
             ClassPropertySkips.TryGetValue(className, out skipKeys);
+        }
 
         AddScalarRows(
             node,
@@ -1313,7 +1391,7 @@ internal sealed class AnimGraph1Builder : IDisposable
 
         if (compiledNode.ContainsKey("m_nTagIndex"))
         {
-            int tagIndex = compiledNode.GetInt32Property("m_nTagIndex");
+            var tagIndex = compiledNode.GetInt32Property("m_nTagIndex");
             if (tagIndex >= 0)
             {
                 var tagName = GetTagName(tagIndex);
@@ -1343,41 +1421,80 @@ internal sealed class AnimGraph1Builder : IDisposable
         if (className == "CChoiceUpdateNode")
         {
             if (compiledNode.ContainsKey("m_choiceMethod"))
+            {
                 node.AddText($"ChoiceMethod: {compiledNode.GetStringProperty("m_choiceMethod")}");
+            }
+
             if (compiledNode.ContainsKey("m_blendMethod"))
+            {
                 node.AddText($"BlendMethod: {compiledNode.GetStringProperty("m_blendMethod")}");
+            }
+
             if (compiledNode.ContainsKey("m_choiceChangeMethod"))
+            {
                 node.AddText($"Choice ChangeMethod: {compiledNode.GetStringProperty("m_choiceChangeMethod")}");
+            }
+
             if (compiledNode.ContainsKey("m_bCrossFade"))
+            {
                 node.AddText($"CrossFade: {compiledNode.GetBooleanProperty("m_bCrossFade")}");
+            }
+
             if (compiledNode.ContainsKey("m_bResetChosen"))
+            {
                 node.AddText($"ResetChosen: {compiledNode.GetBooleanProperty("m_bResetChosen")}");
+            }
+
             if (compiledNode.ContainsKey("m_bDontResetSameSelection"))
+            {
                 node.AddText($"DontResetSameSelection: {compiledNode.GetBooleanProperty("m_bDontResetSameSelection")}");
+            }
         }
 
         if (className == "CSequenceUpdateNode")
         {
             if (compiledNode.ContainsKey("m_duration"))
+            {
                 node.AddText($"Duration: {compiledNode.GetFloatProperty("m_duration"):F2}");
+            }
+
             if (compiledNode.ContainsKey("m_playbackSpeed"))
+            {
                 node.AddText($"Speed: {compiledNode.GetFloatProperty("m_playbackSpeed"):F2}");
+            }
+
             if (compiledNode.ContainsKey("m_bLoop"))
+            {
                 node.AddText($"Loop: {compiledNode.GetBooleanProperty("m_bLoop")}");
+            }
         }
 
         if (className == "CBlend2DUpdateNode")
         {
             if (compiledNode.ContainsKey("m_blendSourceX"))
+            {
                 node.AddText($"Blend X: {compiledNode.GetStringProperty("m_blendSourceX")}");
+            }
+
             if (compiledNode.ContainsKey("m_blendSourceY"))
+            {
                 node.AddText($"Blend Y: {compiledNode.GetStringProperty("m_blendSourceY")}");
+            }
+
             if (compiledNode.ContainsKey("m_eBlendMode"))
+            {
                 node.AddText($"Mode: {compiledNode.GetStringProperty("m_eBlendMode")}");
+            }
+
             if (compiledNode.ContainsKey("m_bLoop"))
+            {
                 node.AddText($"Loop: {compiledNode.GetBooleanProperty("m_bLoop")}");
+            }
+
             if (compiledNode.ContainsKey("m_playbackSpeed"))
+            {
                 node.AddText($"Playback Speed: {compiledNode.GetFloatProperty("m_playbackSpeed"):F2}");
+            }
 
             if (compiledNode.ContainsKey("m_damping"))
             {
@@ -1392,13 +1509,13 @@ internal sealed class AnimGraph1Builder : IDisposable
             {
                 var items = compiledNode.GetArray("m_items");
                 node.AddText($"Items: {items.Count}");
-                for (int i = 0; i < items.Count; i++)
+                for (var i = 0; i < items.Count; i++)
                 {
                     var item = items[i];
-                    int seqIdx = item.GetInt32Property("m_hSequence", -1);
-                    string seqDisplay = seqIdx >= 0 ? GetSequenceName(seqIdx) : "None";
+                    var seqIdx = item.GetInt32Property("m_hSequence", -1);
+                    var seqDisplay = seqIdx >= 0 ? GetSequenceName(seqIdx) : "None";
                     var pos = ParseVector2(item, "m_vPos");
-                    float dur = item.GetFloatProperty("m_flDuration");
+                    var dur = item.GetFloatProperty("m_flDuration");
                     node.AddText($"  [{i}] Seq: {seqDisplay} ({pos.x:F1}, {pos.y:F1}) dur={dur:F2}s");
                 }
             }
@@ -1408,11 +1525,19 @@ internal sealed class AnimGraph1Builder : IDisposable
         {
             AddIndexedName(node, compiledNode, "m_nWeightListIndex", "Bone Mask", GetWeightListName);
             if (compiledNode.ContainsKey("m_blendSpace"))
+            {
                 node.AddText($"Blend Space: {compiledNode.GetStringProperty("m_blendSpace")}");
+            }
+
             if (compiledNode.ContainsKey("m_flRootMotionBlend"))
+            {
                 node.AddText($"Root Motion Blend: {compiledNode.GetFloatProperty("m_flRootMotionBlend"):F2}");
+            }
+
             if (compiledNode.ContainsKey("m_bUseBlendScale"))
+            {
                 node.AddText($"Use Blend Scale: {compiledNode.GetBooleanProperty("m_bUseBlendScale")}");
+            }
         }
 
         if (className == "CStateMachineUpdateNode")
@@ -1426,13 +1551,15 @@ internal sealed class AnimGraph1Builder : IDisposable
                     node.AddText($"States: {states.Count}");
                     foreach (var state in states)
                     {
-                        string name = state.GetStringProperty("m_name", "Unnamed");
-                        bool isStart = state.GetIntegerProperty("m_bIsStartState") > 0;
+                        var name = state.GetStringProperty("m_name", "Unnamed");
+                        var isStart = state.GetIntegerProperty("m_bIsStartState") > 0;
                         node.AddText($"  {(isStart ? "*" : " ")} {name}");
                     }
                 }
                 if (stateMachine.ContainsKey("m_transitions"))
+                {
                     node.AddText($"Transitions: {stateMachine.GetArray("m_transitions").Count}");
+                }
             }
             if (compiledNode.ContainsKey("m_transitionData") && compiledNode.GetArray("m_transitionData").Count > 0)
             {
@@ -1447,7 +1574,9 @@ internal sealed class AnimGraph1Builder : IDisposable
         if (className == "CSelectorUpdateNode")
         {
             if (compiledNode.ContainsKey("m_selectionSource"))
+            {
                 node.AddText($"SelectionSource: {compiledNode.GetStringProperty("m_selectionSource")}");
+            }
         }
 
         if (className == "CTwoBoneIKUpdateNode" && compiledNode.ContainsKey("m_opFixedData"))
@@ -1455,19 +1584,25 @@ internal sealed class AnimGraph1Builder : IDisposable
             var opFixedData = compiledNode.GetSubCollection("m_opFixedData");
 
             if (opFixedData.ContainsKey("m_endEffectorType"))
+            {
                 node.AddText($"End Effector Type: {opFixedData.GetStringProperty("m_endEffectorType")}");
+            }
 
             if (opFixedData.ContainsKey("m_targetType"))
+            {
                 node.AddText($"Target Type: {opFixedData.GetStringProperty("m_targetType")}");
+            }
 
-            int fixedIdx = opFixedData.GetInt32Property("m_nFixedBoneIndex", -1);
-            int middleIdx = opFixedData.GetInt32Property("m_nMiddleBoneIndex", -1);
-            int endIdx = opFixedData.GetInt32Property("m_nEndBoneIndex", -1);
+            var fixedIdx = opFixedData.GetInt32Property("m_nFixedBoneIndex", -1);
+            var middleIdx = opFixedData.GetInt32Property("m_nMiddleBoneIndex", -1);
+            var endIdx = opFixedData.GetInt32Property("m_nEndBoneIndex", -1);
             if (fixedIdx >= 0 && middleIdx >= 0 && endIdx >= 0)
             {
                 var chainName = GetIKChainNameByBoneIndices(fixedIdx, middleIdx, endIdx);
                 if (!string.IsNullOrEmpty(chainName))
+                {
                     node.AddText($"IK Chain: {chainName}");
+                }
             }
 
             if (opFixedData.ContainsKey("m_hPositionParam"))
@@ -1481,29 +1616,37 @@ internal sealed class AnimGraph1Builder : IDisposable
                 node.AddText($"Rotation Param: {GetParameterDescriptionFromHandle(handle)}");
             }
 
-            string[] extraProps = { "m_bAlwaysUseFallbackHinge", "m_vLsFallbackHingeAxis", "m_bMatchTargetOrientation", "m_bConstrainTwist", "m_flMaxTwist" };
+            string[] extraProps = ["m_bAlwaysUseFallbackHinge", "m_vLsFallbackHingeAxis", "m_bMatchTargetOrientation", "m_bConstrainTwist", "m_flMaxTwist"];
             foreach (var prop in extraProps)
             {
                 if (opFixedData.ContainsKey(prop))
                 {
                     var val = opFixedData[prop];
                     if (!val.IsCollection && !val.IsArray)
+                    {
                         node.AddText($"{prop}: {val}");
+                    }
                 }
             }
         }
         if (className == "CAimMatrixUpdateNode")
         {
             if (compiledNode.ContainsKey("m_target"))
+            {
                 node.AddText($"Target: {compiledNode.GetStringProperty("m_target")}");
+            }
 
             AddIndexedName(node, compiledNode, "m_hSequence", "Sequence", GetSequenceName);
 
             if (compiledNode.ContainsKey("m_bResetChild"))
+            {
                 node.AddText($"Reset Child: {compiledNode.GetBooleanProperty("m_bResetChild")}");
+            }
 
             if (compiledNode.ContainsKey("m_bLockWhenWaning"))
+            {
                 node.AddText($"Lock When Waning: {compiledNode.GetBooleanProperty("m_bLockWhenWaning")}");
+            }
 
             if (compiledNode.ContainsKey("m_opFixedSettings"))
             {
@@ -1522,27 +1665,41 @@ internal sealed class AnimGraph1Builder : IDisposable
                 }
 
                 if (settings.ContainsKey("m_eBlendMode"))
+                {
                     node.AddText($"Blend Mode: {settings.GetStringProperty("m_eBlendMode")}");
+                }
 
                 if (settings.ContainsKey("m_flMaxYawAngle"))
+                {
                     node.AddText($"Max Yaw Angle: {settings.GetFloatProperty("m_flMaxYawAngle"):F2}");
+                }
 
                 if (settings.ContainsKey("m_flMaxPitchAngle"))
+                {
                     node.AddText($"Max Pitch Angle: {settings.GetFloatProperty("m_flMaxPitchAngle"):F2}");
+                }
 
                 AddIndexedName(node, settings, "m_nBoneMaskIndex", "Bone Mask", GetWeightListName);
 
                 if (settings.ContainsKey("m_bTargetIsPosition"))
+                {
                     node.AddText($"Target Is Position: {settings.GetBooleanProperty("m_bTargetIsPosition")}");
+                }
 
                 if (settings.ContainsKey("m_bUseBiasAndClamp"))
+                {
                     node.AddText($"Use Bias And Clamp: {settings.GetBooleanProperty("m_bUseBiasAndClamp")}");
+                }
 
                 if (settings.ContainsKey("m_flBiasAndClampYawOffset"))
+                {
                     node.AddText($"Bias/Clamp Yaw Offset: {settings.GetFloatProperty("m_flBiasAndClampYawOffset"):F2}");
+                }
 
                 if (settings.ContainsKey("m_flBiasAndClampPitchOffset"))
+                {
                     node.AddText($"Bias/Clamp Pitch Offset: {settings.GetFloatProperty("m_flBiasAndClampPitchOffset"):F2}");
+                }
 
                 if (settings.ContainsKey("m_biasAndClampBlendCurve"))
                 {
@@ -1567,17 +1724,27 @@ internal sealed class AnimGraph1Builder : IDisposable
             }
 
             if (opFixedData.ContainsKey("m_bMatchTranslation"))
+            {
                 node.AddText($"Match Translation: {opFixedData.GetBooleanProperty("m_bMatchTranslation")}");
+            }
+
             if (opFixedData.ContainsKey("m_bMatchRotation"))
+            {
                 node.AddText($"Match Rotation: {opFixedData.GetBooleanProperty("m_bMatchRotation")}");
+            }
         }
 
         if (className == "CFootPinningUpdateNode")
         {
             if (compiledNode.ContainsKey("m_eTimingSource"))
+            {
                 node.AddText($"Timing Source: {compiledNode.GetStringProperty("m_eTimingSource")}");
+            }
+
             if (compiledNode.ContainsKey("m_bResetChild"))
+            {
                 node.AddText($"Reset Child: {compiledNode.GetBooleanProperty("m_bResetChild")}");
+            }
 
             if (compiledNode.ContainsKey("m_params"))
             {
@@ -1594,18 +1761,31 @@ internal sealed class AnimGraph1Builder : IDisposable
                 var poseData = compiledNode.GetSubCollection("m_poseOpFixedData");
 
                 if (poseData.ContainsKey("m_flBlendTime"))
+                {
                     node.AddText($"Blend Time: {poseData.GetFloatProperty("m_flBlendTime"):F2}");
+                }
+
                 if (poseData.ContainsKey("m_flLockBreakDistance"))
+                {
                     node.AddText($"Lock Break Distance: {poseData.GetFloatProperty("m_flLockBreakDistance"):F2}");
+                }
+
                 if (poseData.ContainsKey("m_flMaxLegTwist"))
+                {
                     node.AddText($"Max Leg Twist: {poseData.GetFloatProperty("m_flMaxLegTwist"):F2}");
+                }
 
                 AddIndexedName(node, poseData, "m_nHipBoneIndex", "Hip Bone", GetBoneName);
 
                 if (poseData.ContainsKey("m_bApplyLegTwistLimits"))
+                {
                     node.AddText($"Apply Leg Twist Limits: {poseData.GetBooleanProperty("m_bApplyLegTwistLimits")}");
+                }
+
                 if (poseData.ContainsKey("m_bApplyFootRotationLimits"))
+                {
                     node.AddText($"Apply Foot Rotation Limits: {poseData.GetBooleanProperty("m_bApplyFootRotationLimits")}");
+                }
 
                 if (poseData.ContainsKey("m_footInfo"))
                 {
@@ -1613,29 +1793,55 @@ internal sealed class AnimGraph1Builder : IDisposable
                     if (footInfoArray.Count > 0)
                     {
                         node.AddText($"Feet ({footInfoArray.Count}):");
-                        for (int i = 0; i < footInfoArray.Count; i++)
+                        for (var i = 0; i < footInfoArray.Count; i++)
                         {
                             var foot = footInfoArray[i];
                             var footLines = new List<string>();
 
                             if (foot.ContainsKey("m_nFootIndex"))
+                            {
                                 footLines.Add(FormatIndexed("Foot", foot.GetInt32Property("m_nFootIndex"), GetFootName));
+                            }
+
                             if (foot.ContainsKey("m_nTargetBoneIndex"))
+                            {
                                 footLines.Add(FormatIndexed("Target Bone", foot.GetInt32Property("m_nTargetBoneIndex"), GetBoneName));
+                            }
+
                             if (foot.ContainsKey("m_nAnkleBoneIndex"))
+                            {
                                 footLines.Add(FormatIndexed("Ankle Bone", foot.GetInt32Property("m_nAnkleBoneIndex"), GetBoneName));
+                            }
+
                             if (foot.ContainsKey("m_nIKAnchorBoneIndex"))
+                            {
                                 footLines.Add(FormatIndexed("IK Anchor Bone", foot.GetInt32Property("m_nIKAnchorBoneIndex"), GetBoneName));
+                            }
+
                             if (foot.ContainsKey("m_ikChainIndex"))
+                            {
                                 footLines.Add(FormatIndexed("IK Chain", foot.GetInt32Property("m_ikChainIndex"), GetIKChainName));
+                            }
+
                             if (foot.ContainsKey("m_nTagIndex"))
+                            {
                                 footLines.Add(FormatIndexed("Tag", foot.GetInt32Property("m_nTagIndex"), GetTagName));
+                            }
+
                             if (foot.ContainsKey("m_flMaxIKLength"))
+                            {
                                 footLines.Add($"Max IK Length: {foot.GetFloatProperty("m_flMaxIKLength"):F2}");
+                            }
+
                             if (foot.ContainsKey("m_flMaxRotationLeft"))
+                            {
                                 footLines.Add($"Max Rotation Left: {foot.GetFloatProperty("m_flMaxRotationLeft"):F2}");
+                            }
+
                             if (foot.ContainsKey("m_flMaxRotationRight"))
+                            {
                                 footLines.Add($"Max Rotation Right: {foot.GetFloatProperty("m_flMaxRotationRight"):F2}");
+                            }
 
                             node.AddText($"  [{i}] {string.Join(", ", footLines)}");
                         }
@@ -1688,8 +1894,15 @@ internal sealed class AnimGraph1Builder : IDisposable
         var typeOrder = new[] { "BOOL", "INT", "FLOAT", "ENUM", "VECTOR", "QUATERNION", "SYMBOL", "VIRTUAL", "UNKNOWN" };
         foreach (var type in typeOrder)
         {
-            if (!typeToParameters.TryGetValue(type, out var list)) continue;
-            if (list.Count == 0) continue;
+            if (!typeToParameters.TryGetValue(type, out var list))
+            {
+                continue;
+            }
+
+            if (list.Count == 0)
+            {
+                continue;
+            }
 
             var ordered = list.OrderBy(p => parameterObjectToIndex.TryGetValue(p, out var idx) ? idx : int.MaxValue).ToList();
             var friendlyName = ParameterTypeDisplayName.TryGetValue(type, out var display) ? display : type;
@@ -1756,7 +1969,9 @@ internal sealed class AnimGraph1Builder : IDisposable
     private void AddComponentNodes(GraphDocument document)
     {
         if (components.Count == 0)
+        {
             return;
+        }
 
         foreach (var comp in components)
         {

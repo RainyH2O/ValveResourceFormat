@@ -19,9 +19,10 @@ namespace GUI.Forms
             Height = 450;
             Text = "EntityInfoForm";
 
-            EntityInfoControl = new(vrfGuiContext);
-
-            EntityInfoControl.Dock = DockStyle.Fill;
+            EntityInfoControl = new(vrfGuiContext)
+            {
+                Dock = DockStyle.Fill
+            };
             Controls.Add(EntityInfoControl);
 
             Icon = Program.MainForm.Icon;

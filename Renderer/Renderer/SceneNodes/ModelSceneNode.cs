@@ -861,8 +861,8 @@ namespace ValveResourceFormat.Renderer.SceneNodes
             boneMatricesGpu?.Delete();
         }
 
-        private DotToMorphConstraint[] dotToMorphConstraints = [];
-        private float[] dotToMorphValues = [];
+        private readonly DotToMorphConstraint[] dotToMorphConstraints = [];
+        private readonly float[] dotToMorphValues = [];
 
         /// <summary>
         /// Parses the constraints that drive a morph from a bone's facing, resolving the bones and the

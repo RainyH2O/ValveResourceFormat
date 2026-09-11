@@ -71,9 +71,8 @@ namespace ValveResourceFormat.ResourceTypes
             {
                 Resource = null!,
                 Data = data,
+                createdFormat = format ?? ParticleFormatUpgrader.LatestFormat
             };
-
-            system.createdFormat = format ?? ParticleFormatUpgrader.LatestFormat;
 
             return system;
         }

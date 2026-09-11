@@ -21,7 +21,7 @@ namespace ValveResourceFormat.Renderer.Buffers
         public Vector4 BarnLightOrientationQ;
         /// <summary>Angle-based fade parameters for the barn light.</summary>
         public Vector3 BarnLightAngleFade;
-        private uint _padding0;
+        private readonly uint _padding0;
         /// <summary>Shadow map offset and scale for the barn light.</summary>
         public Vector4 BarnLightShadowOffsetScale;
         /// <summary>Cookie texture parameters for the barn light.</summary>
@@ -34,7 +34,7 @@ namespace ValveResourceFormat.Renderer.Buffers
         public float BarnLightShadowScale;
         /// <summary>Packed path trace index and barn light flags.</summary>
         public uint PathTraceIndex_BarnLightFlags;
-        private uint _padding1;
+        private readonly uint _padding1;
         /// <summary>Transform matrix from world space to barn light illumination space.</summary>
         public OpenTK.Mathematics.Matrix3x4 BarnIlluminationFromWorld;
     }

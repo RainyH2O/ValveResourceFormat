@@ -28,23 +28,33 @@ partial class HalfEdgeMesh
         {
             // visit each full edge once
             if (GetFullEdgeForHalfEdge(hEdge) != hEdge)
+            {
                 continue;
+            }
 
             var hFaceA = hEdge.Face;
             var hFaceB = hEdge.OppositeEdge.Face;
 
             if (hFaceA == FaceHandle.Invalid || hFaceB == FaceHandle.Invalid || hFaceA == hFaceB)
+            {
                 continue;
+            }
 
             // only look at triangles
             if (ComputeNumEdgesInFace(hFaceA) != 3 || ComputeNumEdgesInFace(hFaceB) != 3)
+            {
                 continue;
+            }
 
             if (canMergeFaces != null && !canMergeFaces(hFaceA, hFaceB))
+            {
                 continue;
+            }
 
             if (!EdgeShouldBeRemoved(hEdge, positions, angleFaceCos, angleShape))
+            {
                 continue;
+            }
 
             EdgeToQuadVerts(hEdge, positions, out var v1, out var v2, out var v3, out var v4);
             candidates.Add((QuadCalcError(v1, v2, v3, v4), hEdge));
@@ -62,7 +72,9 @@ partial class HalfEdgeMesh
             var hFaceB = hEdge.OppositeEdge.Face;
 
             if (mergedFaces.Contains(hFaceA) || mergedFaces.Contains(hFaceB))
+            {
                 continue;
+            }
 
             if (DissolveEdge(hEdge, out _))
             {
@@ -100,11 +112,15 @@ partial class HalfEdgeMesh
 
         // written this way so nan normals from degenerate triangles also delimit
         if (!(Vector3.Dot(normalA, normalB) >= angleFaceCos))
+        {
             return false;
+        }
 
         // a flipped face is out of the question
         if (IsQuadFlip(v1, v2, v3, v4))
+        {
             return false;
+        }
 
         var e0 = Vector3.Normalize(v1 - v2);
         var e1 = Vector3.Normalize(v2 - v3);
@@ -174,10 +190,14 @@ partial class HalfEdgeMesh
         var d41 = v1 - v4;
 
         if (Vector3.Dot(Vector3.Cross(d12, d23), Vector3.Cross(d34, d41)) < 0f)
+        {
             return true;
+        }
 
         if (Vector3.Dot(Vector3.Cross(d23, d34), Vector3.Cross(d41, d12)) < 0f)
+        {
             return true;
+        }
 
         return false;
     }

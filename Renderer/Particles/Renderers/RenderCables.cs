@@ -17,7 +17,7 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
     {
         private const string ShaderName = "particle_cable";
 
-        private Shader shader;
+        private readonly Shader shader;
         private readonly Shader? depthShader;
         private readonly Scene scene;
         private readonly RenderMaterial material;

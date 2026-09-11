@@ -1070,7 +1070,7 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
             return $"{kind} 0";
         }
 
-        GL.GetObjectLabel(identifier, name, 256, out _, out string label);
+        GL.GetObjectLabel(identifier, name, 256, out _, out var label);
         return string.IsNullOrEmpty(label) ? $"{kind} {name}" : $"{kind} {name} '{label}'";
     }
 #endif

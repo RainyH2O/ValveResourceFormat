@@ -1341,7 +1341,7 @@ partial class ModelExtract
             if (model.Data.ContainsKey("m_animGraph2Refs"))
             {
                 var animGraph2Refs = model.Data.GetArray("m_animGraph2Refs");
-                for (int i = 0; i < animGraph2Refs.Count; i++)
+                for (var i = 0; i < animGraph2Refs.Count; i++)
                 {
                     var refObj = animGraph2Refs[i];
                     var identifier = refObj.GetStringProperty("m_sIdentifier");

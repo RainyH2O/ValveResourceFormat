@@ -412,7 +412,7 @@ partial class ModelExtract
             Log = log
         };
 
-        log.AddLayer(new DmeLogLayer<T>());
+        log.AddLayer([]);
 
         return channel;
     }

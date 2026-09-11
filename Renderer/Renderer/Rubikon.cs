@@ -1152,7 +1152,9 @@ public class Rubikon
 
             //avoids division early
             if (min > tracedDistanceAlongAxis)
+            {
                 return;
+            }
 
             min /= tracedDistanceAlongAxis;
             max /= tracedDistanceAlongAxis;
@@ -1165,10 +1167,14 @@ public class Rubikon
             exit = MathF.Min(exit, max);
 
             if (enter > exit || exit <= 0)
+            {
                 return;
+            }
         }
         if (enter > 1.0f)
+        {
             return;
+        }
 
         // Already overlapping this triangle at the start position - nothing can be closer,
         // so report start-solid and let the callers early-exit

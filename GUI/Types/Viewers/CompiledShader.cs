@@ -14,10 +14,10 @@ namespace GUI.Types.Viewers
 {
     class CompiledShader : IDisposable, IViewer
     {
-        private TextControl control;
-        private TreeView fileListView;
+        private readonly TextControl control;
+        private readonly TreeView fileListView;
         private readonly Container components;
-        private ThemedContextMenuStrip shaderFileContextMenu;
+        private readonly ThemedContextMenuStrip shaderFileContextMenu;
         private readonly VrfGuiContext vrfGuiContext;
         private VfxProgramData? featuresProgram;
 

@@ -116,19 +116,19 @@ namespace ValveResourceFormat.Renderer.Materials
         public Material Material { get; }
 
         /// <summary>Gets the integer parameters, seeded from <see cref="Material"/> and writable per instance.</summary>
-        public MaterialInputs<long> IntParams { get; } = new();
+        public MaterialInputs<long> IntParams { get; } = [];
 
         /// <summary>Gets the float parameters, seeded from <see cref="Material"/> and writable per instance.</summary>
-        public MaterialInputs<float> FloatParams { get; } = new();
+        public MaterialInputs<float> FloatParams { get; } = [];
 
         /// <summary>Gets the vector parameters, seeded from <see cref="Material"/> and writable per instance.</summary>
-        public MaterialInputs<Vector4> VectorParams { get; } = new();
+        public MaterialInputs<Vector4> VectorParams { get; } = [];
 
         /// <summary>Gets the map of matrix uniform names to their current values for this material.</summary>
-        public MaterialInputs<Matrix4x4> Matrices { get; } = new();
+        public MaterialInputs<Matrix4x4> Matrices { get; } = [];
 
         /// <summary>Gets the map of texture uniform names to the bound <see cref="RenderTexture"/> objects for this material.</summary>
-        public MaterialInputs<RenderTexture> Textures { get; } = new();
+        public MaterialInputs<RenderTexture> Textures { get; } = [];
 
         /// <summary>Gets or sets a value indicating whether this material is rendered as a screen-space or world-space overlay (polygon-offset, no depth write).</summary>
         public bool IsOverlay { get; set; }

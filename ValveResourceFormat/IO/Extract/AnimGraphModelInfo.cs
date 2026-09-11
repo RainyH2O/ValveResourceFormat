@@ -151,7 +151,7 @@ public sealed class AnimGraphModelInfo
             return ikChainBonesCache;
         }
 
-        ikChainBonesCache = new Dictionary<string, List<string>>();
+        ikChainBonesCache = [];
         var ikChains = GetIKChainsFromModel(ModelData);
         if (ikChains is null)
         {

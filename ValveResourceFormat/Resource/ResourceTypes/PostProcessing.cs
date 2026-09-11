@@ -120,8 +120,10 @@ namespace ValveResourceFormat.ResourceTypes
         /// </summary>
         public string ToValvePostProcessing(bool preloadLookupTable = false, string lutFileName = "")
         {
-            var outKV3 = new KVObject();
-            outKV3.Add("_class", "CPostProcessData");
+            var outKV3 = new KVObject
+            {
+                { "_class", "CPostProcessData" }
+            };
 
             var layers = KVObject.Array();
 

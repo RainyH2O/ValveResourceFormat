@@ -142,9 +142,11 @@ public sealed class SoundscapeBank
     {
         var syntheticName = $"{ownerName}#{operatorName}{syntheticIndex++}";
 
-        var wrapper = new KVObject();
-        wrapper.Add("type", type);
-        wrapper.Add("operator", data);
+        var wrapper = new KVObject
+        {
+            { "type", type },
+            { "operator", data }
+        };
 
         eventBank.AddSoundEvent(syntheticName, wrapper);
         return syntheticName;

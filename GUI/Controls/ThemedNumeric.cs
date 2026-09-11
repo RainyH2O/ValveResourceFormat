@@ -115,7 +115,9 @@ namespace GUI.Controls
         protected override void OnMouseUp(MouseEventArgs mevent)
         {
             if (mevent.Button == MouseButtons.Middle)
+            {
                 MiddleMouseDown = false;
+            }
 
             base.OnMouseUp(mevent);
         }

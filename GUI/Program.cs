@@ -67,7 +67,7 @@ namespace GUI
             Assembly? entryAssembly = Assembly.GetEntryAssembly();
             if (entryAssembly is not null)
             {
-                object[] attrs = entryAssembly.GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false);
+                var attrs = entryAssembly.GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false);
                 if (attrs is not null && attrs.Length > 0)
                 {
                     ProductVersion = ((AssemblyInformationalVersionAttribute)attrs[0]).InformationalVersion;

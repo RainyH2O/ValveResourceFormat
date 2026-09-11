@@ -93,8 +93,10 @@ namespace ValveResourceFormat.ResourceTypes
 
             var xyDist = MathF.Sqrt(forwardX * forwardX + forwardY * forwardY);
 
-            Vector3 angles = new();
-            angles.X = MathF.Atan2(-forwardZ, xyDist);
+            Vector3 angles = new()
+            {
+                X = MathF.Atan2(-forwardZ, xyDist)
+            };
 
             if (xyDist > 0.001f)
             {

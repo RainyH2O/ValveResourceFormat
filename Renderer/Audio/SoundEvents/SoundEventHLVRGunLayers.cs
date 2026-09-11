@@ -87,13 +87,15 @@ internal sealed class SoundEventHLVRGunLayers : SoundEvent
         {
             var (file, _, falloffMin, falloffMax) = layers[i];
 
-            var wrapper = new KVObject();
-            wrapper.Add("type", "hlvr_default_3d");
-            wrapper.Add("vsnd_files", file);
-            wrapper.Add("delay", Definition.Delay);
-            wrapper.Add("pitch", Definition.Pitch);
-            wrapper.Add("pitch_rand_min", pitchRandMin);
-            wrapper.Add("pitch_rand_max", pitchRandMax);
+            var wrapper = new KVObject
+            {
+                { "type", "hlvr_default_3d" },
+                { "vsnd_files", file },
+                { "delay", Definition.Delay },
+                { "pitch", Definition.Pitch },
+                { "pitch_rand_min", pitchRandMin },
+                { "pitch_rand_max", pitchRandMax }
+            };
 
             if (falloffMax > 0f)
             {

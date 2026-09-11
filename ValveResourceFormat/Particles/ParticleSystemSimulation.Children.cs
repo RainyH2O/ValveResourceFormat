@@ -122,12 +122,11 @@ namespace ValveResourceFormat.Particles
 
                 var childSystem = new ParticleSystemSimulation(childSystemDefinition, fileLoader, logger, null, systemState)
                 {
-                    MainControlPoint = MainControlPoint
+                    MainControlPoint = MainControlPoint,
+                    startDelay = parse.Float("m_flDelay", 0f),
+                    isEndCapChild = parse.Boolean("m_bEndCap", false),
+                    detailLevel = parse.Enum("m_nDetailLevel", ParticleDetailLevel.PARTICLEDETAIL_LOW)
                 };
-
-                childSystem.startDelay = parse.Float("m_flDelay", 0f);
-                childSystem.isEndCapChild = parse.Boolean("m_bEndCap", false);
-                childSystem.detailLevel = parse.Enum("m_nDetailLevel", ParticleDetailLevel.PARTICLEDETAIL_LOW);
 
                 childSimulations.Add(childSystem);
             }

@@ -604,9 +604,9 @@ internal sealed class CrossingRepair
         => Count(incident[node], candidates) > 0;
 
     private readonly List<int> localScratch = [];
-    private int[] allWires = [];
+    private readonly int[] allWires = [];
     private readonly List<int> unionScratch = [];
-    private int[] unionMarks = [];
+    private readonly int[] unionMarks = [];
     private int unionStamp;
     private int unionMark;
 
