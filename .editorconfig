@@ -41,17 +41,12 @@ dotnet_diagnostic.CA1062.severity = none
 # CA1303: Do not pass literals as localized parameters
 dotnet_diagnostic.CA1303.severity = none
 
-# CA1304: Specify CultureInfo
-dotnet_diagnostic.CA1304.severity = suggestion
-
 # CA1305: Specify IFormatProvider
-dotnet_diagnostic.CA1305.severity = suggestion
+# KVObject conversions are always invariant, the analyzer only sees that a provider overload exists
+dotnet_code_quality.CA1305.excluded_symbol_names = T:ValveKeyValue.KVObject
 
-# CA1307: Specify StringComparison
-dotnet_diagnostic.CA1307.severity = suggestion
-
-# CA1310: Specify StringComparison for correctness
-dotnet_diagnostic.CA1310.severity = suggestion
+# CA1307: Specify StringComparison (not part of the Recommended set used by Debug builds)
+dotnet_diagnostic.CA1307.severity = warning
 
 # CA1508: Avoid dead conditional code
 dotnet_diagnostic.CA1508.severity = none
@@ -88,9 +83,6 @@ dotnet_diagnostic.CA2008.severity = none
 
 # CA2119: Seal methods that satisfy private interfaces
 dotnet_diagnostic.CA2119.severity = none
-
-# CA2201: Do not raise reserved exception types
-dotnet_diagnostic.CA2201.severity = suggestion
 
 # CA2214: Do not call overridable methods in constructors
 dotnet_diagnostic.CA2214.severity = none

@@ -136,7 +136,7 @@ namespace GUI.Controls
 
     public class ThemedColorNumeric : ThemedAbstractNumeric<Color>
     {
-        protected override string ConvertToText(Color value) => ColorTranslator.ToHtml(value).Replace("#", "");
+        protected override string ConvertToText(Color value) => ColorTranslator.ToHtml(value).TrimStart('#');
 
         protected override Color Parse(string text)
         {
@@ -179,7 +179,7 @@ namespace GUI.Controls
         {
             try
             {
-                return Clamp(int.Parse(text));
+                return Clamp(int.Parse(text, CultureInfo.InvariantCulture));
             }
             catch (Exception)
             {
@@ -227,7 +227,7 @@ namespace GUI.Controls
         {
             try
             {
-                return Clamp(float.Parse(text));
+                return Clamp(float.Parse(text, CultureInfo.InvariantCulture));
             }
             catch (Exception)
             {

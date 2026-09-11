@@ -95,7 +95,7 @@ public class BaseEntity
         }
 
         // "name,attachment" addresses an attachment point; the name half is all an entity follows
-        var comma = parentName.IndexOf(',');
+        var comma = parentName.IndexOf(',', StringComparison.Ordinal);
 
         if (comma >= 0)
         {

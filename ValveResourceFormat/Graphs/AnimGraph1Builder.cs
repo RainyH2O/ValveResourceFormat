@@ -838,7 +838,7 @@ internal sealed class AnimGraph1Builder : IDisposable
             "CQuaternionAnimParameter" => "QUATERNION",
             "CSymbolAnimParameter" => "SYMBOL",
             "CVirtualAnimParameter" => "VIRTUAL",
-            _ => className.Replace("AnimParameter", "").TrimStart('C').ToUpperInvariant(),
+            _ => className.Replace("AnimParameter", "", StringComparison.Ordinal).TrimStart('C').ToUpperInvariant(),
         };
     }
 
@@ -1262,7 +1262,7 @@ internal sealed class AnimGraph1Builder : IDisposable
         var className = compiledNode.GetStringProperty("_class");
         string displayName = ClassDisplayName.TryGetValue(className, out var display)
             ? display
-            : className?.Replace("UpdateNode", "") ?? "Unknown";
+            : className?.Replace("UpdateNode", "", StringComparison.Ordinal) ?? "Unknown";
 
         string nodeName = compiledNode.GetStringProperty("m_name");
         if (string.IsNullOrEmpty(nodeName))
@@ -1276,7 +1276,7 @@ internal sealed class AnimGraph1Builder : IDisposable
                 if (seqIdx >= 0)
                 {
                     var seqName = GetSequenceName(seqIdx);
-                    if (!string.IsNullOrEmpty(seqName) && !seqName.StartsWith("sequence_"))
+                    if (!string.IsNullOrEmpty(seqName) && !seqName.StartsWith("sequence_", StringComparison.Ordinal))
                     {
                         nodeName = seqName;
                     }
