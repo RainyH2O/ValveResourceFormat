@@ -76,8 +76,6 @@ public class PickingTexture : Framebuffer
     private PickingIntent Intent;
     private PickingResponse? Response;
 
-    private readonly RendererContext RendererContext;
-
     // could share depth buffer with main framebuffer, but msaa doesn't match
     // private readonly Framebuffer depthSource;
 
@@ -86,7 +84,6 @@ public class PickingTexture : Framebuffer
     /// <param name="onPicked">Handler invoked when a pick result is available.</param>
     public PickingTexture(RendererContext rendererContext, EventHandler<PickingResponse> onPicked) : base(nameof(PickingTexture))
     {
-        RendererContext = rendererContext;
         Shader = rendererContext.ShaderLoader.LoadShader("picking");
         DebugShader = rendererContext.ShaderLoader.LoadShader("picking", ("F_DEBUG_PICKER", 1));
         OnPicked += onPicked;

@@ -24,7 +24,7 @@ public class GameExtractTests
         // Use this to create or update correct output files
         var UpdateFiles = false;
 
-        if (UpdateFiles == false && !File.Exists(outputPathRepo))
+        if (!UpdateFiles && !File.Exists(outputPathRepo))
         {
             Skip.Test($"Sample output file not present.");
         }

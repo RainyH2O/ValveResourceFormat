@@ -337,12 +337,12 @@ namespace Tests
                 await Assert.That(ChannelMapping.RG.Count).IsEqualTo(2);
                 await Assert.That(ChannelMapping.G.Count).IsEqualTo(1);
                 await Assert.That(ChannelMapping.NULL.Count).IsZero();
-                await Assert.That(ChannelMapping.RGBA.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B, ChannelMapping.Channel.A }, CollectionOrdering.Matching);
-                await Assert.That(ChannelMapping.RGB.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B }, CollectionOrdering.Matching);
-                await Assert.That(ChannelMapping.RG.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.R, ChannelMapping.Channel.G }, CollectionOrdering.Matching);
-                await Assert.That(ChannelMapping.AG.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.A, ChannelMapping.Channel.G }, CollectionOrdering.Matching);
-                await Assert.That(ChannelMapping.A.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.A }, CollectionOrdering.Matching);
-                await Assert.That(ChannelMapping.R.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.R }, CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.RGBA.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B, ChannelMapping.Channel.A], CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.RGB.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B], CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.RG.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.R, ChannelMapping.Channel.G], CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.AG.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.A, ChannelMapping.Channel.G], CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.A.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.A], CollectionOrdering.Matching);
+                await Assert.That(ChannelMapping.R.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.R], CollectionOrdering.Matching);
 
                 await Assert.That((byte)ChannelMapping.R).IsZero();
                 await Assert.That((byte)ChannelMapping.G).IsEqualTo((byte)0x01);
@@ -361,11 +361,11 @@ namespace Tests
                 await Assert.That(ChannelMapping.AG.Destinations).IsEquivalentTo(new byte[] { 0, 1 }, CollectionOrdering.Matching);
 
                 var rotated = ChannelMapping.FromUInt32(0x23120130, packedDestinations: true);
-                await Assert.That(rotated.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.A, ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B }, CollectionOrdering.Matching);
+                await Assert.That(rotated.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.A, ChannelMapping.Channel.R, ChannelMapping.Channel.G, ChannelMapping.Channel.B], CollectionOrdering.Matching);
                 await Assert.That(rotated.Destinations).IsEquivalentTo(new byte[] { 0, 1, 2, 3 }, CollectionOrdering.Matching);
 
                 var offset = ChannelMapping.FromUInt32(0xFFFF1201, packedDestinations: true);
-                await Assert.That(offset.ValidChannels).IsEquivalentTo(new[] { ChannelMapping.Channel.R, ChannelMapping.Channel.G }, CollectionOrdering.Matching);
+                await Assert.That(offset.ValidChannels).IsEquivalentTo([ChannelMapping.Channel.R, ChannelMapping.Channel.G], CollectionOrdering.Matching);
                 await Assert.That(offset.Destinations).IsEquivalentTo(new byte[] { 1, 2 }, CollectionOrdering.Matching);
 
                 await Assert.That(ChannelMapping.R.ToString()).IsEqualTo("R");

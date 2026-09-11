@@ -552,7 +552,7 @@ public partial class GltfModelExporter
             var drawCall = drawCalls[drawCallIndex];
             var transform = Matrix4x4.Identity;
 
-            if (fragmentData.GetBooleanProperty("m_bHasTransform") == true)
+            if (fragmentData.GetBooleanProperty("m_bHasTransform"))
             {
                 transform *= fragmentTransforms[transformIndex++].ToMatrix4x4();
 

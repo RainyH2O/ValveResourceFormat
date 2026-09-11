@@ -877,13 +877,13 @@ public partial class PlayerMovement : IPlayerController
     {
         var quarterExtents = new Vector3(halfExtents.X * 0.5f, halfExtents.Y * 0.5f, halfExtents.Z);
 
-        Span<Vector2> corners = stackalloc[]
-        {
+        Span<Vector2> corners =
+        [
             new Vector2(-1, -1),
             new Vector2(1, -1),
             new Vector2(-1, 1),
             new Vector2(1, 1),
-        };
+        ];
 
         foreach (var corner in corners)
         {
@@ -910,8 +910,8 @@ public partial class PlayerMovement : IPlayerController
         }
 
         // No downward candidates: don't unstuck into a fall
-        Span<Vector3> directions = stackalloc[]
-        {
+        Span<Vector3> directions =
+        [
             Vector3.UnitZ,        // Up
             Vector3.UnitX,        // Right
             -Vector3.UnitX,       // Left
@@ -921,7 +921,7 @@ public partial class PlayerMovement : IPlayerController
             Vector3.Normalize(new Vector3(-1, 1, 0)),
             Vector3.Normalize(new Vector3(1, -1, 0)),
             Vector3.Normalize(new Vector3(-1, -1, 0)),
-        };
+        ];
 
         for (var distance = 1f; distance < 100f; distance += 10f)
         {

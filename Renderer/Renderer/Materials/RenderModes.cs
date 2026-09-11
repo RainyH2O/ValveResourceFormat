@@ -69,7 +69,7 @@ namespace ValveResourceFormat.Renderer.Materials
             new("QuadOverdraw")
         ];
 
-        private readonly static Dictionary<string, byte> ShaderIds = new(Items.Count);
+        private static readonly Dictionary<string, byte> ShaderIds = new(Items.Count);
 
         /// <summary>Registers the shader define index assigned to a render mode name during preprocessing.</summary>
         /// <param name="renderMode">The render mode name (without the <c>renderMode_</c> prefix).</param>

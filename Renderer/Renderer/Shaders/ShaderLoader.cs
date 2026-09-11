@@ -221,7 +221,7 @@ namespace ValveResourceFormat.Renderer.Shaders
                 ?? throw new FileNotFoundException($"Shader '{shaderFileName}' does not exist.");
 
             if (availableStages.Length == 0
-            || availableStages[(int)ShaderProgramType.Vertex] == false && availableStages[(int)ShaderProgramType.Compute] == false)
+            || !availableStages[(int)ShaderProgramType.Vertex] && !availableStages[(int)ShaderProgramType.Compute])
             {
                 throw new InvalidDataException($"Shader '{shaderFileName}' does not have a vertex or compute stage.");
             }

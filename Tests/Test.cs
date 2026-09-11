@@ -52,7 +52,7 @@ namespace Tests
 
             await VerifyExtension(resource, file);
 
-            if (resource.ResourceType != ResourceType.Map) /// Tested by <see cref="MapExtractTest"/>
+            if (resource.ResourceType != ResourceType.Map) // Tested by MapExtractTest
             {
                 InternalTestExtraction.Test(resource);
             }
@@ -104,7 +104,7 @@ namespace Tests
 
             await VerifyExtension(resource, file);
 
-            if (resource.ResourceType != ResourceType.Map) /// Tested by <see cref="MapExtractTest"/>
+            if (resource.ResourceType != ResourceType.Map) // Tested by MapExtractTest
             {
                 InternalTestExtraction.Test(resource);
             }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Types.PackageViewer;
@@ -178,7 +179,7 @@ namespace GUI.Types.Exporter
 
             // When queuing files this way, it'll preserve the original tree
             // which is probably unwanted behaviour? It works tho /shrug
-            foreach (IBetterBaseItem item in items)
+            foreach (var item in items.Cast<IBetterBaseItem>())
             {
                 exporter.QueueFiles(item);
             }

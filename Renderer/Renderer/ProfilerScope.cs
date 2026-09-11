@@ -8,7 +8,7 @@ namespace ValveResourceFormat.Renderer;
 /// the region shows a CPU time and a blank GPU column. Must still be opened on the thread owning the
 /// frame, between <see cref="PerfStats.MarkFrameBegin"/> and <see cref="PerfStats.MarkFrameEnd"/>.
 /// </remarks>
-public ref struct ProfilerScope
+public readonly ref struct ProfilerScope
 {
     private readonly int timeQueryId;
 

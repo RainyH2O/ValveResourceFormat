@@ -518,7 +518,7 @@ partial class ModelExtract
     {
         var animName = localSequenceNameArray[autoLayer.LocalReference];
 
-        if (autoLayer.Pose == true)
+        if (autoLayer.Pose)
         {
             var poseParam = poseParamNames[autoLayer.LocalPose];
             return MakeNode("AnimBlendLayerPoseParam", [

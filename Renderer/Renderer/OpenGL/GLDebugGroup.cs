@@ -6,7 +6,7 @@ namespace ValveResourceFormat.Renderer;
 /// <remarks>
 /// Used to annotate sections of OpenGL commands in debugging tools like RenderDoc.
 /// </remarks>
-public ref struct GLDebugGroup
+public readonly ref struct GLDebugGroup
 {
     internal int TimeQueryId { get; }
 

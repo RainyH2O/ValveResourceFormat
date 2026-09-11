@@ -20,7 +20,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         /// <summary>Gets or sets whether this physics node is individually enabled for rendering.</summary>
         public bool Enabled
         {
-            get => field;
+            get;
             set
             {
                 field = value;

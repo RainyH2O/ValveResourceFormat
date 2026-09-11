@@ -66,7 +66,7 @@ public class ViewmodelSceneNode : ModelSceneNode
     /// </summary>
     public int SelectedItemIndex
     {
-        get => field;
+        get;
         set
         {
             if (field == value)

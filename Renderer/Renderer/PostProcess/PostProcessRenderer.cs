@@ -281,7 +281,7 @@ namespace ValveResourceFormat.Renderer.PostProcess
             {
                 colorBufferDraw.Bind(FramebufferTarget.DrawFramebuffer);
 
-                var postProcessShader = State.HasBloom == true ? shaderPostProcessBloom : shaderPostProcess;
+                var postProcessShader = State.HasBloom ? shaderPostProcessBloom : shaderPostProcess;
 
                 if (State.HasBloom)
                 {

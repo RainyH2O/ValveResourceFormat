@@ -15,7 +15,9 @@ namespace ValveResourceFormat.Renderer
     /// </summary>
     public partial class GPUMeshBufferCache
     {
+#pragma warning disable IDE0052 // Only read by the DEBUG diagnostic in the attribute binding loop
         private readonly RendererContext RendererContext;
+#pragma warning restore IDE0052
         private readonly Dictionary<string, GPUMeshBuffers> gpuBuffers = [];
         private readonly Dictionary<VAOKey, int> vertexArrayObjects = [];
 

@@ -302,7 +302,7 @@ namespace ValveResourceFormat.Renderer.World
             }
 
             scene.LightingInfo.StoreLights(
-                scene.AllNodes.Where(static n => n is SceneLight).Cast<SceneLight>().ToList()
+                scene.AllNodes.OfType<SceneLight>().ToList()
             );
         }
 

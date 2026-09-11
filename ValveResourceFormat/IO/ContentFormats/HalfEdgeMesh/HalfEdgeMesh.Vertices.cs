@@ -467,7 +467,7 @@ partial class HalfEdgeMesh
 
     internal static int FindFaceInSetSharedByVertices(VertexHandle hVertexA, VertexHandle hVertexB, List<FaceHandle> faceList)
     {
-        if ((IsVertexInMesh(hVertexA) == false) || (IsVertexInMesh(hVertexB) == false))
+        if (!IsVertexInMesh(hVertexA) || !IsVertexInMesh(hVertexB))
         {
             return -1;
         }
@@ -632,7 +632,7 @@ partial class HalfEdgeMesh
             var hStartVertex = vertexSearchList[0];
             vertexSearchList.RemoveAt(0);
 
-            if (IsVertexInMesh(hStartVertex) == false)
+            if (!IsVertexInMesh(hStartVertex))
             {
                 continue;
             }

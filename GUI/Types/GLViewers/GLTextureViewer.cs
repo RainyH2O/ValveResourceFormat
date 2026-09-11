@@ -1559,7 +1559,7 @@ namespace GUI.Types.GLViewers
 
         protected override void OnGLLoad()
         {
-            if (Svg == null) /// Svg will be setup on <see cref="OnFirstPaint"/> because it needs to be rescaled
+            if (Svg == null) // Svg will be setup on OnFirstPaint because it needs to be rescaled
             {
                 SetupTexture(false);
             }
@@ -1609,7 +1609,7 @@ namespace GUI.Types.GLViewers
 
             UiControl.BeginInvoke(UpdateZoomLabel);
 
-            /// This will call <see cref="CenterPosition"/> since it could not have been moved by user on first paint yet
+            // This will call CenterPosition since it could not have been moved by user on first paint yet
             ClampPosition();
         }
 

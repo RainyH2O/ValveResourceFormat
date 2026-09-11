@@ -46,7 +46,7 @@ namespace ValveResourceFormat.Renderer
         /// </summary>
         public virtual bool LayerEnabled
         {
-            get => field;
+            get;
             set
             {
                 var valueChanged = value != field;

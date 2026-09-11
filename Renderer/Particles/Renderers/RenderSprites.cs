@@ -23,7 +23,6 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
         private const string DefaultTextureName = "materials/particle/base_sprite.vtex";
 
         private readonly Shader shader;
-        private readonly RendererContext rendererContext;
         private readonly int vaoHandle;
         private readonly ParticleTextureLayer[] layers;
 
@@ -64,8 +63,6 @@ namespace ValveResourceFormat.Renderer.Particles.Renderers
 
         public RenderSprites(ParticleDefinitionParser parse, RendererContext rendererContext) : base(parse)
         {
-            this.rendererContext = rendererContext;
-
             blendMode = parse.Enum<ParticleBlendMode>("m_nOutputBlendMode", blendMode);
 
             (layers, var textureName) = ParticleTextureLayer.Build(parse, rendererContext, DefaultTextureName, srgbRead: OutputIsColor);

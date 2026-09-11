@@ -62,7 +62,7 @@ namespace ValveResourceFormat.Renderer
         public sealed class Fragment : SceneNode
         {
             /// <summary>Gets the aggregate that owns this fragment.</summary>
-            public required new SceneAggregate Parent { get; init; }
+            public new required SceneAggregate Parent { get; init; }
 
             /// <summary>Gets the shared renderable mesh used to issue this fragment's draw call.</summary>
             public required RenderableMesh RenderMesh { get; init; }
@@ -336,8 +336,7 @@ namespace ValveResourceFormat.Renderer
                 var tintColor = fragmentData.GetSubCollection("m_vTintColor").ToVector3();
                 var flags = fragmentData.GetEnumValue<ObjectTypeFlags>("m_objectFlags", normalize: true);
                 var lodGroupMask = fragmentData.GetUInt32Property("m_nLODGroupMask");
-                var fragmentTransform = fragmentData.GetBooleanProperty("m_bHasTransform") == true
-                    ? fragmentTransforms[transformIndex++]
+                var fragmentTransform = fragmentData.GetBooleanProperty("m_bHasTransform") ? fragmentTransforms[transformIndex++]
                     : null;
                 // The compiler writes -1 for fragments that no setup governs
                 var lodSetupIndex = fragmentData.GetInt32Property("m_nLODSetupIndex", -1);

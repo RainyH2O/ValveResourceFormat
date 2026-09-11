@@ -243,7 +243,6 @@ public class AllocStats
     // Rolling one second window, published on rollover so the numbers are readable.
     private long windowStart;
     private long windowTotalBytes;
-    private int windowFrames;
     private long windowMaxFrameBytes;
     private readonly int[] windowStartCollections = new int[GC.MaxGeneration + 1];
 
@@ -326,7 +325,6 @@ public class AllocStats
         lastFrameTotalBytes = GC.GetTotalAllocatedBytes(precise: false) - frameStartTotalBytes;
 
         windowTotalBytes += lastFrameTotalBytes;
-        windowFrames++;
         windowMaxFrameBytes = Math.Max(windowMaxFrameBytes, lastFrameTotalBytes);
 
         var elapsed = Stopwatch.GetElapsedTime(windowStart).TotalSeconds;
@@ -348,7 +346,6 @@ public class AllocStats
     {
         windowStart = Stopwatch.GetTimestamp();
         windowTotalBytes = 0;
-        windowFrames = 0;
         windowMaxFrameBytes = 0;
 
         for (var gen = 0; gen <= GC.MaxGeneration; gen++)

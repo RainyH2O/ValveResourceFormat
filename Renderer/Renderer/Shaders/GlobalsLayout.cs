@@ -397,7 +397,7 @@ public sealed class GlobalsLayout
             return;
         }
 
-        values.Slice(1, constant.ComponentCount - 1).Fill(values[0]);
+        values[1..constant.ComponentCount].Fill(values[0]);
     }
 
     private static double ParseScalar(GlobalsDeclaration declaration, ReadOnlySpan<char> text)

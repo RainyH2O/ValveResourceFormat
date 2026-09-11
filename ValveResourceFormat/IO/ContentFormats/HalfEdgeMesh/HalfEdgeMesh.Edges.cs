@@ -355,7 +355,7 @@ partial class HalfEdgeMesh
         var hVertex = GetEndVertexConnectedToEdge(hEdge);
         var nNumEdges = ComputeNumEdgesConnectedToVertex(hVertex);
 
-        if (IsHalfEdgeInMesh(hEdge) == false)
+        if (!IsHalfEdgeInMesh(hEdge))
         {
             return HalfEdgeHandle.Invalid;
         }
@@ -657,7 +657,7 @@ partial class HalfEdgeMesh
 
                 if (iEdge == 0)
                 {
-                    if ((bVisitedOpposite == false) && (nNumConnectedHalfEdges == nNumEdges))
+                    if (!bVisitedOpposite && (nNumConnectedHalfEdges == nNumEdges))
                     {
                         connectivityType = ComponentConnectivityType.Loop;
                         break;

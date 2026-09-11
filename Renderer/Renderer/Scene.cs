@@ -844,7 +844,7 @@ namespace ValveResourceFormat.Renderer
                                 firstIndex = (uint)(drawMeshletIndex * count);
                             }
 
-                            if (fragment.LayerEnabled == false)
+                            if (!fragment.LayerEnabled)
                             {
                                 count = 0;
                             }

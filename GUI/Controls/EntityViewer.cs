@@ -514,7 +514,7 @@ namespace GUI.Types.Viewers
             }
         }
 
-        private readonly static string[] ToolSpriteTextureKeys = ["g_tColorA", "g_tColorB", "g_tColorC", "g_tColor"];
+        private static readonly string[] ToolSpriteTextureKeys = ["g_tColorA", "g_tColorB", "g_tColorC", "g_tColor"];
 
         private static string? GetTextureFromMaterial(Material material)
         {

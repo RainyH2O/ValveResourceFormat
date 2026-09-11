@@ -77,7 +77,7 @@ namespace ValveResourceFormat.Renderer
         /// <summary>Gets or sets whether animation playback is paused. Changing the value forces a pose update.</summary>
         public bool IsPaused
         {
-            get => field;
+            get;
             set
             {
                 forceUpdate |= field != value;
@@ -91,7 +91,7 @@ namespace ValveResourceFormat.Renderer
         /// </summary>
         public bool ApplyAdditive
         {
-            get => field;
+            get;
             set
             {
                 forceUpdate |= field != value;
