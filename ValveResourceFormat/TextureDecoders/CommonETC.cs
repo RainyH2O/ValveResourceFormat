@@ -28,7 +28,7 @@ namespace ValveResourceFormat.TextureDecoders
         protected readonly uint[] m_buf = new uint[16];
         protected readonly byte[,] m_c = new byte[3, 3];
 
-        protected void DecodeEtc2Block(Span<byte> block)
+        protected void DecodeEtc2Block(ReadOnlySpan<byte> block)
         {
             var j = (ushort)(block[6] << 8 | block[7]);
             var k = (ushort)(block[4] << 8 | block[5]);

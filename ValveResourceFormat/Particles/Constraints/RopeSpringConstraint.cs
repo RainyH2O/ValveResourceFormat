@@ -133,7 +133,7 @@ namespace ValveResourceFormat.Particles.Constraints
         /// once from the spawn geometry (total chain length over particle count), while <see cref="Particle.PositionPrevious"/> still
         /// holds the spawn positions.
         /// </summary>
-        private float ResolveBaseLength(Span<Particle> current, ParticleSystemState particleSystemState)
+        private float ResolveBaseLength(ReadOnlySpan<Particle> current, ParticleSystemState particleSystemState)
         {
             var initial = initialRestingLength.NextNumber(particleSystemState);
             if (initial >= 0f)

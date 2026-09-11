@@ -27,7 +27,7 @@ namespace ValveResourceFormat.TextureDecoders
         /// </summary>
         /// <param name="block">The 8 bytes of the block.</param>
         /// <param name="output">Receives 16 bytes, the texel at (x, y) at index y * 4 + x.</param>
-        public static void DecodeBlock(Span<byte> block, Span<byte> output)
+        public static void DecodeBlock(ReadOnlySpan<byte> block, Span<byte> output)
         {
             int baseCodeword = block[0];
             var multiplier = block[1] >> 4;

@@ -67,7 +67,7 @@ namespace ValveResourceFormat.TextureDecoders
             }
         }
 
-        private void DecodeEtc2a8Block(Span<byte> block)
+        private void DecodeEtc2a8Block(ReadOnlySpan<byte> block)
         {
             int @base = block[0];
             int data1 = block[1];
@@ -97,7 +97,7 @@ namespace ValveResourceFormat.TextureDecoders
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Get6SwapedBytes(Span<byte> block)
+        private static ulong Get6SwapedBytes(ReadOnlySpan<byte> block)
         {
             return block[7] | (uint)block[6] << 8 |
                     (uint)block[5] << 16 | (uint)block[4] << 24 |

@@ -254,7 +254,7 @@ namespace ValveResourceFormat.Blocks
             return buffer;
         }
 
-        private static byte[] DecompressData(OnDiskBufferData buffer, Span<byte> span, int decompressedSize, bool isVertex, bool isZstdCompressed, bool isMeshoptCompressed)
+        private static byte[] DecompressData(OnDiskBufferData buffer, ReadOnlySpan<byte> span, int decompressedSize, bool isVertex, bool isZstdCompressed, bool isMeshoptCompressed)
         {
             byte[]? tempZstd = null;
 
