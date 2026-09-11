@@ -586,13 +586,10 @@ namespace GUI.Types.GLViewers
         /// </summary>
         private static string GetSequenceDisplayName(SpritesheetData.Sequence sequence)
         {
-            var name = sequence.Name;
-            var isDescriptive = name.Length > 0
-                && !name.StartsWith("CDme", StringComparison.Ordinal)
-                && !uint.TryParse(name, out _);
+            var isDescriptive = sequence.IsNamed && !uint.TryParse(sequence.Name, out _);
 
             return isDescriptive
-                ? $"#{sequence.Id} {name} ({sequence.Frames.Length} frames)"
+                ? $"#{sequence.Id} {sequence.Name} ({sequence.Frames.Length} frames)"
                 : $"#{sequence.Id} ({sequence.Frames.Length} frames)";
         }
 

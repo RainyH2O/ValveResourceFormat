@@ -182,6 +182,14 @@ namespace ValveResourceFormat.ResourceTypes
                 public float EffectiveTotalTime => TotalTime > 0f ? TotalTime : 1f;
 
                 /// <summary>
+                /// Gets a value indicating whether <see cref="Name"/> is a name the sheet was authored with.
+                /// A sequence that was never named carries the name of the element class it was built from.
+                /// </summary>
+                public bool IsNamed => Name.Length > 0
+                    && !Name.StartsWith("CDme", StringComparison.Ordinal)
+                    && !Name.Any(char.IsWhiteSpace);
+
+                /// <summary>
                 /// Gets the time at which a frame starts, measured from the start of the sequence.
                 /// </summary>
                 /// <param name="frameIndex">Index of the frame to locate.</param>
@@ -1429,6 +1437,7 @@ namespace ValveResourceFormat.ResourceTypes
                         var sequence = data.Sequences[s];
 
                         writer.WriteLine("{0,-16} [Sequence {1}]:", string.Empty, s);
+                        writer.WriteLine("{0,-16}   m_nId             = {1}", string.Empty, sequence.Id);
                         writer.WriteLine("{0,-16}   m_name            = '{1}'", string.Empty, sequence.Name);
                         writer.WriteLine("{0,-16}   m_bClamp          = {1}", string.Empty, sequence.Clamp);
                         writer.WriteLine("{0,-16}   m_bAlphaCrop      = {1}", string.Empty, sequence.AlphaCrop);

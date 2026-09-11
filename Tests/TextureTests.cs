@@ -262,8 +262,83 @@ namespace Tests
             using (Assert.Multiple())
             {
                 await Assert.That(sprites).Count().IsEqualTo(4);
-                await Assert.That(sprites.Keys).All(rect => rect.Width == 16);
+                await Assert.That(sprites.Keys).All(sprite => sprite.Image.Width == 16 && sprite.Image.Height == 16);
+                await Assert.That(sprites.Keys).All(sprite => !sprite.Cropped && sprite.Pixels != sprite.Image);
                 await Assert.That(mks).Contains("frame DXT5_lava_drops_sheet_seq0.png 1");
+                await Assert.That(mks).Contains("LOOP");
+                await Assert.That(mks.Split('\n').Any(line => line.StartsWith("name ", StringComparison.Ordinal))).IsFalse();
+                await Assert.That(mks).DoesNotContain("alphacrop");
+            }
+        }
+
+        [Test]
+        public async Task SpriteSheetMksKeepsAlphaCroppedSequences()
+        {
+            using var resource = new Resource();
+            resource.Read(Path.Combine(TexturesDir, "sheet_alphacrop.vtex_c"));
+
+            var extract = new TextureExtract(resource);
+
+            await Assert.That(extract.TryGetMksData(out var sprites, out var mks)).IsTrue();
+
+            var lines = mks.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var cropped = sprites.Keys.Single(sprite => sprite.Cropped);
+
+            using (Assert.Multiple())
+            {
+                await Assert.That(lines).Contains("sequence 0 alphacrop");
+                await Assert.That(lines).Contains("name cropped_seq");
+                await Assert.That(lines).Contains("sequence 1");
+                await Assert.That(lines).Contains("name whole_seq");
+                await Assert.That(cropped.Image.Width).IsGreaterThan(cropped.Pixels.Width);
+                await Assert.That(cropped.Image.Height).IsGreaterThan(cropped.Pixels.Height);
+            }
+        }
+
+        [Test]
+        public async Task SpriteSheetMksKeepsTimingAndDecalParams()
+        {
+            using var resource = new Resource();
+            resource.Read(Path.Combine(TexturesDir, "sheet_clamp_decal.vtex_c"));
+
+            var extract = new TextureExtract(resource);
+
+            await Assert.That(extract.TryGetMksData(out _, out var mks)).IsTrue();
+
+            var lines = mks.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var held = Array.IndexOf(lines, "sequence 0");
+            var looped = Array.IndexOf(lines, "sequence 1");
+
+            using (Assert.Multiple())
+            {
+                await Assert.That(lines[held + 2]).IsEqualTo("clamp-extendlastframe");
+                await Assert.That(lines).Contains("decalScale 0.2");
+                await Assert.That(lines).Contains("animationScale 5");
+                await Assert.That(lines[held + 6]).EndsWith(" 2");
+                await Assert.That(lines[looped + 2]).IsEqualTo("LOOP");
+                await Assert.That(lines[looped + 3]).EndsWith(" 0");
+            }
+        }
+
+        [Test]
+        public async Task SpriteSheetMksKeepsSequenceNames()
+        {
+            using var resource = new Resource();
+            resource.Read(Path.Combine(TexturesDir, "sheet_named_sequences.vtex_c"));
+
+            var extract = new TextureExtract(resource);
+
+            await Assert.That(extract.TryGetMksData(out _, out var mks)).IsTrue();
+
+            var lines = mks.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+            using (Assert.Multiple())
+            {
+                await Assert.That(lines).Contains("name embers_loop");
+                await Assert.That(lines).Contains("name embers_burst");
+                await Assert.That(lines).Contains("name 2");
+                await Assert.That(lines[Array.IndexOf(lines, "sequence 0") + 1]).IsEqualTo("name embers_loop");
+                await Assert.That(lines[Array.IndexOf(lines, "sequence 0") + 2]).IsEqualTo("LOOP");
             }
         }
 

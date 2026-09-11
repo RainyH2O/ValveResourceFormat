@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -230,9 +231,11 @@ public sealed class TextureExtract
         {
             vtex.AddSubFile(Path.GetFileName(GetMksFileName())!, () => Encoding.UTF8.GetBytes(mks));
 
-            foreach (var (spriteRect, spriteFileName) in sprites)
+            var packed = sprites.Keys.Select(static sprite => sprite.Pixels).ToArray();
+
+            foreach (var (sprite, spriteFileName) in sprites)
             {
-                vtex.AddImageSubFile(Path.GetFileName(spriteFileName)!, (bitmap) => SubsetToPngImage(bitmap, spriteRect));
+                vtex.AddImageSubFile(Path.GetFileName(spriteFileName)!, (bitmap) => SpriteToPngImage(bitmap, sprite, packed));
             }
 
             return vtex;
@@ -318,6 +321,52 @@ public sealed class TextureExtract
     public static byte[] ToPngImage(SKBitmap bitmap)
     {
         return EncodePng(bitmap);
+    }
+
+    /// <summary>
+    /// Converts one sprite of a sheet to PNG image bytes, restoring the image the sheet cut it out of: its
+    /// pixels sit where they sat in that image, and whatever the sheet packed around them is cleared away.
+    /// </summary>
+    public static byte[] SpriteToPngImage(SKBitmap bitmap, SheetSprite sprite, SKRectI[] packed)
+    {
+        if (sprite.Pixels == sprite.Image)
+        {
+            return SubsetToPngImage(bitmap, sprite.Pixels);
+        }
+
+        using var image = new SKBitmap(sprite.Image.Width, sprite.Image.Height, bitmap.ColorType, bitmap.AlphaType);
+        using var canvas = new SKCanvas(image);
+        canvas.Clear(SKColors.Transparent);
+
+        var copy = sprite.Cropped ? sprite.Pixels : SKRectI.Intersect(sprite.Image, new SKRectI(0, 0, bitmap.Width, bitmap.Height));
+
+        if (!copy.IsEmpty)
+        {
+            using var pixels = new SKBitmap();
+
+            if (bitmap.ExtractSubset(pixels, copy))
+            {
+                canvas.DrawBitmap(pixels, new SKPoint(copy.Left - sprite.Image.Left, copy.Top - sprite.Image.Top), SKSamplingOptions.Default);
+            }
+        }
+
+        if (!sprite.Cropped)
+        {
+            using var clear = new SKPaint { Color = SKColors.Transparent, BlendMode = SKBlendMode.Src };
+
+            foreach (var other in packed)
+            {
+                if (other == sprite.Pixels || !other.IntersectsWith(copy))
+                {
+                    continue;
+                }
+
+                var area = SKRectI.Intersect(other, copy);
+                canvas.DrawRect(area.Left - sprite.Image.Left, area.Top - sprite.Image.Top, area.Width, area.Height, clear);
+            }
+        }
+
+        return EncodePng(image);
     }
 
     /// <summary>
@@ -600,9 +649,15 @@ public sealed class TextureExtract
     }
 
     /// <summary>
+    /// A sprite the sheet packs: the rectangle holding its pixels, the bounds of the image it was cut from, and
+    /// whether the sheet kept nothing of that image outside those pixels.
+    /// </summary>
+    public readonly record struct SheetSprite(SKRectI Pixels, SKRectI Image, bool Cropped);
+
+    /// <summary>
     /// Attempts to extract sprite sheet data and MKS texture script.
     /// </summary>
-    public bool TryGetMksData(out Dictionary<SKRectI, string> sprites, out string mks)
+    public bool TryGetMksData(out Dictionary<SheetSprite, string> sprites, out string mks)
     {
         mks = string.Empty;
         sprites = [];
@@ -619,28 +674,35 @@ public sealed class TextureExtract
             return false;
         }
 
+        var width = texture.ActualWidth;
+        var height = texture.ActualHeight;
+
         var mksBuilder = new StringBuilder();
         var textureName = Path.GetFileNameWithoutExtension(fileName);
         var packmodeNonFlat = false;
+        var compilerNamedSequences = 0;
+        var framesWithExtraImages = 0;
 
         for (var s = 0; s < spriteSheetData.Sequences.Length; s++)
         {
             var sequence = spriteSheetData.Sequences[s];
+            var cropped = IsCropped(sequence);
+            var alphaCrop = cropped ? GetAlphaCropMode(sequence) : string.Empty;
             mksBuilder.AppendLine();
 
             switch (sequence.NoColor, sequence.NoAlpha)
             {
                 case (false, false):
-                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence {s}");
+                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence {sequence.Id}{alphaCrop}");
                     break;
 
                 case (false, true):
-                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence-rgb {s}");
+                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence-rgb {sequence.Id}{alphaCrop}");
                     packmodeNonFlat = true;
                     break;
 
                 case (true, false):
-                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence-a {s}");
+                    mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"sequence-a {sequence.Id}{alphaCrop}");
                     packmodeNonFlat = true;
                     break;
 
@@ -648,36 +710,57 @@ public sealed class TextureExtract
                     throw new InvalidDataException($"Unexpected combination of {nameof(sequence.NoColor)} and {nameof(sequence.NoAlpha)}");
             }
 
+            if (sequence.IsNamed)
+            {
+                mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"name {sequence.Name}");
+            }
+            else if (sequence.Name.Length > 0)
+            {
+                compilerNamedSequences++;
+            }
+
             if (!sequence.Clamp)
             {
                 mksBuilder.AppendLine("LOOP");
+            }
+            else if (HoldsLastFrame(sequence))
+            {
+                mksBuilder.AppendLine("clamp-extendlastframe");
+            }
+
+            foreach (var (floatName, floatValue) in sequence.FloatParams)
+            {
+                mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"{floatName} {floatValue.ToString(CultureInfo.InvariantCulture)}");
             }
 
             for (var f = 0; f < sequence.Frames.Length; f++)
             {
                 var frame = sequence.Frames[f];
 
-                var imageFileName = sequence.Frames.Length == 1
-                    ? $"{textureName}_seq{s}.png"
-                    : $"{textureName}_seq{s}_{f}.png";
-
-                // A frame holds up to four image slots, and the unused ones repeat the first rectangle.
-                var image = frame.Images[0];
-                var imageRect = image.GetCroppedRect(texture.ActualWidth, texture.ActualHeight);
-
-                if (imageRect.IsEmpty)
+                if (frame.Images.Length == 0)
                 {
                     continue;
                 }
 
-                var displayTime = frame.DisplayTime;
-                if (sequence.Clamp && displayTime == 0)
+                // A frame holds up to four image slots, and the unused ones repeat the first rectangle.
+                var image = frame.Images[0];
+
+                if (frame.Images.Length > 1)
                 {
-                    displayTime = 1;
+                    framesWithExtraImages++;
                 }
 
-                sprites.TryAdd(imageRect, imageFileName);
-                mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"frame {sprites[imageRect]} {displayTime.ToString(CultureInfo.InvariantCulture)}");
+                var sprite = new SheetSprite(
+                    image.GetCroppedRect(width, height),
+                    ToPixelRect(image.UncroppedMin, image.UncroppedMax, width, height),
+                    cropped);
+
+                var imageFileName = sequence.Frames.Length == 1
+                    ? $"{textureName}_seq{s}.png"
+                    : $"{textureName}_seq{s}_{f}.png";
+
+                sprites.TryAdd(sprite, imageFileName);
+                mksBuilder.AppendLine(CultureInfo.InvariantCulture, $"frame {sprites[sprite]} {frame.DisplayTime.ToString(CultureInfo.InvariantCulture)}");
             }
         }
 
@@ -686,9 +769,88 @@ public sealed class TextureExtract
             mksBuilder.Insert(0, "packmode rgb+a\n");
         }
 
+        if (framesWithExtraImages > 0)
+        {
+            mksBuilder.Insert(0, $"// {framesWithExtraImages} frames hold more than one image, which this sheet format writes and the compiler no longer reads\n");
+        }
+
+        if (compilerNamedSequences > 0)
+        {
+            mksBuilder.Insert(0, $"// {compilerNamedSequences} sequences were left unnamed and carry what the compiler wrote instead\n");
+        }
+
         mksBuilder.Insert(0, $"// Reconstructed with {StringToken.VRF_GENERATOR}\n\n");
         mks = mksBuilder.ToString();
         return true;
+    }
+
+    /// <summary>
+    /// Whether this sequence spans the display time of its last frame. A clamping sequence that does not
+    /// runs out at the frame before it, and the sheet compiler drops that last display time.
+    /// </summary>
+    private static bool HoldsLastFrame(Texture.SpritesheetData.Sequence sequence)
+        => sequence.Frames.Length > 1 && sequence.Frames[^1].DisplayTime > 0f;
+
+    /// <summary>
+    /// Whether the sheet cropped this sequence's images down to the part the alpha channel covers and kept
+    /// nothing of what surrounded it. Such an image reaches outside the texture, which holds the crop alone.
+    /// </summary>
+    private static bool IsCropped(Texture.SpritesheetData.Sequence sequence)
+    {
+        if (sequence.AlphaCrop)
+        {
+            return true;
+        }
+
+        foreach (var frame in sequence.Frames)
+        {
+            foreach (var image in frame.Images)
+            {
+                if (image.UncroppedMin.X < 0f || image.UncroppedMin.Y < 0f || image.UncroppedMax.X > 1f || image.UncroppedMax.Y > 1f)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The mks keyword that crops this sequence's images down to the alpha covered part of them, for the axes
+    /// the sheet cropped.
+    /// </summary>
+    private static string GetAlphaCropMode(Texture.SpritesheetData.Sequence sequence)
+    {
+        var cropsU = false;
+        var cropsV = false;
+
+        foreach (var frame in sequence.Frames)
+        {
+            foreach (var image in frame.Images)
+            {
+                cropsU |= image.CroppedMin.X > image.UncroppedMin.X || image.CroppedMax.X < image.UncroppedMax.X;
+                cropsV |= image.CroppedMin.Y > image.UncroppedMin.Y || image.CroppedMax.Y < image.UncroppedMax.Y;
+            }
+        }
+
+        return (cropsU, cropsV) switch
+        {
+            (true, true) => " alphacrop",
+            (true, false) => " alphacrop_u",
+            (false, true) => " alphacrop_v",
+            _ => string.Empty,
+        };
+    }
+
+    private static SKRectI ToPixelRect(Vector2 min, Vector2 max, int width, int height)
+    {
+        var startX = (int)MathF.Floor(min.X * width);
+        var startY = (int)MathF.Floor(min.Y * height);
+        var endX = (int)MathF.Floor(max.X * width) + 1;
+        var endY = (int)MathF.Floor(max.Y * height) + 1;
+
+        return new SKRectI(startX, startY, endX, endY);
     }
 
     private string GetInputFileNameForVtex()
