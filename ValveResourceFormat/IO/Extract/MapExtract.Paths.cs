@@ -418,7 +418,15 @@ public sealed partial class MapExtract
         if (physics is not null)
         {
             var collisionSides = cable.NumSides;
-            var physicsVertices = physics.Parts.Sum(part => part.Shape.Meshes.Sum(mesh => mesh.Shape.GetVertices().Length));
+            var physicsVertices = 0;
+
+            foreach (var part in physics.Parts)
+            {
+                foreach (var mesh in part.Shape.Meshes)
+                {
+                    physicsVertices += mesh.Shape.GetVertices().Length;
+                }
+            }
 
             var collisionRings = cable.ClosedLoop ? rings.Count - 1 : rings.Count;
 
