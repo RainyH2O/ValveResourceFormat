@@ -109,6 +109,12 @@ namespace GUI.Types.GLViewers
         /// <summary>The editor entities of the view, which draw what Hammer shows of them.</summary>
         protected HammerEntityVisuals EntityVisuals { get; }
 
+        /// <summary>Gets whether this viewer uses the standard editor selection helpers.</summary>
+        protected virtual bool UseSelectionVisuals => true;
+
+        /// <summary>Gets the highlight manager used by viewers with custom selection visuals.</summary>
+        protected SelectedNodeRenderer? SelectedNodeRenderer { get; private set; }
+
         static readonly TimeSpan FpsUpdateTimeSpan = TimeSpan.FromSeconds(0.1);
 
         private readonly float[] frameTimes = new float[30];
@@ -149,7 +155,15 @@ namespace GUI.Types.GLViewers
             physicsTraceRenderer?.Delete();
             physicsTraceRenderer = null;
 
-            selectionVisuals?.Delete();
+            if (SelectedNodeRenderer != null)
+            {
+                SelectedNodeRenderer.Delete();
+                SelectedNodeRenderer = null;
+            }
+            else
+            {
+                selectionVisuals?.Delete();
+            }
             selectionVisuals = null;
 
             toolsPass?.Dispose();
@@ -522,7 +536,15 @@ namespace GUI.Types.GLViewers
             baseGrid = new InfiniteGrid(Scene);
             Debug.Assert(MainFramebuffer != null);
 
-            selectionVisuals = new(Selection, EntityVisuals, Tools, Scene.RendererContext);
+            if (UseSelectionVisuals)
+            {
+                selectionVisuals = new(Selection, EntityVisuals, Tools, Scene.RendererContext);
+            }
+            else
+            {
+                SelectedNodeRenderer = new(Scene.RendererContext, Selection, EntityVisuals, Tools);
+                selectionVisuals = SelectedNodeRenderer.SelectionVisuals;
+            }
             toolsPass = new(Scene.RendererContext, MainFramebuffer);
             Picker = new(Scene.RendererContext, OnPicked);
 
@@ -793,6 +815,7 @@ namespace GUI.Types.GLViewers
 
             // The tools are drawn over the final image, so they keep their colors whatever the exposure
             toolsPass.Render(Renderer, GLDefaultFramebuffer, selectionVisuals, TextRenderer);
+            SelectedNodeRenderer?.RenderScreenMarkers();
         }
 
         protected override void OnBufferSwapped(double blockedMs, double framePeriodMs)
@@ -838,6 +861,7 @@ namespace GUI.Types.GLViewers
                     Camera = Renderer.Camera,
                 };
 
+                SelectedNodeRenderer?.UpdateLightingHighlights();
                 Renderer.Update(updateContext);
 
                 Input.LateUpdate(Renderer.Camera);
@@ -852,7 +876,14 @@ namespace GUI.Types.GLViewers
                         Text = ScreenDebugText,
                     }, Renderer.Camera);
                 }
-                selectionVisuals.Update(renderContext, updateContext);
+                if (SelectedNodeRenderer != null)
+                {
+                    SelectedNodeRenderer.Update(renderContext, updateContext);
+                }
+                else
+                {
+                    selectionVisuals.Update(renderContext, updateContext);
+                }
             }
 
             // After the update, so the listener is placed with this frame's camera vectors rather than
@@ -1298,6 +1329,8 @@ namespace GUI.Types.GLViewers
                 "Irradiance" or "Illumination" => LightingBindingDisplay.LightProbe,
                 _ => LightingBindingDisplay.None,
             };
+
+            SelectedNodeRenderer?.SetRenderMode(renderMode);
 
             currentRenderMode = renderMode;
             ApplyRenderModeToNodes();

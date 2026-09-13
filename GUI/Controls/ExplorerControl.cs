@@ -6,7 +6,6 @@ using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Utils;
@@ -31,10 +30,13 @@ namespace GUI.Controls
         private readonly TaskCompletionSource handleCreated = new();
         private readonly List<TreeDataNode> TreeData = [];
         private static readonly ConcurrentDictionary<string, string> WorkshopAddons = new();
+        private Task scanTask = Task.CompletedTask;
+        private TreeNode? scanningTreeNode;
 
         public ExplorerControl()
         {
             InitializeComponent();
+            InitializeMapOpenMenu();
 
             foreach (Control control in Controls)
             {
@@ -100,7 +102,15 @@ namespace GUI.Controls
             DebugAddEmbeddedResourcesToTree();
 #endif
 
-            var scanningTreeNode = new TreeNode("Scanning game folders…")
+            StartScan();
+        }
+
+        private void StartScan()
+        {
+            scanningTreeNode?.Remove();
+
+            var recentImage = AppIcons.Icons["History"];
+            scanningTreeNode = new TreeNode("Scanning game folders…")
             {
                 ImageIndex = recentImage,
                 SelectedImageIndex = recentImage,
@@ -108,27 +118,31 @@ namespace GUI.Controls
             treeView.Nodes.Add(scanningTreeNode);
 
             string[] listedFiles = [.. Settings.Config.RecentFiles, .. Settings.Config.BookmarkedFiles];
+            scanTask = RunScanAsync(scanningTreeNode, listedFiles);
+        }
 
-            // Scan for vpks
-            var scanTask = Task.Run(() => ScanForSteamGames(listedFiles));
-            scanTask.ContinueWith(async t =>
+        private async Task RunScanAsync(TreeNode statusNode, string[] listedFiles)
+        {
+            try
             {
-                Log.Error(nameof(ExplorerControl), t.Exception!.ToString());
+                await Task.Run(() => ScanForSteamGames(listedFiles)).ConfigureAwait(false);
 
                 await handleCreated.Task.ConfigureAwait(false);
                 await treeView.InvokeAsync(() =>
                 {
-                    scanningTreeNode.Text = "Failed to scan game folders, see the console for details.";
+                    statusNode.Remove();
                 }).ConfigureAwait(false);
-            }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
-            scanTask.ContinueWith(async t =>
+            }
+            catch (Exception exception)
             {
+                Log.Error(nameof(ExplorerControl), exception.ToString());
+
                 await handleCreated.Task.ConfigureAwait(false);
                 await treeView.InvokeAsync(() =>
                 {
-                    scanningTreeNode.Remove();
+                    statusNode.Text = "Failed to scan game folders, see the console for details.";
                 }).ConfigureAwait(false);
-            }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+            }
         }
 
         private async Task ScanForSteamGames(string[] listedFiles)
@@ -689,6 +703,26 @@ namespace GUI.Controls
             Settings.Config.RecentFiles.Remove(path);
 
             RedrawList(APPID_RECENT_FILES, GetRecentFileNodes());
+        }
+
+        private void OnRefreshExplorerClick(object sender, EventArgs e)
+        {
+            if (!scanTask.IsCompleted)
+            {
+                return;
+            }
+
+            treeView.BeginUpdate();
+            foreach (var node in TreeData.Where(static node => node.AppID >= 0).ToList())
+            {
+                node.ParentNode.Remove();
+                TreeData.Remove(node);
+            }
+            treeView.EndUpdate();
+
+            InstalledSteamGames.Refresh();
+            WorkshopAddons.Clear();
+            StartScan();
         }
 
         private void OnExplorerLoad(object sender, EventArgs e)

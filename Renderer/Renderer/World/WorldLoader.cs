@@ -47,7 +47,7 @@ namespace ValveResourceFormat.Renderer.World
 
         // Kept apart from world_layer_base so the world geometry can be hidden while collision stays visible.
         // Always enabled, the physics group filter decides what actually draws.
-        private const string PhysicsDebugLayerName = "Physics Visualization Layer";
+        internal const string PhysicsDebugLayerName = "Physics Visualization Layer";
 
         /// <summary>
         /// Visibility layer of the entities a <c>point_template</c> shows while the world is stopped. The template

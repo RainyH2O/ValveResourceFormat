@@ -53,9 +53,14 @@ namespace GUI
             Settings.Load();
             Themer.InitializeTheme();
             InitializeComponent();
+            InitializeEntityExportMenus();
+            InitializeEntityImportMenu();
+            InitializeEntitySimulationOpenMenu();
+            InitializeMapOpenMenu();
             LoadIcons();
 
             mainTabs.ConfirmClose = ConfirmCloseTab;
+            InitializeGameplayFlowCloseConfirmation();
 
             // Let the explorer start scanning games before the window even spawns
             if (args.Length == 0 && (Settings.IsFirstStartup || Settings.Config.OpenExplorerOnStart != 0))
@@ -394,7 +399,7 @@ namespace GUI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (!ConfirmCloseApp())
+            if (!ConfirmCloseGameplayFlows() || !ConfirmCloseApp())
             {
                 e.Cancel = true;
                 return;
@@ -638,6 +643,8 @@ namespace GUI
                 toolStripSeparator5.Visible = canExport || tabIndex == 0;
                 exportAsIsToolStripMenuItem.Visible = canExport;
                 decompileExportToolStripMenuItem.Visible = canExport;
+                exportEntitiesTabToolStripMenuItem.Visible = thisTab.Tag is ExportData entityExportData
+                    && IsEntityExportResource(entityExportData.PackageEntry?.GetFullPath() ?? entityExportData.VrfGuiContext.FileName);
 
                 clearConsoleToolStripMenuItem.Visible = tabIndex == 0;
 

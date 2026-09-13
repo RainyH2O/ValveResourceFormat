@@ -44,7 +44,8 @@ internal sealed class SelectionOutline
     /// <param name="sceneFramebuffer">What the scene was rendered into.</param>
     /// <param name="target">What the outline is drawn over, the size of the scene.</param>
     /// <param name="nodes">The nodes to outline.</param>
-    public void Render(Renderer renderer, Framebuffer sceneFramebuffer, Framebuffer target, IReadOnlyList<SceneNode> nodes)
+    /// <param name="settings">An optional viewport outline style.</param>
+    public void Render(Renderer renderer, Framebuffer sceneFramebuffer, Framebuffer target, IReadOnlyList<SceneNode> nodes, SelectionHighlightSettings? settings)
     {
         if (nodes.Count == 0)
         {
@@ -103,8 +104,13 @@ internal sealed class SelectionOutline
         using (GraphicsContext.RenderState.Scope(depthTest: false, depthWrite: false, blend: true))
         {
             edgeShader.Use();
-            edgeShader.SetUniform("g_vOutlineColor", VisibleColor);
-            edgeShader.SetUniform("g_vOccludedColor", OccludedColor);
+            var color = settings == null ? VisibleColor : new Vector4(new Vector3(settings.Color.R, settings.Color.G, settings.Color.B) / 255f, 1f);
+            edgeShader.SetUniform("g_flOutlineSize", (settings?.OutlineWidth ?? 2.5f) / 2.5f);
+            edgeShader.SetUniform("g_flOutlineSoftness", settings?.OutlineSoftness ?? 0.8f);
+            edgeShader.SetUniform("g_flOutlineIntensity", settings?.OutlineIntensity ?? 2.25f);
+            edgeShader.SetUniform("g_flOutlineFillAlpha", settings?.FillAlpha ?? 0f);
+            edgeShader.SetUniform("g_vOutlineColor", color);
+            edgeShader.SetUniform("g_vOccludedColor", settings == null ? OccludedColor : new Vector4(new Vector3(color.X, color.Y, color.Z), OccludedColor.W));
             edgeShader.SetTexture(0, "g_tOutlineMask", resolvedMask.Color!);
 
             GL.BindVertexArray(rendererContext.MeshBufferCache.EmptyVAO);

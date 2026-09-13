@@ -29,11 +29,13 @@ namespace GUI.Controls
             DoubleBuffered = true;
         }
 
+        protected virtual int DefaultItemHeight => 26;
+
         protected override void OnCreateControl()
         {
             base.OnCreateControl();
 
-            ItemHeight = this.AdjustForDPI(26);
+            ItemHeight = this.AdjustForDPI(DefaultItemHeight);
         }
 
         protected override void OnHandleCreated(EventArgs e)

@@ -14,7 +14,7 @@ namespace ValveResourceFormat.Renderer.Editor.Helpers;
 /// One of the things an entity is drawn with in the editor. An entity gets a helper for each one its class
 /// declares, and everything seen of it comes from them: its model, its icon, the light it casts.
 /// </summary>
-public abstract class EntityHelper
+public abstract partial class EntityHelper
 {
     /// <summary>Gets the entity the helper belongs to.</summary>
     public IHelperOwner Owner { get; }
@@ -149,6 +149,13 @@ public abstract class EntityHelper
 
         node.Draw(context =>
         {
+            if (placement != null)
+            {
+                transform.Translation = Owner.Transform.Translation;
+                node.Transform = node.ApplyPlacementScale(transform);
+                Matrix4x4.Invert(transform, out worldToPlacement);
+            }
+
             context.PushAbsoluteTransform(worldToPlacement);
             Render(context, HelperRenderState.Unselected);
             context.PopTransform();

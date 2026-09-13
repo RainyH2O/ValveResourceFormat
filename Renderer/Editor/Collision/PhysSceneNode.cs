@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Runtime.InteropServices;
 using ValveResourceFormat.Renderer.SceneNodes;
+using ValveResourceFormat.Renderer.World;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using RnHull = ValveResourceFormat.ResourceTypes.RubikonPhysics.Shapes.Hull;
@@ -175,6 +176,11 @@ namespace ValveResourceFormat.Renderer.Editor.Collision
 
         /// <summary>Gets the index into <see cref="PhysAggregateData.CollisionAttributes"/> of the group this node draws.</summary>
         public required int CollisionAttributeIndex { get; init; }
+
+        /// <summary>Gets whether this node represents the default world collision group.</summary>
+        public bool IsDefaultGroup => EntityInstance == null && LayerName == WorldLoader.PhysicsDebugLayerName
+            && Physics.CollisionAttributes[CollisionAttributeIndex].GetStringProperty("m_CollisionGroupString")
+                ?.Equals("default", StringComparison.OrdinalIgnoreCase) == true;
 
         private PhysSceneNode(Scene scene, List<SimpleVertexNormal> verts, List<int> inds, int lineIndexCount) : base(scene, verts, inds, lineIndexCount)
         {

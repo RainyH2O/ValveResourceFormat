@@ -45,6 +45,12 @@ internal sealed class AccompanyHelper(IHelperOwner owner, HelperDeclaration decl
         AddShapes();
     }
 
+    internal override void RefreshPlacement()
+    {
+        Frames = null;
+        base.RefreshPlacement();
+    }
+
     private NodeFrame[] GetFrames()
     {
         if (Frames != null)

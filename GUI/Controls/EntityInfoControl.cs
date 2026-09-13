@@ -1,6 +1,9 @@
+using System.ComponentModel;
+using System.Linq;
 using System.Windows.Forms;
 using GUI.Utils;
 using ValveKeyValue;
+using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
@@ -8,6 +11,9 @@ namespace GUI.Forms
 {
     partial class EntityInfoControl : UserControl
     {
+        public DataGridView OutputsGrid => dataGridOutputs;
+        public DataGridView InputsGrid => dataGridInputs;
+
         /// <summary>
         /// Raised when a property naming a file or an entity, or the entity on the other end of a
         /// connection, is double clicked.
@@ -18,10 +24,14 @@ namespace GUI.Forms
         /// Raised when the fire button of an output or input connection is clicked.
         /// </summary>
         public event EventHandler<Connection>? ConnectionFireRequested;
+        public event DataGridViewCellEventHandler? PropertiesCellDoubleClick;
+        public event DataGridViewCellEventHandler? OutputsCellDoubleClick;
+        public event DataGridViewCellEventHandler? InputsCellDoubleClick;
 
         public EntityInfoControl()
         {
             InitializeComponent();
+            InitializeColumnLayout();
 
             components ??= new System.ComponentModel.Container();
             components.Add(tabPageOutputs);
@@ -56,6 +66,7 @@ namespace GUI.Forms
             SetTabVisible(tabPageOutputs, dataGridOutputs.RowCount > 0);
             SetTabVisible(tabPageInputs, dataGridInputs.RowCount > 0);
             SetTabVisible(tabPageReferences, dataGridReferences.RowCount > 0);
+            UpdatePreferredColumnWidths();
         }
 
         private void SetTabVisible(TabPage page, bool shouldShow)
@@ -106,6 +117,8 @@ namespace GUI.Forms
         /// </summary>
         public void PopulateFromEntity(List<Entity> entities, Entity entity)
         {
+            var targetResolver = new EntityIOTargetResolver(entities);
+
             foreach (var child in entity.Children)
             {
                 var text = BareText(child.Value);
@@ -123,16 +136,17 @@ namespace GUI.Forms
             {
                 foreach (var connection in entity.Connections)
                 {
-                    AddOutputConnection(connection, FindEntities(entities, connection.TargetName));
+                    AddOutputConnection(connection, targetResolver);
                 }
             }
 
-            foreach (var connection in entity.GetInputConnections(entities))
+            foreach (var connection in targetResolver.GetInputConnections(entity))
             {
                 AddInputConnection(connection);
             }
 
             AddReferences(entities, entity);
+            SortConnections();
         }
 
         /// <summary>
@@ -197,15 +211,23 @@ namespace GUI.Forms
         internal static string? BareText(KVObject value)
             => value.ValueType == KVValueType.String ? (string)value : null;
 
-        private void AddOutputConnection(Connection connectionData, List<Entity> targets)
+        private void AddOutputConnection(Connection connectionData, EntityIOTargetResolver? targetResolver)
         {
+            var targets = new List<Entity>();
+            targetResolver?.Resolve(connectionData, targets);
+
+            var targetHammerIds = string.Join(",", targets
+                .Select(static target => target.TryGetValue("hammeruniqueid", out var hammerId) ? hammerId.ToString() : string.Empty)
+                .Where(static hammerId => !string.IsNullOrEmpty(hammerId))
+                .Distinct(StringComparer.Ordinal));
             var rowIndex = dataGridOutputs.Rows.Add([
                 connectionData.OutputName,
                 connectionData.TargetName,
                 connectionData.InputName,
                 connectionData.OverrideParam,
                 connectionData.Delay,
-                GetStringTimesToFire(connectionData.TimesToFire)
+                GetStringTimesToFire(connectionData.TimesToFire),
+                targetHammerIds
             ]);
 
             var row = dataGridOutputs.Rows[rowIndex];
@@ -215,8 +237,12 @@ namespace GUI.Forms
 
         private void AddInputConnection(Connection connectionData)
         {
+            var sourceName = connectionData.SourceEntity.TargetName ?? string.Empty;
+            var sourceHammerId = connectionData.SourceEntity.GetStringProperty("hammeruniqueid");
+
             var rowIndex = dataGridInputs.Rows.Add([
-                connectionData.SourceEntity.TargetName ?? "",
+                sourceHammerId,
+                sourceName,
                 connectionData.OutputName,
                 connectionData.InputName,
                 connectionData.OverrideParam,
@@ -227,6 +253,58 @@ namespace GUI.Forms
             var row = dataGridInputs.Rows[rowIndex];
             row.Tag = new LinkedEntities([connectionData.SourceEntity]);
             row.Cells[InputsFire.Index].Tag = connectionData;
+        }
+
+        private void SortConnections()
+        {
+            SortDataGridView(dataGridOutputs, [OutputsTargetHammerId.Name, OutputsDelay.Name]);
+            SortDataGridView(dataGridInputs, [InputsSourceHammerId.Name, InputsDelay.Name]);
+        }
+
+        private static void SortDataGridView(DataGridView grid, string[] columnNames)
+        {
+            if (grid.RowCount <= 1)
+            {
+                return;
+            }
+
+            var comparer = new MultiColumnNumericStringComparer(ListSortDirection.Ascending, columnNames);
+            var rows = grid.Rows.Cast<DataGridViewRow>().Where(static row => !row.IsNewRow).ToList();
+            rows.Sort(comparer.Compare);
+
+            grid.Rows.Clear();
+            foreach (var row in rows)
+            {
+                grid.Rows.Add(row);
+            }
+        }
+
+        public void SelectConnection(DataGridView targetGrid, Connection connection)
+        {
+            var targetTab = targetGrid == dataGridOutputs ? tabPageOutputs : tabPageInputs;
+            if (targetTab.Parent != null)
+            {
+                tabControl.SelectedTab = targetTab;
+            }
+
+            for (var i = 0; i < targetGrid.RowCount; i++)
+            {
+                var row = targetGrid.Rows[i];
+                if (!ReferenceEquals(row.Tag, connection)
+                    && !row.Cells.Cast<DataGridViewCell>().Any(cell => ReferenceEquals(cell.Tag, connection)))
+                {
+                    continue;
+                }
+
+                targetGrid.ClearSelection();
+                targetGrid.CurrentCell = row.Cells[0];
+                foreach (DataGridViewCell cell in row.Cells)
+                {
+                    cell.Selected = true;
+                }
+                targetGrid.FirstDisplayedScrollingRowIndex = i;
+                return;
+            }
         }
 
         private static string GetStringTimesToFire(int timesToFire)
@@ -241,16 +319,42 @@ namespace GUI.Forms
 
         private void OnPropertiesCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
-            ShowLinkedResource(dataGridProperties, ColumnValue, e);
+            if (e.RowIndex < 0 || e.ColumnIndex != ColumnValue.Index)
+            {
+                return;
+            }
+
+            if (PropertiesCellDoubleClick != null)
+            {
+                PropertiesCellDoubleClick.Invoke(dataGridProperties, e);
+                return;
+            }
+
+            if (dataGridProperties.Rows[e.RowIndex].Tag is LinkedResource link)
+            {
+                LinkedResourceActivated?.Invoke(this, link);
+            }
         }
 
         private void OnOutputsCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
+            if (OutputsCellDoubleClick != null)
+            {
+                OutputsCellDoubleClick.Invoke(dataGridOutputs, e);
+                return;
+            }
+
             ShowLinkedResource(dataGridOutputs, OutputsTargetEntity, e);
         }
 
         private void OnInputsCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
+            if (InputsCellDoubleClick != null)
+            {
+                InputsCellDoubleClick.Invoke(dataGridInputs, e);
+                return;
+            }
+
             ShowLinkedResource(dataGridInputs, InputsSource, e);
         }
 

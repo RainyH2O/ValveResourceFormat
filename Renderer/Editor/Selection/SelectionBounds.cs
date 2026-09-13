@@ -23,7 +23,8 @@ internal static class SelectionBounds
     /// <param name="box">The box, in the space it is placed in.</param>
     /// <param name="camera">The camera, to find the corner nearest it.</param>
     /// <param name="textRenderer">What the lengths are written with.</param>
-    public static void Draw(ToolRenderContext context, in Matrix4x4 transform, in AABB box, Camera camera, TextRenderer textRenderer)
+    /// <param name="showDimensions">Whether the edge lengths are drawn.</param>
+    public static void Draw(ToolRenderContext context, in Matrix4x4 transform, in AABB box, Camera camera, TextRenderer textRenderer, bool showDimensions = true)
     {
         context.PushTransform(transform);
         context.PushRenderMode(ToolRenderMode.WireframeNoZ);
@@ -32,7 +33,10 @@ internal static class SelectionBounds
         context.DrawWireBox(box.Min, box.Max);
 
         // The dimensions are drawn over the edges they run along
-        DrawDimensions(context, box, camera, textRenderer);
+        if (showDimensions)
+        {
+            DrawDimensions(context, box, camera, textRenderer);
+        }
 
         context.PopRenderMode();
         context.PopTransform();

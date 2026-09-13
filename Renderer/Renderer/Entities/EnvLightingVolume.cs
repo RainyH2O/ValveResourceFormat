@@ -32,6 +32,7 @@ public abstract class EnvLightingVolume : BaseEntity
         if (SceneLightingVolume.AddEnvironmentMap(Scene, KeyValues, RigidTransform, LayerName, isSphere) is { } envMap)
         {
             envMap.EntityData = Data;
+            envMap.EntityInstance = this;
         }
     }
 
@@ -39,6 +40,8 @@ public abstract class EnvLightingVolume : BaseEntity
     /// <param name="fadesAtEdges">Whether the probe fades out over the edge fade distances, otherwise it ends at its box.</param>
     protected void AddLightProbe(bool fadesAtEdges)
     {
-        SceneLightingVolume.AddLightProbe(Scene, KeyValues, RigidTransform, LayerName, isSphere, fadesAtEdges).EntityData = Data;
+        var lightProbe = SceneLightingVolume.AddLightProbe(Scene, KeyValues, RigidTransform, LayerName, isSphere, fadesAtEdges);
+        lightProbe.EntityData = Data;
+        lightProbe.EntityInstance = this;
     }
 }

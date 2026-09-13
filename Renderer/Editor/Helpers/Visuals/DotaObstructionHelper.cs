@@ -64,6 +64,17 @@ internal sealed class DotaObstructionHelper : ModelHelper
         }
     }
 
+    internal override void RefreshPlacement()
+    {
+        if (ModelNode is { } node)
+        {
+            node.Transform = GetModelTransform();
+            Owner.Scene.DynamicOctree.Update(node);
+        }
+
+        base.RefreshPlacement();
+    }
+
     /// <inheritdoc/>
     private protected override Matrix4x4 GetModelTransform()
     {

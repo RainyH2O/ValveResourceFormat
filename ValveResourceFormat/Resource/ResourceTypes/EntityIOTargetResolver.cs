@@ -1,3 +1,4 @@
+using System.Linq;
 using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
@@ -34,6 +35,7 @@ namespace ValveResourceFormat.ResourceTypes
     {
         private readonly Dictionary<string, List<Entity>> byTargetName = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<Entity>> byClassName = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Lazy<Dictionary<Entity, List<Connection>>> inputConnections;
 
         /// <summary>
         /// Indexes <paramref name="entities"/> by target name and class name. Targets resolve only
@@ -43,12 +45,15 @@ namespace ValveResourceFormat.ResourceTypes
         public EntityIOTargetResolver(IEnumerable<Entity> entities)
         {
             ArgumentNullException.ThrowIfNull(entities);
+            var entityList = entities.ToList();
 
-            foreach (var entity in entities)
+            foreach (var entity in entityList)
             {
                 Index(byTargetName, entity.TargetName, entity);
                 Index(byClassName, entity.GetStringProperty("classname"), entity);
             }
+
+            inputConnections = new(() => BuildInputConnections(entityList));
         }
 
         private static void Index(Dictionary<string, List<Entity>> index, string? key, Entity entity)
@@ -75,6 +80,53 @@ namespace ValveResourceFormat.ResourceTypes
         /// <returns>The entities with that name.</returns>
         public IReadOnlyList<Entity> GetByTargetName(string? targetName)
             => !string.IsNullOrEmpty(targetName) && byTargetName.TryGetValue(targetName, out var list) ? list : [];
+
+        /// <summary>
+        /// Gets connections that resolve to <paramref name="entity"/>.
+        /// </summary>
+        /// <param name="entity">The target entity.</param>
+        /// <returns>The connections targeting the entity.</returns>
+        public IReadOnlyList<Connection> GetInputConnections(Entity entity)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            return inputConnections.Value.TryGetValue(entity, out var connections) ? connections : [];
+        }
+
+        private Dictionary<Entity, List<Connection>> BuildInputConnections(List<Entity> entities)
+        {
+            var inputs = new Dictionary<Entity, List<Connection>>(ReferenceEqualityComparer.Instance);
+            var targets = new List<Entity>();
+
+            foreach (var entity in entities)
+            {
+                if (entity.Connections == null)
+                {
+                    continue;
+                }
+
+                foreach (var connection in entity.Connections)
+                {
+                    targets.Clear();
+                    if (Resolve(connection, targets) != EntityIOTargetOutcome.Matched)
+                    {
+                        continue;
+                    }
+
+                    foreach (var target in targets)
+                    {
+                        if (!inputs.TryGetValue(target, out var connections))
+                        {
+                            connections = [];
+                            inputs[target] = connections;
+                        }
+
+                        connections.Add(connection);
+                    }
+                }
+            }
+
+            return inputs;
+        }
 
         /// <summary>
         /// Resolves a connection's target, appending every matching entity to <paramref name="results"/>.

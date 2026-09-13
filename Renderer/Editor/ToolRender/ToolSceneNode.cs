@@ -6,6 +6,8 @@ namespace ValveResourceFormat.Renderer.Editor.ToolRender;
 /// </summary>
 public sealed class ToolSceneNode : SceneNode
 {
+    private Action<ToolRenderContext>? drawShapes;
+
     /// <summary>Gets the shapes, in the space of the node.</summary>
     public ToolGeometry Geometry { get; } = new();
 
@@ -28,8 +30,19 @@ public sealed class ToolSceneNode : SceneNode
     {
         ArgumentNullException.ThrowIfNull(draw);
 
+        drawShapes = draw;
         draw(new ToolRenderContext(Geometry));
         LocalBoundingBox = Geometry.Bounds;
+    }
+
+    internal void RefreshShapes()
+    {
+        if (drawShapes != null)
+        {
+            Geometry.Clear();
+            Draw(drawShapes);
+            Scene.DynamicOctree.Update(this);
+        }
     }
 
     /// <inheritdoc/>

@@ -25,9 +25,13 @@ public enum LightingBindingDisplay
 /// selected with the length of its edges, along with the name of each node and optionally the lighting it uses.
 /// The selected nodes are outlined, and show their tools materials even while those are hidden.
 /// </summary>
-public sealed class SelectionVisuals
+public class SelectionVisuals
 {
-    private static readonly Vector2 NodeNameOffset = new(0, -20);
+    /// <summary>The screen height of the node label in pixels per em.</summary>
+    protected const float NodeLabelScale = 14f;
+
+    /// <summary>The screen offset of the node label from the top of its bounds.</summary>
+    protected static readonly Vector2 NodeNameOffset = new(0, -20);
     private static readonly Color32 LightingBindingColor = new(1.0f, 0.0f, 1.0f, 1.0f);
 
     private readonly SelectionSet selection;
@@ -46,6 +50,18 @@ public sealed class SelectionVisuals
 
     /// <summary>Gets or sets which lighting is shown linked to each selected node.</summary>
     public LightingBindingDisplay LightingBindings { get; set; }
+
+    /// <summary>Gets the nodes whose helpers are drawn in this frame.</summary>
+    protected virtual IReadOnlyList<SceneNode> HighlightedNodes => selection.Nodes;
+
+    /// <summary>Gets whether bounding boxes include their edge lengths.</summary>
+    protected virtual bool ShowDimensions => true;
+
+    /// <summary>Gets an optional style for the selection outline.</summary>
+    protected virtual SelectionHighlightSettings? OutlineSettings => null;
+
+    /// <summary>Gets whether helpers remain fully visible through the scene.</summary>
+    protected virtual bool IgnoreDepth => false;
 
     /// <summary>Initializes the visuals of a selection.</summary>
     /// <param name="selection">The selection to draw.</param>
@@ -78,8 +94,9 @@ public sealed class SelectionVisuals
 
         var context = shapesContext;
         context.Reset();
+        context.IgnoreDepth = IgnoreDepth;
 
-        var nodes = selection.Nodes;
+        var nodes = HighlightedNodes;
         AABB? bounds = null;
 
         tools.SetSelectedNodes(nodes);
@@ -114,7 +131,7 @@ public sealed class SelectionVisuals
         // One box around everything selected
         if (bounds is { } selectionBounds)
         {
-            SelectionBounds.Draw(context, Matrix4x4.Identity, selectionBounds, renderContext.Camera, updateContext.TextRenderer);
+            SelectionBounds.Draw(context, Matrix4x4.Identity, selectionBounds, renderContext.Camera, updateContext.TextRenderer, ShowDimensions);
         }
 
         // The entities no longer selected show the shapes they show while they are not
@@ -137,7 +154,7 @@ public sealed class SelectionVisuals
         ArgumentNullException.ThrowIfNull(sceneFramebuffer);
         ArgumentNullException.ThrowIfNull(target);
 
-        outline.Render(renderer, sceneFramebuffer, target, selection.Nodes);
+        outline.Render(renderer, sceneFramebuffer, target, HighlightedNodes, OutlineSettings);
     }
 
     /// <summary>Deletes the GL objects.</summary>
@@ -186,20 +203,31 @@ public sealed class SelectionVisuals
 
         DrawLightingBindings(context, node, toWorld, bounds.Center);
 
+        AddNodeLabel(camera, textRenderer, node, nodeName, bounds);
+
+        // An icon is a marker, so the size it is drawn at is not part of what is selected
+        return selectionBounds;
+    }
+
+    /// <summary>Queues the label above a node's bounds in viewer world coordinates.</summary>
+    /// <param name="camera">The camera drawing the helpers.</param>
+    /// <param name="textRenderer">The renderer receiving the labels.</param>
+    /// <param name="node">The highlighted node.</param>
+    /// <param name="nodeName">The node or entity class name.</param>
+    /// <param name="bounds">The bounds in viewer world coordinates.</param>
+    protected virtual void AddNodeLabel(Camera camera, TextRenderer textRenderer, SceneNode node, string nodeName, AABB bounds)
+    {
         // draw node name above the bounding box
         var position = bounds.Center;
         position.Z = bounds.Max.Z;
 
         textRenderer.AddTextBillboard(position, new TextRenderer.TextRenderRequest
         {
-            Scale = 14f,
+            Scale = NodeLabelScale,
             Text = nodeName,
             CenterHorizontal = true,
             TextOffset = NodeNameOffset
         }, camera);
-
-        // An icon is a marker, so the size it is drawn at is not part of what is selected
-        return selectionBounds;
     }
 
     /// <summary>What the helpers of an entity cover and what it is made of besides, or its origin where that is nothing.</summary>

@@ -17,7 +17,7 @@ namespace ValveResourceFormat.ResourceTypes
     /// At a pitch of +/-90 forward is vertical and yaw and roll share an axis (gimbal lock), so converting
     /// back to angles puts the whole rotation into yaw and pins roll to zero.
     /// </remarks>
-    public static class EntityTransformHelper
+    public static partial class EntityTransformHelper
     {
         /// <summary>
         /// Reads an entity's scale, rotation and position from its "scales", "angles" and "origin" keyvalues.

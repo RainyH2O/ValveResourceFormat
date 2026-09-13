@@ -18,6 +18,19 @@ namespace Tests.Resources
         }
 
         [Test]
+        public async Task EntityIdentityUsesHammerIdAndOtherwiseObjectReference()
+        {
+            var lump = new EntityLump { Resource = new Resource() };
+            var first = new EntityLump.Entity { ParentLump = lump };
+            var second = new EntityLump.Entity { ParentLump = lump };
+            await Assert.That(new HashSet<EntityLump.Entity> { first, second, first }.Count).IsEqualTo(2);
+
+            first.Add("hammeruniqueid", "same-id");
+            second.Add("hammeruniqueid", "same-id");
+            await Assert.That(new HashSet<EntityLump.Entity> { first, second }.Count).IsEqualTo(1);
+        }
+
+        [Test]
         [Arguments("[PR#]door", "", "", "door")]
         [Arguments("[PR#]door", "1d_", "", "1d_door")]
         [Arguments("door&0000", "", "_3", "door_3")]
@@ -75,9 +88,10 @@ namespace Tests.Resources
             using var resource = new Resource();
             var lump = LoadLump(resource, "graphics_settings_ents.vents_c");
             var entities = lump.GetEntities().ToList();
+            var resolver = new EntityIOTargetResolver(entities);
 
             var inputs = entities
-                .Select(e => (Entity: e, Inputs: e.GetInputConnections(entities)))
+                .Select(e => (Entity: e, Inputs: resolver.GetInputConnections(e)))
                 .Where(pair => pair.Inputs.Count > 0)
                 .ToList();
 

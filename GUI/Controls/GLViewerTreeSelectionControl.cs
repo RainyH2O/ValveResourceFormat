@@ -11,7 +11,7 @@ namespace GUI.Controls
     /// <c>Clip/Player Clip</c> is nested under the item of each group before it, which folds it away. Checking or
     /// unchecking an item does the same to every item below it.
     /// </summary>
-    class GLViewerTreeSelectionControl : UserControl
+    partial class GLViewerTreeSelectionControl : UserControl
     {
         private const char PathSeparator = '/';
 
@@ -52,6 +52,8 @@ namespace GUI.Controls
             treeView.ShowRootLines = treeView.Nodes.Count > 1 && treeView.Nodes.Cast<TreeNode>().Any(static node => node.Nodes.Count > 0);
 
             treeView.EndUpdate();
+
+            InitializeBulkSelection();
 
             treeView.LabelClicked += node => SetChecked(node, !node.Checked);
             treeView.AfterCheck += (_, e) =>
@@ -195,12 +197,7 @@ namespace GUI.Controls
                 StateImageList = checkBoxImages;
             }
 
-            protected override void OnCreateControl()
-            {
-                base.OnCreateControl();
-
-                ItemHeight = this.AdjustForDPI(18);
-            }
+            protected override int DefaultItemHeight => 18;
 
             protected override void OnBeforeSelect(TreeViewCancelEventArgs e)
             {

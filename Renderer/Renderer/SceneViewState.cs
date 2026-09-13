@@ -1292,7 +1292,7 @@ public sealed class SceneViewState
         // Fragments drawn by their aggregate have no draws of their own queued
         foreach (var node in nodes)
         {
-            if (IsDrawnByAggregate(node) && node is SceneAggregate.Fragment fragment
+            if (IsDrawnByAggregate(node) && node is SceneAggregate.Fragment fragment && !fragment.ViewerHidden
                 && aggregatesWithVisibleFragments.Contains(fragment.Parent) && fragment.Parent.IsFragmentInActiveLod(fragment)
                 && Scene.IsDrawn(fragment.DrawCall.Material, fragment))
             {

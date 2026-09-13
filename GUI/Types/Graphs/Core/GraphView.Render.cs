@@ -195,7 +195,7 @@ partial class GraphView
         }
 
         if (wire == Selection.Wire ||
-            (Selection.PrimaryNode != null && (wire.From.Owner == Selection.PrimaryNode || wire.To.Owner == Selection.PrimaryNode)))
+            Selection.SelectedNodes.Contains(wire.From.Owner) || Selection.SelectedNodes.Contains(wire.To.Owner))
         {
             return RenderTier.Focus;
         }
@@ -215,7 +215,7 @@ partial class GraphView
             return MatchesSearchHighlight(node) ? RenderTier.Focus : RenderTier.Background;
         }
 
-        if (node == Selection.PrimaryNode ||
+        if (Selection.SelectedNodes.Contains(node) ||
             (Selection.PrimaryNode != null && (Selection.DirectIn.Contains(node) || Selection.DirectOut.Contains(node))) ||
             (Selection.Wire != null && (Selection.Wire.From.Owner == node || Selection.Wire.To.Owner == node)))
         {
@@ -294,10 +294,10 @@ partial class GraphView
                 continue;
             }
 
-            var isPrimarySelected = !searching && node == Selection.PrimaryNode;
+            var isSelected = !searching && Selection.SelectedNodes.Contains(node);
             SKColor? connectedColor = null;
 
-            if (!searching && !isPrimarySelected && tier == RenderTier.Focus)
+            if (!searching && !isSelected && tier == RenderTier.Focus)
             {
                 if (Selection.PrimaryNode != null)
                 {
@@ -315,9 +315,9 @@ partial class GraphView
                 }
             }
 
-            var isHovered = !isPrimarySelected && connectedColor == null && node == hoveredNode;
+            var isHovered = !isSelected && connectedColor == null && node == hoveredNode;
 
-            DrawNode(canvas, node, isPrimarySelected, connectedColor, isHovered, zoom);
+            DrawNode(canvas, node, isSelected, connectedColor, isHovered, zoom);
         }
     }
 
@@ -477,8 +477,7 @@ partial class GraphView
         canvas.DrawPath(path, wireUnderlayPaint);
 
         var touchesSelection = wire == Selection.Wire ||
-            (Selection.PrimaryNode != null &&
-            (wire.From.Owner == Selection.PrimaryNode || wire.To.Owner == Selection.PrimaryNode));
+            Selection.SelectedNodes.Contains(wire.From.Owner) || Selection.SelectedNodes.Contains(wire.To.Owner);
 
         wirePaint.StrokeWidth = width;
         wirePaint.PathEffect = wire.Dashed ? wireDashEffect : null;
@@ -528,7 +527,7 @@ partial class GraphView
         canvas.DrawRoundRect(rect, 4f, 4f, fillPaint);
 
         textPaint.Color = Palette.TextDim;
-        canvas.DrawText(label, midX - textWidth / 2f, midY - (metrics.Ascent + metrics.Descent) / 2f, SKTextAlign.Left, GraphMetrics.WireLabelFont, textPaint);
+        GraphMetrics.WireLabelFont.DrawText(canvas, label, midX - textWidth / 2f, midY - (metrics.Ascent + metrics.Descent) / 2f, SKTextAlign.Left, textPaint);
     }
 
     private static readonly SKPoint[] HeaderCornerRadii =
@@ -543,7 +542,7 @@ partial class GraphView
 
     private readonly SKRoundRect headerRoundRect = new();
 
-    private void DrawNode(SKCanvas canvas, GraphNode node, bool isPrimarySelected, SKColor? connectedColor, bool isHovered, float zoom)
+    private void DrawNode(SKCanvas canvas, GraphNode node, bool isSelected, SKColor? connectedColor, bool isHovered, float zoom)
     {
         var x = node.Position.X;
         var y = node.Position.Y;
@@ -556,7 +555,7 @@ partial class GraphView
             shadowSelected ??= SKImageFilter.CreateDropShadow(0, 0, 12f, 12f, Palette.Selection.WithAlpha(140));
             shadowConnected ??= SKImageFilter.CreateDropShadow(0, 0, 10f, 10f, Palette.Selection.WithAlpha(80));
 
-            fillPaint.ImageFilter = isPrimarySelected ? shadowSelected : connectedColor != null ? shadowConnected : shadowNormal;
+            fillPaint.ImageFilter = isSelected ? shadowSelected : connectedColor != null ? shadowConnected : shadowNormal;
         }
 
         fillPaint.Color = node.BodyTint is { } tint ? Palette.BodyTint(tint) : Palette.NodeBody;
@@ -581,7 +580,7 @@ partial class GraphView
             }
         }
 
-        if (isPrimarySelected)
+        if (isSelected)
         {
             strokePaint.Color = Palette.Selection;
             strokePaint.StrokeWidth = 2f;
@@ -608,12 +607,12 @@ partial class GraphView
         var titleBaseline = y + GraphMetrics.HeaderHeight / 2f - (titleMetrics.Ascent + titleMetrics.Descent) / 2f;
 
         textPaint.Color = Palette.HeaderText;
-        canvas.DrawText(node.Title, x + titleOffset + GraphMetrics.MarginX, titleBaseline, SKTextAlign.Left, GraphMetrics.TitleFont, textPaint);
+        GraphMetrics.TitleFont.DrawText(canvas, node.Title, x + titleOffset + GraphMetrics.MarginX, titleBaseline, SKTextAlign.Left, textPaint);
 
         if (!string.IsNullOrEmpty(node.Subtitle))
         {
             textPaint.Color = Palette.HeaderTextDim;
-            canvas.DrawText(node.Subtitle, rect.Right - GraphMetrics.MarginX - Geometry.NodeOf(node).SubtitleWidth, titleBaseline, SKTextAlign.Left, GraphMetrics.SubtitleFont, textPaint);
+            GraphMetrics.SubtitleFont.DrawText(canvas, node.Subtitle, rect.Right - GraphMetrics.MarginX - Geometry.NodeOf(node).SubtitleWidth, titleBaseline, SKTextAlign.Left, textPaint);
         }
 
         if (zoom < DetailZoomCutoff)
@@ -672,7 +671,7 @@ partial class GraphView
         var baseline = rowCenterY - (metrics.Ascent + metrics.Descent) / 2f;
 
         textPaint.Color = Palette.Signal(row.Hue);
-        canvas.DrawText(row.Text, textX, baseline, SKTextAlign.Left, GraphMetrics.RowFont, textPaint);
+        GraphMetrics.RowFont.DrawText(canvas, row.Text, textX, baseline, SKTextAlign.Left, textPaint);
     }
 
     private void DrawAnnotationRow(SKCanvas canvas, AnnotationRow row, float x, float rowCenterY)
@@ -693,7 +692,7 @@ partial class GraphView
         var metrics = GraphMetrics.RowFont.Metrics;
         var baseline = rowCenterY - (metrics.Ascent + metrics.Descent) / 2f;
         textPaint.Color = color;
-        canvas.DrawText(row.Text, x + GraphMetrics.MarginX + 14f, baseline, SKTextAlign.Left, GraphMetrics.RowFont, textPaint);
+        GraphMetrics.RowFont.DrawText(canvas, row.Text, x + GraphMetrics.MarginX + 14f, baseline, SKTextAlign.Left, textPaint);
     }
 
     private void DrawTextRow(SKCanvas canvas, TextRow row, float x, float rowCenterY)
@@ -719,7 +718,7 @@ partial class GraphView
 
         var metrics = font.Metrics;
         var baseline = rowCenterY - (metrics.Ascent + metrics.Descent) / 2f;
-        canvas.DrawText(row.Text, textX, baseline, SKTextAlign.Left, font, textPaint);
+        font.DrawText(canvas, row.Text, textX, baseline, SKTextAlign.Left, textPaint);
     }
 
     private void DrawSocketRow(SKCanvas canvas, GraphSocket socket, SKRect nodeRect, float rowCenterY, float outputNameWidth)
@@ -769,11 +768,11 @@ partial class GraphView
 
         if (socket.IsInput)
         {
-            canvas.DrawText(socket.Name, nodeRect.Left + GraphMetrics.MarginX, baseline, SKTextAlign.Left, GraphMetrics.RowFont, textPaint);
+            GraphMetrics.RowFont.DrawText(canvas, socket.Name, nodeRect.Left + GraphMetrics.MarginX, baseline, SKTextAlign.Left, textPaint);
         }
         else
         {
-            canvas.DrawText(socket.Name, nodeRect.Right - GraphMetrics.MarginX - outputNameWidth, baseline, SKTextAlign.Left, GraphMetrics.RowFont, textPaint);
+            GraphMetrics.RowFont.DrawText(canvas, socket.Name, nodeRect.Right - GraphMetrics.MarginX - outputNameWidth, baseline, SKTextAlign.Left, textPaint);
         }
     }
 }

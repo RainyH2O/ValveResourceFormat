@@ -21,7 +21,7 @@ namespace ValveResourceFormat.Renderer.Editor.Entities;
 /// helpers of every entity of a view, of a compiled map or of a source map, so the shapes a selected entity
 /// shows are drawn by the same helpers either way.
 /// </summary>
-public sealed class HammerEntityVisuals : IEntityToolVisuals
+public sealed partial class HammerEntityVisuals : IEntityToolVisuals
 {
     /// <summary>
     /// Visibility layer of what the editor draws entities with that is hidden while it shows only what the game
@@ -213,7 +213,6 @@ public sealed class HammerEntityVisuals : IEntityToolVisuals
     /// <param name="findTargets">Finds the entities a connection reaches.</param>
     internal static void AddConnectionLines(IHelperOwner entity, IReadOnlyList<EntityLump.Connection> connections, Func<EntityLump.Connection, IEnumerable<IHelperOwner>> findTargets)
     {
-        var start = entity.Transform.Translation;
         var alreadySeen = new HashSet<IHelperOwner>(connections.Count);
 
         foreach (var connection in connections)
@@ -235,7 +234,7 @@ public sealed class HammerEntityVisuals : IEntityToolVisuals
 #endif
 
                 // Owned by the entity the line starts at, so it leaves the scene with it
-                entity.AddNode(CreateConnectionLine(entity.Scene, start, target.Transform.Translation, name));
+                entity.AddNode(CreateConnectionLine(entity.Scene, () => entity.Transform.Translation, () => target.Transform.Translation, name));
             }
 
             if (!matched)
@@ -246,7 +245,7 @@ public sealed class HammerEntityVisuals : IEntityToolVisuals
     }
 
     /// <summary>Creates the line along an entity I/O connection, green at the caller and red at the target.</summary>
-    internal static ToolSceneNode CreateConnectionLine(Scene scene, Vector3 start, Vector3 end, string? name = null)
+    internal static ToolSceneNode CreateConnectionLine(Scene scene, Func<Vector3> start, Func<Vector3> end, string? name = null)
     {
         var node = new ToolSceneNode(scene)
         {
@@ -257,7 +256,7 @@ public sealed class HammerEntityVisuals : IEntityToolVisuals
         node.Draw(context =>
         {
             context.PushRenderMode(ToolRenderMode.Wireframe);
-            context.DrawLine(start, end, ConnectionStartColor, ConnectionEndColor);
+            context.DrawLine(start(), end(), ConnectionStartColor, ConnectionEndColor);
             context.PopRenderMode();
         });
 

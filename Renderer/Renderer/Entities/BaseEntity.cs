@@ -29,7 +29,7 @@ public readonly record struct EntitySpawnInfo(Entity Data, string? LayerName, Sp
 /// frame.
 /// </remarks>
 /// <seealso href="https://s2v.app/SchemaExplorer/cs2/server/CBaseEntity">CBaseEntity</seealso>
-public abstract class BaseEntity
+public abstract partial class BaseEntity
 {
     /// <summary>Gets the scene that holds the nodes of this entity.</summary>
     public Scene Scene { get; }
@@ -1313,7 +1313,7 @@ public abstract class BaseEntity
         SetWorldPose(EntityTransformHelper.ToRigidTransformationMatrix(newAngles, newOrigin));
     }
 
-    private void SetWorldPose(in Matrix4x4 world)
+    internal void SetWorldPose(in Matrix4x4 world)
     {
         if (!Matrix4x4.Invert(GetParentFrame(), out var worldToParent))
         {

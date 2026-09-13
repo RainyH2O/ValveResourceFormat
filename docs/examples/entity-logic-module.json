@@ -1,0 +1,62 @@
+{
+    "formatVersion": 1,
+    "entities": [
+        {
+            "properties": {
+                "classname": "trigger_once",
+                "targetname": "module_trigger",
+                "origin": [0, 0, 64],
+                "spawnflags": 1
+            },
+            "box": {
+                "size": [128, 128, 128],
+                "center": [0, 0, 0],
+                "material": "materials/tools/toolstrigger.vmat"
+            },
+            "connections": [
+                {
+                    "output": "OnStartTouch",
+                    "target": "module_relay",
+                    "input": "Trigger",
+                    "parameter": "",
+                    "delay": 0,
+                    "timesToFire": 1
+                }
+            ]
+        },
+        {
+            "properties": {
+                "classname": "logic_relay",
+                "targetname": "module_relay",
+                "origin": "192 0 64"
+            },
+            "connections": [
+                {
+                    "output": "OnTrigger",
+                    "target": "module_door",
+                    "input": "Open",
+                    "parameter": "",
+                    "delay": 0.5,
+                    "timesToFire": -1,
+                    "targetType": 2
+                }
+            ]
+        },
+        {
+            "properties": {
+                "classname": "func_door",
+                "targetname": "module_door",
+                "origin": [320, 0, 64],
+                "angles": [0, 0, 0],
+                "movedir": [0, 0, 0],
+                "speed": 100,
+                "wait": 4,
+                "lip": 4
+            },
+            "box": {
+                "size": [16, 128, 128],
+                "material": "materials/dev/graygrid.vmat"
+            }
+        }
+    ]
+}

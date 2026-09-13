@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using ValveKeyValue;
 using ValveResourceFormat.Serialization.KeyValues;
@@ -26,6 +27,34 @@ namespace ValveResourceFormat.ResourceTypes
             /// Gets the parent entity lump that contains this entity.
             /// </summary>
             public required EntityLump ParentLump { get; init; }
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj)
+            {
+                if (obj is not Entity other)
+                {
+                    return false;
+                }
+
+                if (TryGetValue("hammeruniqueid", out var thisId)
+                    && other.TryGetValue("hammeruniqueid", out var otherId))
+                {
+                    return string.Equals(thisId.ToString(), otherId.ToString(), StringComparison.Ordinal);
+                }
+
+                return ReferenceEquals(this, other);
+            }
+
+            /// <inheritdoc/>
+            public override int GetHashCode()
+            {
+                if (TryGetValue("hammeruniqueid", out var id))
+                {
+                    return id.ToString().GetHashCode(StringComparison.Ordinal);
+                }
+
+                return RuntimeHelpers.GetHashCode(this);
+            }
 
             /// <summary>
             /// Gets the target name of the entity.

@@ -57,7 +57,10 @@ public sealed class SceneLightingDebug
     private SceneEnvMap? chosenEnvMap;
     private LineSceneNode? chosenEnvMapBounds;
 
-    private sealed record ProbeGrid(LightProbeSampleGridSceneNode Samples, LineSceneNode? Bounds);
+    private sealed record ProbeGrid(LightProbeSampleGridSceneNode Samples, LineSceneNode? Bounds)
+    {
+        public bool Retained { get; set; }
+    }
 
     private sealed class MarkerSphere(Scene scene, Vector3 center, float radius, Color32 color)
         : ShapeSceneNode(scene, center, radius, color)
@@ -72,6 +75,9 @@ public sealed class SceneLightingDebug
 
     /// <summary>Gets or sets which light probe volumes show their sample grid.</summary>
     public LightProbeDebugGridMode LightProbeGrid { get; set; }
+
+    /// <summary>Gets or sets additional volumes whose grids are shown by the current editor highlight mode.</summary>
+    public IReadOnlySet<SceneLightProbe> HighlightedLightProbes { get; set; } = new HashSet<SceneLightProbe>();
 
     /// <summary>Gets or sets whether a volume showing its grid is also outlined, in its debug colour.</summary>
     public bool LightProbeGridBounds { get; set; } = true;
@@ -111,6 +117,7 @@ public sealed class SceneLightingDebug
     {
         ClearProbeGrids();
         ClearEnvMapMarkers();
+        reflectionColorsShown = false;
     }
 
     private void ClearProbeGrids()
@@ -140,7 +147,7 @@ public sealed class SceneLightingDebug
 
     private void UpdateProbeGrids(Vector3 viewPosition)
     {
-        if (LightProbeGrid == LightProbeDebugGridMode.Off)
+        if (LightProbeGrid == LightProbeDebugGridMode.Off && HighlightedLightProbes.Count == 0)
         {
             ClearProbeGrids();
             return;
@@ -152,14 +159,15 @@ public sealed class SceneLightingDebug
         {
             probeGrids.TryGetValue(probe, out var grid);
 
-            var show = LightProbeGrid switch
+            var showByMode = LightProbeGrid switch
             {
+                LightProbeDebugGridMode.Off => false,
                 LightProbeDebugGridMode.All => true,
                 LightProbeDebugGridMode.Closest => probe == closest,
-                _ => probe == closest || grid != null,
+                _ => probe == closest || grid is { Retained: true },
             };
 
-            show &= probe.LayerEnabled;
+            var show = (showByMode || HighlightedLightProbes.Contains(probe)) && probe.LayerEnabled;
 
             if (grid != null && (!show || (grid.Bounds != null) != LightProbeGridBounds))
             {
@@ -176,6 +184,7 @@ public sealed class SceneLightingDebug
 
             if (grid != null)
             {
+                grid.Retained |= showByMode;
                 var samples = grid.Samples;
                 samples.SampleSize = LightProbeGridSampleSize;
                 samples.Albedo = LightProbeGridAlbedo;

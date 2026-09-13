@@ -155,8 +155,11 @@ namespace CLI
         /// <param name="test_gltf">When using --test, also test glTF export code path for every supported file.</param>
         /// <param name="test_shaders">When using --test, also decompile a few variants of every shader program and reconstruct each shader once.</param>
         /// <param name="test_entity_keys">When using --test, save all unknown entity key hashes to unknown_keys.txt.</param>
+        /// <param name="export_entities">Export a Map or World resource's entities to a JSON file.</param>
+        /// <param name="export_entities_map">Find a Counter-Strike 2 map by name and export its entities to JSON.</param>
+        /// <param name="import_entities">Create an editable VMAP from entity JSON. Requires --input and --output.</param>
         private int HandleArguments(
-            string input,
+            string? input = default,
             bool recursive = false,
             bool recursive_vpk = false,
             [HideDefaultValue] string? vpk_extensions = default,
@@ -203,18 +206,41 @@ namespace CLI
             bool test_vertex_attributes = false,
             bool test_gltf = false,
             bool test_shaders = false,
-            bool test_entity_keys = false
+            bool test_entity_keys = false,
+            bool export_entities = false,
+            [HideDefaultValue] string? export_entities_map = default,
+            bool import_entities = false
         )
         {
             // When you modify the arguments, don't forget to update the command-line.md documentation file too.
-            if (string.IsNullOrWhiteSpace(input))
+            if (string.IsNullOrWhiteSpace(input) && export_entities_map == null)
             {
                 Console.Error.WriteLine("--input is empty.");
                 return 1;
             }
 
+            if (import_entities)
+            {
+                if (recursive || recursive_vpk || vpk_extensions != null || vpk_filepath != null || vpk_cache || vpk_verify
+                    || vpk_search != null || vpk_search_options != null
+                    || vpk_create != null || vpk_create_chunk_size != 0 || all || block != null || decompile
+                    || texture_decode_flags != null || skip_softbody_reconstruction || vpk_list || vpk_dir || kv_flatten
+                    || gltf_export_format != null || gltf_export_materials || gltf_export_animations || gltf_mesh_list != null
+                    || gltf_animation_list != null || gltf_textures_adapt || gltf_export_extras || gltf_compose_additive
+                    || gltf_keep_all_keyframes || shader_list_combos || shader_combo != null || tools_asset_info_short
+                    || threads != 1 || game != null || test || test_loader || test_print_files || test_unique_deps
+                    || test_particles || test_vertex_attributes || test_gltf || test_shaders || test_entity_keys
+                    || export_entities || export_entities_map != null)
+                {
+                    Console.Error.WriteLine("Entity import only accepts --input, --output, and --quiet.");
+                    return 1;
+                }
+
+                return ExecuteEntityImport(input!, output, quiet);
+            }
+
             // A "vpk:" link copied from Source 2 Viewer, which can point to a file or folder inside of the package
-            if (VpkLink.IsVpkLink(input))
+            if (!string.IsNullOrWhiteSpace(input) && VpkLink.IsVpkLink(input))
             {
                 var (packagePaths, linkedPath) = VpkLink.Parse(input);
 
@@ -247,7 +273,7 @@ namespace CLI
             }
 
             // Paths can be relative to a Steam app, such as "steam:730/game/csgo"
-            var inputs = input.Split(',');
+            var inputs = string.IsNullOrWhiteSpace(input) ? [] : input.Split(',');
 
             for (var i = 0; i < inputs.Length; i++)
             {
@@ -272,10 +298,10 @@ namespace CLI
             gltf_export_animations |= gltf_animation_list != null;
             gltf_export_materials |= gltf_textures_adapt;
 
-            var isSteamInput = input.Equals("steam", StringComparison.OrdinalIgnoreCase) && !Path.Exists(input);
+            var isSteamInput = input?.Equals("steam", StringComparison.OrdinalIgnoreCase) == true && !Path.Exists(input);
             var hasFilters = vpk_extensions != null || vpk_filepath != null || LinkedFilePath != null;
 
-            InputFile = isSteamInput ? "steam" : Path.GetFullPath(input);
+            InputFile = isSteamInput ? "steam" : string.IsNullOrWhiteSpace(input) ? string.Empty : Path.GetFullPath(input);
             OutputFile = output;
             Decompile = decompile;
             ExtractOptions = new FileExtractOptions { ReconstructSoftbody = !skip_softbody_reconstruction };
@@ -546,7 +572,24 @@ namespace CLI
 
             FileLoaderLogger = new StderrLogger(Quiet ? LogLevel.Warning : LogLevel.Information);
 
-            return Execute();
+            if (export_entities && export_entities_map != null)
+            {
+                Console.Error.WriteLine("Use either --export_entities or --export_entities_map, not both.");
+                return 1;
+            }
+
+            if (export_entities_map != null)
+            {
+                return ExecuteEntityExportMap(export_entities_map);
+            }
+
+            if (InputFile.Length == 0)
+            {
+                Console.Error.WriteLine("--input is required unless --export_entities_map is used.");
+                return 1;
+            }
+
+            return export_entities ? ExecuteEntityExport() : Execute();
         }
 
         private int Execute()

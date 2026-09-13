@@ -118,6 +118,10 @@ export default defineConfig({
                             link: "/guides/exporting-maps",
                         },
                         {
+                            text: "Entity Maps from JSON",
+                            link: "/guides/entity-map-import",
+                        },
+                        {
                             text: "Exporting Textures",
                             link: "/guides/exporting-textures",
                         },
