@@ -452,8 +452,44 @@ partial class RendererControl : UserControl
 
         SetControlLocation(selectionControl);
 
+        var isBulkUpdating = false;
+
+        selectionControl.CheckedListBox.KeyDown += (_, e) =>
+        {
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                var checkedListBox = selectionControl.CheckedListBox;
+                var checkItems = Enumerable.Range(0, checkedListBox.Items.Count)
+                    .Any(index => !checkedListBox.GetItemChecked(index));
+
+                isBulkUpdating = true;
+                checkedListBox.BeginUpdate();
+                try
+                {
+                    for (var i = 0; i < checkedListBox.Items.Count; i++)
+                    {
+                        checkedListBox.SetItemChecked(i, checkItems);
+                    }
+                }
+                finally
+                {
+                    checkedListBox.EndUpdate();
+                    isBulkUpdating = false;
+                }
+
+                changeCallback(checkedListBox.CheckedItems.OfType<T>().ToArray());
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            }
+        };
+
         selectionControl.CheckedListBox.ItemCheck += (_, e) =>
         {
+            if (isBulkUpdating)
+            {
+                return;
+            }
+
             // Manually calculate the new checked items since ItemCheck is called before CheckedItems is updated
             if (selectionControl.CheckedListBox.Items[e.Index] is T changedItem)
             {

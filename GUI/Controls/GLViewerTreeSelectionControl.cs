@@ -10,7 +10,7 @@ namespace GUI.Controls
     /// <c>Clip/Player Clip</c> is nested under the item of each group before it, and those items can fold it away. Checking or
     /// unchecking an item does the same to every item below it.
     /// </summary>
-    class GLViewerTreeSelectionControl : UserControl
+    partial class GLViewerTreeSelectionControl : UserControl
     {
         private const char PathSeparator = '/';
 
@@ -56,6 +56,8 @@ namespace GUI.Controls
                 // A lone item at the top is never folded, so only several need the arrows that fold them
                 treeView.ShowRootLines = treeView.Nodes.Count > 1 && treeView.Nodes.Cast<TreeNode>().Any(static node => node.Nodes.Count > 0);
             }
+
+            InitializeBulkSelection();
 
             treeView.LabelClicked += node => SetChecked(node, !node.Checked);
             treeView.AfterCheck += (_, e) =>

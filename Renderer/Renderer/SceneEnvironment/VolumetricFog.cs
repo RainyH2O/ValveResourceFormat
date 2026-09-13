@@ -12,7 +12,7 @@ namespace ValveResourceFormat.Renderer.SceneEnvironment
     /// </summary>
     /// <seealso href="https://s2v.app/SchemaExplorer/hlvr/client/C_EnvVolumetricFogController">C_EnvVolumetricFogController</seealso>
     /// <seealso href="https://s2v.app/SchemaExplorer/hlvr/client/C_EnvVolumetricFogVolume">C_EnvVolumetricFogVolume</seealso>
-    public sealed class VolumetricFog : IDisposable
+    public sealed partial class VolumetricFog : IDisposable
     {
         /// <summary>Width of the grid in cells.</summary>
         public const int GridWidth = 240;
@@ -89,7 +89,7 @@ namespace ValveResourceFormat.Renderer.SceneEnvironment
         /// <param name="IndirectStrength">Strength of the baked light in the volume, or a negative value to leave the controller's.</param>
         /// <param name="Tint">Linear color the volume gives the fog, or <see langword="null"/> to leave the controller's.</param>
         /// <param name="FollowsRotation">Whether the box turns with the angles of the entity, rather than staying along the axes.</param>
-        public readonly record struct FogVolume(
+        public readonly partial record struct FogVolume(
             Matrix4x4 LocalToWorld,
             Vector3 Mins,
             Vector3 Maxs,

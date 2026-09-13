@@ -254,6 +254,31 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
         return UiControl;
     }
 
+    public void InitializeRenderLoop(bool renderImmediately = false)
+    {
+        if (UsesSharedRenderLoop)
+        {
+            if (renderImmediately)
+            {
+                ActivateRenderLoop();
+            }
+
+            return;
+        }
+
+        InitializePrivateRenderLoop(renderImmediately);
+    }
+
+    protected virtual bool UsesSharedRenderLoop => true;
+
+    protected virtual void InitializePrivateRenderLoop(bool renderImmediately)
+    {
+    }
+
+    protected virtual void DisposePrivateRenderLoop()
+    {
+    }
+
     /// <summary>
     /// Force the GL control to redraw. Used when the viewer becomes visible after being obscured (e.g. by a
     /// loading panel), which does not reliably deliver a paint message to the underlying GL control on its own.
@@ -261,6 +286,45 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
     public virtual void NotifyVisible()
     {
         GLControl?.Invalidate();
+    }
+
+    internal void ActivateRenderLoop()
+    {
+        if (GLControl is not { IsDisposed: false, Visible: true })
+        {
+            return;
+        }
+
+        if (!UsesSharedRenderLoop)
+        {
+            return;
+        }
+
+        if (!RenderLoopThread.IsCurrentGLControl(this))
+        {
+            ApplySettingsToRenderState();
+        }
+
+        RenderLoopThread.SetCurrentGLControl(this);
+    }
+
+    internal void ActivateRenderLoopAfterLayout()
+    {
+        if (GLControl is { IsDisposed: false, IsHandleCreated: true } glControl)
+        {
+            glControl.BeginInvoke(ActivateRenderLoop);
+        }
+    }
+
+    protected void SelectContainingTabs()
+    {
+        for (var control = (Control?)UiControl; control != null; control = control.Parent)
+        {
+            if (control is TabPage tabPage && tabPage.Parent is TabControl tabControl)
+            {
+                tabControl.SelectTab(tabPage);
+            }
+        }
     }
 
     /// <summary>Whether the debug sidebar gets the shader hot-reload button; viewers that never
@@ -279,6 +343,9 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
     private const int WM_SETFOCUS = 0x0007;
     private const int WM_KILLFOCUS = 0x0008;
     private const int WM_MOUSEMOVE = 0x0200;
+    private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_RBUTTONDOWN = 0x0204;
+    private const int WM_MBUTTONDOWN = 0x0207;
     private const int WM_MOUSEWHEEL = 0x020A;
 
     /// <summary>
@@ -303,11 +370,17 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
                 return MouseOverRenderArea;
 
             case WM_MOUSEWHEEL:
+                ActivateRenderLoop();
                 var screenPosition = new Point((short)m.LParam, (short)(m.LParam >> 16));
                 OnMouseWheel((short)(m.WParam >> 16), GLControl.PointToClient(screenPosition));
                 return true;
 
+            case WM_LBUTTONDOWN or WM_RBUTTONDOWN or WM_MBUTTONDOWN:
+                ActivateRenderLoop();
+                return false;
+
             case WM_KEYDOWN or WM_SYSKEYDOWN:
+                ActivateRenderLoop();
                 OnKeyDown(((Keys)m.WParam & Keys.KeyCode) | Control.ModifierKeys);
                 return true;
 
@@ -465,6 +538,11 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
     {
         RendererContext.CancelLoading();
 
+        if (!UsesSharedRenderLoop)
+        {
+            DisposePrivateRenderLoop();
+        }
+
         using var lockedGl = glLock.EnterScope();
 
         RestoreCursorAfterDrag();
@@ -477,7 +555,10 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
 
         if (GLControl is not null)
         {
-            RenderLoopThread.UnsetCurrentGLControl(this);
+            if (UsesSharedRenderLoop)
+            {
+                RenderLoopThread.UnsetCurrentGLControl(this);
+            }
 
             GLControl.Paint -= OnGlControlPaint;
             GLControl.SizeChanged -= OnSizeChanged;
@@ -514,6 +595,7 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
     private void OnMouseEnter(object? sender, EventArgs e)
     {
         MouseOverRenderArea = true;
+        ActivateRenderLoop();
     }
 
     protected virtual void OnMouseDown(object? sender, MouseEventArgs e)
@@ -851,12 +933,7 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
 
     internal void AttachToRenderLoop()
     {
-        if (!RenderLoopThread.IsCurrentGLControl(this))
-        {
-            ApplySettingsToRenderState();
-        }
-
-        RenderLoopThread.SetCurrentGLControl(this);
+        ActivateRenderLoop();
     }
 
     // Only reapplied when the setting changes, so a field of view set on the viewer itself survives switching tabs
@@ -1004,8 +1081,11 @@ internal abstract class GLBaseControl : IDisposable, IMessageFilter
 
         Debug.Assert(GLNativeWindow is not null);
 
-        RenderLoopThread.RegisterInstance();
-        registeredWithRenderLoop = true;
+        if (UsesSharedRenderLoop)
+        {
+            RenderLoopThread.RegisterInstance();
+            registeredWithRenderLoop = true;
+        }
 
         GraphicsContext = RendererContext.Device.CreateContext(new GLFWSurface(GLNativeWindow.Context));
 

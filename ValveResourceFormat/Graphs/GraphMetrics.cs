@@ -43,23 +43,23 @@ internal static class GraphMetrics
     public const float PairGap = 28f;
 
     /// <summary>Font of a node's title.</summary>
-    public static SKFont TitleFont { get; } = Prepare(SKTypeface
+    public static GraphFont TitleFont { get; } = new(Prepare(SKTypeface
         .FromFamilyName("Segoe UI", new SKFontStyle(SKFontStyleWeight.SemiBold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright))
-        .ToFont(13.5f));
+        .ToFont(13.5f)));
 
     /// <summary>Font of a node's subtitle.</summary>
-    public static SKFont SubtitleFont { get; } = Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(10.5f));
+    public static GraphFont SubtitleFont { get; } = new(Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(10.5f)));
 
     /// <summary>Font of a node's rows.</summary>
-    public static SKFont RowFont { get; } = Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(12f));
+    public static GraphFont RowFont { get; } = new(Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(12f)));
 
     /// <summary>Font of a row carrying a message rather than data.</summary>
-    public static SKFont MessageFont { get; } = Prepare(SKTypeface
+    public static GraphFont MessageFont { get; } = new(Prepare(SKTypeface
         .FromFamilyName("Segoe UI", new SKFontStyle(SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Italic))
-        .ToFont(12f));
+        .ToFont(12f)));
 
     /// <summary>Font of the label drawn at a wire's midpoint.</summary>
-    public static SKFont WireLabelFont { get; } = Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(10.5f));
+    public static GraphFont WireLabelFont { get; } = new(Prepare(SKTypeface.FromFamilyName("Segoe UI").ToFont(10.5f)));
 
     private static SKFont Prepare(SKFont font)
     {
@@ -131,7 +131,7 @@ internal static class GraphMetrics
             // Both names of a paired row share the line, so it must fit them side by side.
             var rowWidth = row switch
             {
-                TextRow text => MarginX * 2f + (text.IsMessage ? 19f : 0f) + (text.Text.Length == 0 ? 0f : RowFont.MeasureText(text.Text)),
+                TextRow text => MarginX * 2f + (text.IsMessage ? 19f : 0f) + (text.Text.Length == 0 ? 0f : (text.IsMessage ? MessageFont : RowFont).MeasureText(text.Text)),
                 SocketRow { Socket.IsInput: false } => MarginX * 2f + outputWidth,
                 SocketRow socket => MarginX * 2f + (socket.Socket.Name.Length == 0 ? 0f : RowFont.MeasureText(socket.Socket.Name)),
                 PairedSocketRow paired => MarginX * 2f + PairGap

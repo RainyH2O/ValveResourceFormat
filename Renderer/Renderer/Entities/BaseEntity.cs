@@ -1317,7 +1317,7 @@ public abstract partial class BaseEntity
         SetWorldPose(EntityTransformHelper.ToRigidTransformationMatrix(newAngles, newOrigin));
     }
 
-    private void SetWorldPose(in Matrix4x4 world)
+    internal void SetWorldPose(in Matrix4x4 world)
     {
         if (!Matrix4x4.Invert(GetParentFrame(), out var worldToParent))
         {

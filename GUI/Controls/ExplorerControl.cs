@@ -30,10 +30,13 @@ namespace GUI.Controls
         private readonly TaskCompletionSource handleCreated = new();
         private readonly List<TreeDataNode> TreeData = [];
         private static readonly ConcurrentDictionary<string, string> WorkshopAddons = new();
+        private Task scanTask = Task.CompletedTask;
+        private TreeNode? scanningTreeNode;
 
         public ExplorerControl()
         {
             InitializeComponent();
+            InitializeMapOpenMenu();
 
             foreach (Control control in Controls)
             {
@@ -99,7 +102,15 @@ namespace GUI.Controls
             DebugAddEmbeddedResourcesToTree();
 #endif
 
-            var scanningTreeNode = new TreeNode("Scanning game folders…")
+            StartScan();
+        }
+
+        private void StartScan()
+        {
+            scanningTreeNode?.Remove();
+
+            var recentImage = AppIcons.Icons["History"];
+            scanningTreeNode = new TreeNode("Scanning game folders…")
             {
                 ImageIndex = recentImage,
                 SelectedImageIndex = recentImage,
@@ -109,7 +120,7 @@ namespace GUI.Controls
             string[] listedFiles = [.. Settings.Config.RecentFiles, .. Settings.Config.BookmarkedFiles.Select(path => SplitPackageLink(path).PathOnDisk)];
 
             // Scan for vpks
-            _ = ScanForSteamGamesAndUpdateTree(listedFiles, scanningTreeNode);
+            scanTask = ScanForSteamGamesAndUpdateTree(listedFiles, scanningTreeNode);
         }
 
         private async Task ScanForSteamGamesAndUpdateTree(string[] listedFiles, TreeNode scanningTreeNode)
@@ -729,6 +740,26 @@ namespace GUI.Controls
             Settings.Config.RecentFiles.Remove(path);
 
             RedrawList(APPID_RECENT_FILES, GetRecentFileNodes());
+        }
+
+        private void OnRefreshExplorerClick(object sender, EventArgs e)
+        {
+            if (!scanTask.IsCompleted)
+            {
+                return;
+            }
+
+            treeView.BeginUpdate();
+            foreach (var node in TreeData.Where(static node => node.AppID >= 0).ToList())
+            {
+                node.ParentNode.Remove();
+                TreeData.Remove(node);
+            }
+            treeView.EndUpdate();
+
+            InstalledSteamGames.Refresh();
+            WorkshopAddons.Clear();
+            StartScan();
         }
 
         private void OnExplorerLoad(object sender, EventArgs e)

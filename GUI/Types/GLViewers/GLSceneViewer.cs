@@ -107,6 +107,12 @@ namespace GUI.Types.GLViewers
         /// <summary>The Hammer helpers of the entities of the view.</summary>
         protected HammerEntityVisuals EntityVisuals { get; }
 
+        /// <summary>Gets whether this viewer uses the standard editor selection helpers.</summary>
+        protected virtual bool UseSelectionVisuals => true;
+
+        /// <summary>Gets the highlight manager used by viewers with custom selection visuals.</summary>
+        protected SelectedNodeRenderer? SelectedNodeRenderer { get; private set; }
+
         static readonly TimeSpan FpsUpdateTimeSpan = TimeSpan.FromSeconds(0.1);
 
         private readonly float[] frameTimes = new float[30];
@@ -147,7 +153,15 @@ namespace GUI.Types.GLViewers
             // Delete GL resources before the base disposes the GL context
             overlayShapes.Delete();
 
-            selectionVisuals?.Delete();
+            if (SelectedNodeRenderer != null)
+            {
+                SelectedNodeRenderer.Delete();
+                SelectedNodeRenderer = null;
+            }
+            else
+            {
+                selectionVisuals?.Delete();
+            }
             selectionVisuals = null;
 
             toolsPass?.Dispose();
@@ -544,7 +558,15 @@ namespace GUI.Types.GLViewers
 
             Debug.Assert(MainFramebuffer != null);
 
-            selectionVisuals = new(Selection, EntityVisuals, Tools, Scene.RendererContext);
+            if (UseSelectionVisuals)
+            {
+                selectionVisuals = new(Selection, EntityVisuals, Tools, Scene.RendererContext);
+            }
+            else
+            {
+                SelectedNodeRenderer = new(Scene.RendererContext, Selection, EntityVisuals, Tools);
+                selectionVisuals = SelectedNodeRenderer.SelectionVisuals;
+            }
             toolsPass = new(Scene.RendererContext, MainFramebuffer);
             Picker = new(Scene.RendererContext, OnPicked);
 
@@ -886,6 +908,7 @@ namespace GUI.Types.GLViewers
                     Camera = Renderer.Camera,
                 };
 
+                SelectedNodeRenderer?.UpdateLightingHighlights();
                 Renderer.Update(updateContext);
 
                 Input.LateUpdate(Renderer.Camera);
@@ -900,7 +923,14 @@ namespace GUI.Types.GLViewers
                         Text = ScreenDebugText,
                     }, Renderer.Camera);
                 }
-                selectionVisuals.Update(renderContext, updateContext);
+                if (SelectedNodeRenderer != null)
+                {
+                    SelectedNodeRenderer.Update(renderContext, updateContext);
+                }
+                else
+                {
+                    selectionVisuals.Update(renderContext, updateContext);
+                }
                 UpdateOverlays();
             }
 
@@ -1367,6 +1397,8 @@ namespace GUI.Types.GLViewers
                 "Irradiance" or "Illumination" => LightingBindingDisplay.LightProbe,
                 _ => LightingBindingDisplay.None,
             };
+
+            SelectedNodeRenderer?.SetRenderMode(renderMode);
 
             currentRenderMode = renderMode;
             ApplyRenderModeToNodes();

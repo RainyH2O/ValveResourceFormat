@@ -11,7 +11,7 @@ using Resource = ValveResourceFormat.Resource;
 
 namespace GUI.Types.Exporter
 {
-    static class ExportFile
+    static partial class ExportFile
     {
         public static async Task ExtractFileFromPackageEntry(PackageEntry file, VrfGuiContext vrfGuiContext, bool decompile)
         {

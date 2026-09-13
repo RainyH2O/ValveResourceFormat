@@ -40,6 +40,9 @@ public sealed class ToolRenderContext
     /// </summary>
     public ToolRenderLayer? LayerOverride { get; set; }
 
+    /// <summary>Gets or sets whether all shapes are drawn over the scene.</summary>
+    public bool IgnoreDepth { get; set; }
+
     /// <summary>Gets or sets whether triangles get the normal of their face, which the shaded modes light them by.</summary>
     public bool ComputeFaceNormals { get; set; }
 
@@ -84,6 +87,11 @@ public sealed class ToolRenderContext
         get
         {
             var flags = ToolRenderModes.GetFlags(RenderMode);
+
+            if (IgnoreDepth)
+            {
+                flags |= ToolRenderModeFlags.NoZ;
+            }
 
             if ((flags & ToolRenderModeFlags.Wireframe) != 0 && LineWidth != 0f)
             {
@@ -664,7 +672,7 @@ public sealed class ToolRenderContext
 
         if (!IsPickOnly)
         {
-            Output.AddHandle(new ToolHandleState(type, noZ, border, translucent, LayerOverride), worldPosition, size, color);
+            Output.AddHandle(new ToolHandleState(type, noZ || IgnoreDepth, border, translucent, LayerOverride), worldPosition, size, color);
         }
     }
 

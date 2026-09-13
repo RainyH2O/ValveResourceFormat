@@ -177,6 +177,9 @@ namespace ValveResourceFormat.Renderer.Editor.Collision
         /// <summary>Gets the index into <see cref="PhysAggregateData.CollisionAttributes"/> of the group this node draws.</summary>
         public required int CollisionAttributeIndex { get; init; }
 
+        /// <summary>Gets whether this node represents the default world collision group.</summary>
+        public bool IsDefaultGroup { get; internal set; }
+
         private PhysSceneNode(Scene scene, List<SimpleVertexNormal> verts, List<int> inds, int lineIndexCount) : base(scene, verts, inds, lineIndexCount)
         {
         }

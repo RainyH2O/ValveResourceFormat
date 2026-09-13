@@ -94,6 +94,23 @@ namespace ValveResourceFormat.Renderer
             }
         } = true;
 
+        /// <summary>Gets whether this node is visible after applying layer and viewer visibility controls.</summary>
+        public bool IsVisibleInViewer => LayerEnabled && !ViewerHidden;
+
+        internal bool ViewerHidden
+        {
+            get;
+            set
+            {
+                var wasVisible = IsVisibleInViewer;
+                field = value;
+                if (wasVisible != IsVisibleInViewer)
+                {
+                    Scene.MarkParentSetDirty(this);
+                }
+            }
+        }
+
         /// <summary>
         /// Gets or sets whether the node itself wants to be drawn, independently of its layer.
         /// The node remains in the scene graph and is checked each frame.

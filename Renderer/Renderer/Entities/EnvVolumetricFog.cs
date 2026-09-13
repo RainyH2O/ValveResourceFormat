@@ -25,7 +25,7 @@ public sealed class EnvVolumetricFogController : BaseEntity
 
 /// <summary><c>env_volumetric_fog_volume</c>. A box of volumetric fog.</summary>
 /// <seealso href="https://s2v.app/SchemaExplorer/hlvr/client/C_EnvVolumetricFogVolume">C_EnvVolumetricFogVolume</seealso>
-public sealed class EnvVolumetricFogVolume : BaseEntity
+public sealed partial class EnvVolumetricFogVolume : BaseEntity
 {
     private VolumetricFog.FogVolume? fogVolume;
 
@@ -78,7 +78,10 @@ public sealed class EnvVolumetricFogVolume : BaseEntity
             entity.GetFloatProperty("heightfogedgewidth"),
             indirectStrength,
             tint,
-            followsRotation);
+            followsRotation)
+        {
+            Owner = this,
+        };
 
         fogVolume = newVolume;
         fogInfo.Volumetric.AddVolume(newVolume);

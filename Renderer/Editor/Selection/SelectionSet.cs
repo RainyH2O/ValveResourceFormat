@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 
 namespace ValveResourceFormat.Renderer.Editor.Selection;
@@ -10,6 +11,11 @@ public sealed class SelectionSet
 {
     private readonly Lock changeLock = new();
     private SceneNode[] nodes = [];
+
+    internal Lock Synchronization => changeLock;
+
+    /// <summary>Occurs after the selected nodes change.</summary>
+    public event EventHandler? Changed;
 
     /// <summary>Gets the selected nodes, in the order they were selected.</summary>
     public IReadOnlyList<SceneNode> Nodes => Volatile.Read(ref nodes);
@@ -26,10 +32,13 @@ public sealed class SelectionSet
         if (node == null)
         {
             Volatile.Write(ref nodes, []);
-            return;
+        }
+        else
+        {
+            Volatile.Write(ref nodes, [node]);
         }
 
-        Volatile.Write(ref nodes, [node]);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Clears the selection.</summary>
@@ -48,9 +57,33 @@ public sealed class SelectionSet
         if (index >= 0)
         {
             Volatile.Write(ref nodes, [.. nodes.AsSpan(0, index), .. nodes.AsSpan(index + 1)]);
+        }
+        else
+        {
+            Volatile.Write(ref nodes, [.. nodes, node]);
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Replaces the selection with the given nodes, preserving their order.</summary>
+    /// <param name="newNodes">The nodes to select.</param>
+    public void Replace(IEnumerable<SceneNode> newNodes)
+    {
+        ArgumentNullException.ThrowIfNull(newNodes);
+
+        var replacement = newNodes
+            .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+            .ToArray();
+
+        using var _ = changeLock.EnterScope();
+
+        if (nodes.SequenceEqual(replacement))
+        {
             return;
         }
 
-        Volatile.Write(ref nodes, [.. nodes, node]);
+        Volatile.Write(ref nodes, replacement);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }
