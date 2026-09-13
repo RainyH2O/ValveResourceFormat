@@ -11,6 +11,32 @@ namespace ValveResourceFormat.Renderer.Entities;
 /// </summary>
 public abstract class BaseModelEntity : BaseEntity
 {
+    /// <summary>SolidType_t from CS2: https://s2v.app/SchemaExplorer/cs2/client/SolidType_t.</summary>
+    public enum SolidType
+    {
+        /// <summary>Not solid.</summary>
+        SOLID_NONE = 0,
+        /// <summary>Brush model.</summary>
+        SOLID_BSP = 1,
+        /// <summary>Axis-aligned bounding box.</summary>
+        SOLID_BBOX = 2,
+        /// <summary>Oriented bounding box.</summary>
+        SOLID_OBB = 3,
+        /// <summary>Sphere.</summary>
+        SOLID_SPHERE = 4,
+        /// <summary>Point.</summary>
+        SOLID_POINT = 5,
+        /// <summary>The model's physics collision.</summary>
+        SOLID_VPHYSICS = 6,
+        /// <summary>Capsule.</summary>
+        SOLID_CAPSULE = 7,
+        /// <summary>Cylinder.</summary>
+        SOLID_CYLINDER = 8,
+    }
+
+    /// <summary>Gets the solid type.</summary>
+    public SolidType Solid { get; protected set; }
+
     /// <summary>
     /// Gets the node this entity draws as, or <see langword="null"/> when its model has no meshes. A brush
     /// compiled for collision alone is the usual reason.
@@ -22,6 +48,7 @@ public abstract class BaseModelEntity : BaseEntity
     /// </summary>
     protected BaseModelEntity(EntitySystem system, EntitySpawnInfo spawnInfo) : base(system, spawnInfo)
     {
+        Solid = KeyValues.ContainsKey("solid") ? KeyValues.GetEnumValue<SolidType>("solid") : SolidType.SOLID_NONE;
     }
 
     /// <summary>

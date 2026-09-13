@@ -44,7 +44,7 @@ public sealed class PropDynamic : BaseModelEntity
 
         // The collider is rigid and ignores scale, and blocking with a hull of the wrong size is worse
         // than not blocking at all
-        hasCollision = KeyValues.GetInt32Property("solid", 6) != 0 && EntityScale == Vector3.One;
+        hasCollision = Solid != SolidType.SOLID_NONE && EntityScale == Vector3.One;
         IsSolid = hasCollision && !HasSpawnFlags(SpawnFlag.StartCollisionDisabled);
 
         // HL:A only
