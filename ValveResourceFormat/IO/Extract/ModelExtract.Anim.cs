@@ -398,11 +398,11 @@ partial class ModelExtract
         return merged;
     }
 
-    private static DmeChannel BuildDmeChannel<T>(string name, Element toElement, string toAttribute, out DmeLog<T> log)
+    private static DmeChannel BuildDmeChannel(string name, Element toElement, string toAttribute, DmeLog log, DmeLogLayer layer)
     {
-        log = [];
+        log.Layers.Add(layer);
 
-        var channel = new DmeChannel
+        return new DmeChannel
         {
             Name = name,
             ToElement = toElement,
@@ -410,13 +410,9 @@ partial class ModelExtract
             Mode = 3,
             Log = log
         };
-
-        log.AddLayer([]);
-
-        return channel;
     }
 
-    private static void ProcessBoneFrameForDmeChannel(Bone bone, Frame frame, TimeSpan time, DmeLogLayer<Vector3> positionLayer, DmeLogLayer<Quaternion> orientationLayer, bool dropVertical)
+    private static void ProcessBoneFrameForDmeChannel(Bone bone, Frame frame, TimeSpan time, DmeVector3LogLayer positionLayer, DmeQuaternionLogLayer orientationLayer, bool dropVertical)
     {
         var frameBone = frame.Bones[bone.Index];
 
@@ -434,7 +430,7 @@ partial class ModelExtract
         orientationLayer.LayerValues[frame.FrameIndex] = frameBone.Angle;
     }
 
-    private static void ProcessFlexFrameForDmeChannel(int flexId, Frame frame, TimeSpan time, DmeLogLayer<float> flexLayer)
+    private static void ProcessFlexFrameForDmeChannel(int flexId, Frame frame, TimeSpan time, DmeFloatLogLayer flexLayer)
     {
         var flexValue = frame.Datas[flexId];
 
@@ -448,13 +444,11 @@ partial class ModelExtract
         {
             return;
         }
-        var rootPositionChannel = BuildDmeChannel<Vector3>($"_p", skeleton.Transform, "position", out var rootPositionLog);
-        var rootPositionLayer = rootPositionLog.GetLayer(0);
-        rootPositionLayer.LayerValues = new Vector3[anim.FrameCount];
+        var rootPositionLayer = new DmeVector3LogLayer { LayerValues = new Vector3[anim.FrameCount] };
+        var rootPositionChannel = BuildDmeChannel("_p", skeleton.Transform, "position", new DmeVector3Log(), rootPositionLayer);
 
-        var rootOrientationChannel = BuildDmeChannel<Quaternion>($"_o", skeleton.Transform, "orientation", out var rootOrientationLog);
-        var rootOrientationLayer = rootOrientationLog.GetLayer(0);
-        rootOrientationLayer.LayerValues = new Quaternion[anim.FrameCount];
+        var rootOrientationLayer = new DmeQuaternionLogLayer { LayerValues = new Quaternion[anim.FrameCount] };
+        var rootOrientationChannel = BuildDmeChannel("_o", skeleton.Transform, "orientation", new DmeQuaternionLog(), rootOrientationLayer);
 
         for (var i = 0; i < anim.FrameCount; i++)
         {
@@ -490,9 +484,8 @@ partial class ModelExtract
             };
             flexElement.Add("flexWeight", 0f);
 
-            var flexChannel = BuildDmeChannel<float>($"{flexController.Name}_flex_channel", flexElement, "flexWeight", out var flexLog);
-            var flexLogLayer = flexLog.GetLayer(0);
-            flexLogLayer.LayerValues = new float[anim.FrameCount];
+            var flexLogLayer = new DmeFloatLogLayer { LayerValues = new float[anim.FrameCount] };
+            var flexChannel = BuildDmeChannel($"{flexController.Name}_flex_channel", flexElement, "flexWeight", new DmeFloatLog(), flexLogLayer);
 
             for (var i = 0; i < anim.FrameCount; i++)
             {
@@ -513,14 +506,11 @@ partial class ModelExtract
             var transform = transforms[bone.Index];
             var boneName = GetExportBoneName(bone);
 
-            var positionChannel = BuildDmeChannel<Vector3>($"{boneName}_p", transform, "position", out var positionLog);
-            var orientationChannel = BuildDmeChannel<Quaternion>($"{boneName}_o", transform, "orientation", out var orientationLog);
+            var positionLogLayer = new DmeVector3LogLayer { LayerValues = new Vector3[anim.FrameCount] };
+            var orientationLogLayer = new DmeQuaternionLogLayer { LayerValues = new Quaternion[anim.FrameCount] };
 
-            var positionLogLayer = positionLog.GetLayer(0);
-            var orientationLogLayer = orientationLog.GetLayer(0);
-
-            positionLogLayer.LayerValues = new Vector3[anim.FrameCount];
-            orientationLogLayer.LayerValues = new Quaternion[anim.FrameCount];
+            var positionChannel = BuildDmeChannel($"{boneName}_p", transform, "position", new DmeVector3Log(), positionLogLayer);
+            var orientationChannel = BuildDmeChannel($"{boneName}_o", transform, "orientation", new DmeQuaternionLog(), orientationLogLayer);
 
             for (var i = 0; i < anim.FrameCount; i++)
             {
@@ -541,7 +531,7 @@ partial class ModelExtract
     /// <summary>
     /// Workaround for ModelDoc ignoring animation data on bone when bone doesn't have any motion
     /// </summary>
-    private static void ApplyModelDocHack(DmeLogLayer<Vector3> logLayer)
+    private static void ApplyModelDocHack(DmeVector3LogLayer logLayer)
     {
         // I guess this means there is actually no animation data?
         if (logLayer.LayerValues.Length == 0)
@@ -574,7 +564,7 @@ partial class ModelExtract
         logLayer.Times.AddRange(newTimes);
     }
 
-    private static bool DoesLayerHaveMotion(DmeLogLayer<Vector3> logLayer)
+    private static bool DoesLayerHaveMotion(DmeVector3LogLayer logLayer)
     {
         if (logLayer.LayerValues.Length == 1)
         {

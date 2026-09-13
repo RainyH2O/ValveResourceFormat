@@ -976,7 +976,7 @@ public class CDmePolygonMeshDataArray : DMElement
     public int Size { get; set; }
 
     /// <summary>
-    /// Array of <see cref="CDmePolygonMeshDataStream{T}"/>.
+    /// Array of <see cref="CDmePolygonMeshDataStream"/>.
     /// </summary>
     public Datamodel.ElementArray Streams { get; } = [];
 }
@@ -993,7 +993,7 @@ public class CDmePolygonMeshSubdivisionData : DMElement
     public Datamodel.IntArray SubdivisionLevels { get; } = [];
 
     /// <summary>
-    /// Array of <see cref="CDmePolygonMeshDataStream{T}"/>.
+    /// Array of <see cref="CDmePolygonMeshDataStream"/>.
     /// </summary>
     public Datamodel.ElementArray Streams { get; } = [];
 }
@@ -1001,9 +1001,8 @@ public class CDmePolygonMeshSubdivisionData : DMElement
 /// <summary>
 /// One named data stream of a <see cref="CDmePolygonMeshDataArray"/>, such as position, uv, or material index.
 /// </summary>
-/// <typeparam name="T">Element type of <see cref="Data"/>.</typeparam>
 [CamelCaseProperties]
-public class CDmePolygonMeshDataStream<T> : DMElement
+public class CDmePolygonMeshDataStream : DMElement
 {
     /// <summary>
     /// Name Hammer knows this stream by, for example "position" or "texcoord".
@@ -1036,7 +1035,8 @@ public class CDmePolygonMeshDataStream<T> : DMElement
     public DMElement? SubdivisionBinding { get; init; }
 
     /// <summary>
-    /// An int, vector2, vector3, or vector4 array.
+    /// An int, vector2, vector3, or vector4 array: <see cref="Datamodel.IntArray"/>, <see cref="Datamodel.Vector2Array"/>,
+    /// <see cref="Datamodel.Vector3Array"/> or <see cref="Datamodel.Vector4Array"/>.
     /// </summary>
-    public required Datamodel.Array<T> Data { get; init; }
+    public System.Collections.IList? Data { get; init; }
 }

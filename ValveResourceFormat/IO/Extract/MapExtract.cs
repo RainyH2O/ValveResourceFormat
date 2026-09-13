@@ -630,18 +630,17 @@ public sealed partial class MapExtract
 
         static void GetTotalDataStreamSizes(Datamodel.ElementArray streams, ref int accumulatedMapMeshSize)
         {
-            CountSpecialType<int>(streams, ref accumulatedMapMeshSize);
-            CountSpecialType<float>(streams, ref accumulatedMapMeshSize);
-            CountSpecialType<Vector2>(streams, ref accumulatedMapMeshSize);
-            CountSpecialType<Vector3>(streams, ref accumulatedMapMeshSize);
-            CountSpecialType<Vector4>(streams, ref accumulatedMapMeshSize);
-
-            static void CountSpecialType<T>(Datamodel.ElementArray streams, ref int accumulatedMapMeshSize)
+            foreach (var dataStream in streams.OfType<CDmePolygonMeshDataStream>())
             {
-                foreach (var dataStream in streams.OfType<CDmePolygonMeshDataStream<T>>())
+                accumulatedMapMeshSize += dataStream.Data switch
                 {
-                    accumulatedMapMeshSize += GetArraySize(dataStream.Data);
-                }
+                    Datamodel.Array<int> array => GetArraySize(array),
+                    Datamodel.Array<float> array => GetArraySize(array),
+                    Datamodel.Array<Vector2> array => GetArraySize(array),
+                    Datamodel.Array<Vector3> array => GetArraySize(array),
+                    Datamodel.Array<Vector4> array => GetArraySize(array),
+                    _ => 0,
+                };
             }
         }
 
@@ -1151,7 +1150,7 @@ public sealed partial class MapExtract
 
         foreach (var mesh in candidates)
         {
-            var positions = mesh.MeshData.VertexData.Streams.OfType<CDmePolygonMeshDataStream<Vector3>>().FirstOrDefault(s => s.Name == "position:0")?.Data;
+            var positions = mesh.MeshData.VertexData.Streams.OfType<CDmePolygonMeshDataStream>().FirstOrDefault(s => s.Name == "position:0")?.Data as Datamodel.Array<Vector3>;
             if (positions is null)
             {
                 continue;

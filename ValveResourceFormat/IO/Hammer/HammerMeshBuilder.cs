@@ -387,37 +387,23 @@ namespace ValveResourceFormat.IO
 
             var mesh = new CDmePolygonMesh();
 
-            var faceTextureScales = CreateStream<Vector2Array, Vector2>(0, "textureScale:0");
-            var faceTextureAxesU = CreateStream<Vector4Array, Vector4>(0, "textureAxisU:0");
-            var faceTextureAxesV = CreateStream<Vector4Array, Vector4>(0, "textureAxisV:0");
-            var faceMaterialIndices = CreateStream<IntArray, int>(8, "materialindex:0");
-            var faceFlags = CreateStream<IntArray, int>(3, "flags:0");
-            var faceLightmapScaleBiases = CreateStream<IntArray, int>(1, "lightmapScaleBias:0");
-            mesh.FaceData.Streams.Add(faceTextureScales);
-            mesh.FaceData.Streams.Add(faceTextureAxesU);
-            mesh.FaceData.Streams.Add(faceTextureAxesV);
-            mesh.FaceData.Streams.Add(faceMaterialIndices);
-            mesh.FaceData.Streams.Add(faceFlags);
-            mesh.FaceData.Streams.Add(faceLightmapScaleBiases);
+            var faceTextureScales = CreateStream<Vector2Array>(mesh.FaceData, 0, "textureScale:0");
+            var faceTextureAxesU = CreateStream<Vector4Array>(mesh.FaceData, 0, "textureAxisU:0");
+            var faceTextureAxesV = CreateStream<Vector4Array>(mesh.FaceData, 0, "textureAxisV:0");
+            var faceMaterialIndices = CreateStream<IntArray>(mesh.FaceData, 8, "materialindex:0");
+            var faceFlags = CreateStream<IntArray>(mesh.FaceData, 3, "flags:0");
+            var faceLightmapScaleBiases = CreateStream<IntArray>(mesh.FaceData, 1, "lightmapScaleBias:0");
 
-            var texcoords = CreateStream<Vector2Array, Vector2>(1, "texcoord:0");
-            var texcoords1 = CreateStream<Vector2Array, Vector2>(1, "texcoord:1", "texcoord1");
-            var vertexpaintblendparams = CreateStream<Vector4Array, Vector4>(1, "VertexPaintBlendParams:0");
-            var vertexpainttintcolor = CreateStream<Vector4Array, Vector4>(1, "VertexPaintTintColor:0");
-            var normals = CreateStream<Vector3Array, Vector3>(1, "normal:0");
-            var tangents = CreateStream<Vector4Array, Vector4>(1, "tangent:0");
-            mesh.FaceVertexData.Streams.Add(texcoords);
-            mesh.FaceVertexData.Streams.Add(texcoords1);
-            mesh.FaceVertexData.Streams.Add(vertexpaintblendparams);
-            mesh.FaceVertexData.Streams.Add(vertexpainttintcolor);
-            mesh.FaceVertexData.Streams.Add(normals);
-            mesh.FaceVertexData.Streams.Add(tangents);
+            var texcoords = CreateStream<Vector2Array>(mesh.FaceVertexData, 1, "texcoord:0");
+            var texcoords1 = CreateStream<Vector2Array>(mesh.FaceVertexData, 1, "texcoord:1", "texcoord1");
+            var vertexpaintblendparams = CreateStream<Vector4Array>(mesh.FaceVertexData, 1, "VertexPaintBlendParams:0");
+            var vertexpainttintcolor = CreateStream<Vector4Array>(mesh.FaceVertexData, 1, "VertexPaintTintColor:0");
+            var normals = CreateStream<Vector3Array>(mesh.FaceVertexData, 1, "normal:0");
+            var tangents = CreateStream<Vector4Array>(mesh.FaceVertexData, 1, "tangent:0");
 
-            var vertexPositions = CreateStream<Vector3Array, Vector3>(3, "position:0");
-            mesh.VertexData.Streams.Add(vertexPositions);
+            var vertexPositions = CreateStream<Vector3Array>(mesh.VertexData, 3, "position:0");
 
-            var edgeFlags = CreateStream<IntArray, int>(3, "flags:0");
-            mesh.EdgeData.Streams.Add(edgeFlags);
+            var edgeFlags = CreateStream<IntArray>(mesh.EdgeData, 3, "flags:0");
 
             for (var i = 0; i < polygonMesh.Topology.VertexCount; i++)
             {
@@ -435,13 +421,13 @@ namespace ValveResourceFormat.IO
                 mesh.VertexDataIndices.Add(vertexDataIndex);
                 mesh.VertexData.Size++;
 
-                vertexPositions.Data.Add(polygonMesh.Positions[hVertex]);
+                vertexPositions.Add(polygonMesh.Positions[hVertex]);
             }
 
             for (var i = 0; i < activeHalfEdgeCount / 2; i++)
             {
                 mesh.EdgeData.Size++;
-                edgeFlags.Data.Add((int)EdgeFlag.None);
+                edgeFlags.Add((int)EdgeFlag.None);
             }
 
             for (var i = 0; i < polygonMesh.Topology.HalfEdgeCount; i++)
@@ -470,12 +456,12 @@ namespace ValveResourceFormat.IO
 
                 // corner data was fanned onto the half edge streams in WriteFaceData(),
                 // boundary half edges keep the stream defaults (zero)
-                normals.Data.Add(polygonMesh.Normals[hEdge]);
-                tangents.Data.Add(polygonMesh.Tangents[hEdge]);
-                texcoords.Data.Add(polygonMesh.TextureCoords[hEdge]);
-                texcoords1.Data.Add(polygonMesh.TextureCoords1[hEdge]);
-                vertexpaintblendparams.Data.Add(polygonMesh.VertexPaintBlendParams[hEdge]);
-                vertexpainttintcolor.Data.Add(polygonMesh.VertexPaintTintColor[hEdge]);
+                normals.Add(polygonMesh.Normals[hEdge]);
+                tangents.Add(polygonMesh.Tangents[hEdge]);
+                texcoords.Add(polygonMesh.TextureCoords[hEdge]);
+                texcoords1.Add(polygonMesh.TextureCoords1[hEdge]);
+                vertexpaintblendparams.Add(polygonMesh.VertexPaintBlendParams[hEdge]);
+                vertexpainttintcolor.Add(polygonMesh.VertexPaintTintColor[hEdge]);
             }
 
             foreach (var material in polygonMesh.Materials)
@@ -498,12 +484,12 @@ namespace ValveResourceFormat.IO
 
                 // texture projection parameters, the axes carry the texel offset in w
                 var textureOffset = polygonMesh.TextureOffset[hFace];
-                faceTextureScales.Data.Add(polygonMesh.TextureScale[hFace]);
-                faceTextureAxesU.Data.Add(new Vector4(polygonMesh.TextureUAxis[hFace], textureOffset.X));
-                faceTextureAxesV.Data.Add(new Vector4(polygonMesh.TextureVAxis[hFace], textureOffset.Y));
-                faceMaterialIndices.Data.Add(polygonMesh.MaterialIndex[hFace]);
-                faceFlags.Data.Add(0);
-                faceLightmapScaleBiases.Data.Add(0);
+                faceTextureScales.Add(polygonMesh.TextureScale[hFace]);
+                faceTextureAxesU.Add(new Vector4(polygonMesh.TextureUAxis[hFace], textureOffset.X));
+                faceTextureAxesV.Add(new Vector4(polygonMesh.TextureVAxis[hFace], textureOffset.Y));
+                faceMaterialIndices.Add(polygonMesh.MaterialIndex[hFace]);
+                faceFlags.Add(0);
+                faceLightmapScaleBiases.Add(0);
 
                 mesh.FaceEdgeIndices.Add(halfEdgeRemap[hFace.Edge.Index]);
             }
@@ -1082,26 +1068,20 @@ namespace ValveResourceFormat.IO
         }
 
         /// <summary>
-        /// Creates a named mesh data stream, optionally filled with initial values.
+        /// Adds a named, empty mesh data stream to a data array.
         /// </summary>
         /// <typeparam name="TArray">Datamodel array type backing the stream.</typeparam>
-        /// <typeparam name="T">Element type of the stream.</typeparam>
+        /// <param name="dataArray">Data array the stream is added to.</param>
         /// <param name="dataStateFlags">Flags describing how the stream is stored.</param>
         /// <param name="name">Stream name, in "semantic:index" form.</param>
         /// <param name="standardAttributeName">Name Hammer knows the stream by, defaults to the semantic.</param>
-        /// <param name="data">Values to seed the stream with.</param>
-        public static CDmePolygonMeshDataStream<T> CreateStream<TArray, T>(int dataStateFlags, string name, string? standardAttributeName = null, params T[] data)
-            where TArray : Array<T>, new()
-            where T : notnull
+        /// <returns>The array backing the stream, to be filled with its values.</returns>
+        public static TArray CreateStream<TArray>(CDmePolygonMeshDataArray dataArray, int dataStateFlags, string name, string? standardAttributeName = null)
+            where TArray : System.Collections.IList, new()
         {
+            var data = new TArray();
 
-            var dmArray = new TArray();
-            foreach (var item in data)
-            {
-                dmArray.Add(item);
-            }
-
-            var stream = new CDmePolygonMeshDataStream<T>
+            dataArray.Streams.Add(new CDmePolygonMeshDataStream
             {
                 Name = name,
                 StandardAttributeName = string.IsNullOrEmpty(standardAttributeName) ? name[..^2] : standardAttributeName,
@@ -1110,10 +1090,10 @@ namespace ValveResourceFormat.IO
                 VertexBufferLocation = 0,
                 DataStateFlags = dataStateFlags,
                 SubdivisionBinding = null,
-                Data = dmArray
-            };
+                Data = data
+            });
 
-            return stream;
+            return data;
         }
 
         internal static IList<T>? GetElementArraySafe<T>(Element Element, string elementName)
