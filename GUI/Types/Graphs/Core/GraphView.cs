@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Windows.Forms;
 using SkiaSharp;
 using ValveResourceFormat.Graphs;
@@ -37,15 +38,18 @@ partial class GraphView : IDisposable
     }
 
     public bool IsMoving { get; private set; }
+    public bool MultipleSelectionEnabled { get; set; }
     private SKPoint lastLocation;
     private SKPoint dragOrigin;
     private bool dragStarted;
+    private GraphNode? pendingToggleNode;
     private const float DragThreshold = 4f;
 
     // Synchronizes graph state between the render thread and UI mouse handlers.
     private readonly System.Threading.Lock stateLock = new();
 
     public event EventHandler? GraphChanged;
+    public event EventHandler? SelectionChanged;
 
     public int NodeCount => Document.NodeCount;
     public int WireCount => Document.WireCount;
@@ -66,6 +70,12 @@ partial class GraphView : IDisposable
     {
         VisualVersion++;
         GraphChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnSelectionChanged()
+    {
+        OnGraphChanged();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private bool straightWires;
@@ -182,7 +192,11 @@ partial class GraphView : IDisposable
 
             if (!IsMoving && hitNode is { } selectedNode)
             {
-                if (modifiers == Keys.Shift)
+                if (MultipleSelectionEnabled && (modifiers & Keys.Control) != 0)
+                {
+                    pendingToggleNode = selectedNode;
+                }
+                else if (modifiers == Keys.Shift)
                 {
                     ToggleSelection(selectedNode);
                 }
@@ -192,7 +206,7 @@ partial class GraphView : IDisposable
                 }
             }
 
-            if (!IsMoving && hitNode is { } node && Selection.PrimaryNode != null)
+            if (!IsMoving && hitNode is { } node && (Selection.PrimaryNode != null || pendingToggleNode != null))
             {
                 IsMoving = true;
                 dragStarted = false;
@@ -221,6 +235,13 @@ partial class GraphView : IDisposable
                 }
 
                 dragStarted = true;
+
+                if (pendingToggleNode != null)
+                {
+                    var node = pendingToggleNode;
+                    pendingToggleNode = null;
+                    SetPrimarySelection(node);
+                }
             }
 
             var delta = new Vector2(graphPoint.X - lastLocation.X, graphPoint.Y - lastLocation.Y);
@@ -265,8 +286,16 @@ partial class GraphView : IDisposable
         }
 
         lastLocation = graphPoint;
+        var wasDragging = dragStarted;
         IsMoving = false;
         dragStarted = false;
+
+        if (!wasDragging && pendingToggleNode != null)
+        {
+            var node = pendingToggleNode;
+            pendingToggleNode = null;
+            ToggleNodeSelection(node);
+        }
     }
 
     /// <summary>Abandons a live node drag, e.g. when focus is lost mid-gesture and the mouse-up will never arrive.</summary>
@@ -276,6 +305,7 @@ partial class GraphView : IDisposable
 
         IsMoving = false;
         dragStarted = false;
+        pendingToggleNode = null;
     }
 
     /// <summary>
@@ -379,19 +409,25 @@ partial class GraphView : IDisposable
     private void SelectWire(GraphWire wire)
     {
         Document.SelectWire(wire);
-        OnGraphChanged();
+        OnSelectionChanged();
     }
 
     private void SetPrimarySelection(GraphNode node)
     {
         Document.SelectNode(node);
-        MarkVisualDirty();
+        OnSelectionChanged();
     }
 
     private void ToggleSelection(GraphNode node)
     {
         Document.ToggleSelection(node);
-        OnGraphChanged();
+        OnSelectionChanged();
+    }
+
+    private void ToggleNodeSelection(GraphNode node)
+    {
+        Document.ToggleNodeSelection(node);
+        OnSelectionChanged();
     }
 
     /// <summary>Clears the current node or wire selection.</summary>
@@ -402,7 +438,7 @@ partial class GraphView : IDisposable
             Document.ClearSelection();
         }
 
-        OnGraphChanged();
+        OnSelectionChanged();
     }
 
     /// <summary>Returns the connected components of the graph (each node in exactly one list).</summary>
@@ -416,7 +452,29 @@ partial class GraphView : IDisposable
             Document.SelectNode(node);
         }
 
-        OnGraphChanged();
+        OnSelectionChanged();
+    }
+
+    /// <summary>Selects every node that is currently visible after graph filtering.</summary>
+    public void SelectAllVisibleNodes()
+    {
+        using (stateLock.EnterScope())
+        {
+            Document.SelectNodes(Nodes.Where(static node => !node.Hidden));
+        }
+
+        OnSelectionChanged();
+    }
+
+    /// <summary>Updates selection state without invalidating a viewer that does not own the render loop.</summary>
+    public void SynchronizeSelectedNodes(IEnumerable<GraphNode> selectedNodes)
+    {
+        using (stateLock.EnterScope())
+        {
+            Document.SelectNodes(selectedNodes.Where(static node => !node.Hidden));
+        }
+
+        MarkVisualDirty();
     }
 
     /// <summary>Live search filter: non-matching nodes render dimmed. Null or whitespace clears it.</summary>

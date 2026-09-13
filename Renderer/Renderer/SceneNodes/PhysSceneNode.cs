@@ -177,6 +177,9 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         /// <summary>Gets the index into <see cref="PhysAggregateData.CollisionAttributes"/> of the group this node draws.</summary>
         public int CollisionAttributeIndex { get; private init; }
 
+        /// <summary>Gets whether this node represents the default world collision group.</summary>
+        public bool IsDefaultGroup { get; init; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="PhysSceneNode"/> class from pre-built vertex and index lists.
         /// </summary>
@@ -391,6 +394,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 var attributes = phys.CollisionAttributes[collisionAttributeIndex];
                 var tags = PhysAggregateData.GetInteractAsTags(attributes);
                 var group = attributes.GetStringProperty("m_CollisionGroupString");
+                var isDefaultGroup = classname == null && group?.Equals("default", StringComparison.OrdinalIgnoreCase) == true;
 
                 var tooltexture = MapExtract.GetToolTextureShortenedName_ForInteractStrings([.. tags]);
 
@@ -404,7 +408,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 {
                     if (group != null)
                     {
-                        if (group.Equals("default", StringComparison.OrdinalIgnoreCase))
+                        if (isDefaultGroup)
                         {
                             physName = $"- default";
                         }
@@ -460,7 +464,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                         {
                             AddMeshTriangles(chunkVerts, chunkInds, chunkLines, mesh, triangles, meshEdges, lineCorners, chunk);
 
-                            physSceneNodes.Add(CreateNode(scene, phys, chunkVerts, chunkInds, chunkLines, physName, fileName, collisionAttributeIndex, toolMaterialName));
+                            physSceneNodes.Add(CreateNode(scene, phys, chunkVerts, chunkInds, chunkLines, physName, fileName, collisionAttributeIndex, isDefaultGroup, toolMaterialName));
 
                             chunkVerts.Clear();
                             chunkInds.Clear();
@@ -476,7 +480,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
 
                 if (inds.Count > 0 || !groupHasNode)
                 {
-                    physSceneNodes.Add(CreateNode(scene, phys, verts, inds, lines, physName, fileName, collisionAttributeIndex, toolMaterialName));
+                    physSceneNodes.Add(CreateNode(scene, phys, verts, inds, lines, physName, fileName, collisionAttributeIndex, isDefaultGroup, toolMaterialName));
                 }
 
                 // PhysSceneNode uploads verts to the gpu and does not keep them around
@@ -492,7 +496,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         }
 
         // The line indices are appended after the triangle indices
-        private static PhysSceneNode CreateNode(Scene scene, PhysAggregateData phys, List<SimpleVertexNormal> verts, List<int> inds, List<int> lines, string physName, string? fileName, int collisionAttributeIndex, string? toolMaterialName)
+        private static PhysSceneNode CreateNode(Scene scene, PhysAggregateData phys, List<SimpleVertexNormal> verts, List<int> inds, List<int> lines, string physName, string? fileName, int collisionAttributeIndex, bool isDefaultGroup, string? toolMaterialName)
         {
             inds.AddRange(lines);
 
@@ -516,6 +520,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 OverlayRenderOrder = collisionAttributeIndex,
                 Physics = phys,
                 CollisionAttributeIndex = collisionAttributeIndex,
+                IsDefaultGroup = isDefaultGroup,
             };
 
             if (toolMaterialName != null)

@@ -27,9 +27,13 @@ public enum LightingBindingDisplay
 /// the lighting it uses. Lines and faces are solid where the scene does not hide them, and faint over it.
 /// The outline itself is drawn by the renderer for every node with <see cref="SceneNode.IsSelected"/>.
 /// </summary>
-public sealed class SelectionVisuals
+public class SelectionVisuals
 {
-    private static readonly Vector2 NodeNameOffset = new(0, -20);
+    /// <summary>The screen height of the node label in pixels per em.</summary>
+    protected const float NodeLabelScale = 14f;
+
+    /// <summary>The screen offset of the node label from the top of its bounds.</summary>
+    protected static readonly Vector2 NodeNameOffset = new(0, -20);
     private static readonly Color32 LightingBindingColor = new(1.0f, 0.0f, 1.0f, 1.0f);
 
     private readonly SelectionSet selection;
@@ -43,6 +47,15 @@ public sealed class SelectionVisuals
 
     /// <summary>Gets or sets which lighting is shown linked to each selected node.</summary>
     public LightingBindingDisplay LightingBindings { get; set; }
+
+    /// <summary>Gets the nodes whose helpers are drawn in this frame.</summary>
+    protected virtual IReadOnlyList<SceneNode> HighlightedNodes => selection.Nodes;
+
+    /// <summary>Gets whether bounding boxes include their edge lengths.</summary>
+    protected virtual bool ShowDimensions => true;
+
+    /// <summary>Gets whether helpers remain fully visible through the scene.</summary>
+    protected virtual bool IgnoreDepth => false;
 
     /// <summary>Creates the buffers the helpers are drawn with.</summary>
     /// <param name="rendererContext">Renderer context for loading shaders.</param>
@@ -64,7 +77,7 @@ public sealed class SelectionVisuals
     /// <param name="updateContext">Update context providing the text renderer.</param>
     public void Update(Scene.RenderContext renderContext, Scene.UpdateContext updateContext)
     {
-        var nodes = selection.Nodes;
+        var nodes = HighlightedNodes;
 
         if (nodes.Count == 0)
         {
@@ -105,7 +118,7 @@ public sealed class SelectionVisuals
         overlayFaces.Draw(0, overlayFaces.VertexCount, primitive: PrimitiveType.Triangles);
 
         // Faces pull further towards the camera, so they still show where they lie on the scene's surfaces
-        shader.SetUniform("g_bDepthTest", true);
+        shader.SetUniform("g_bDepthTest", !IgnoreDepth);
         shader.SetUniform("g_flDepthTolerance", 0.004f);
         faces.Draw(0, faces.VertexCount, primitive: PrimitiveType.Triangles);
 
@@ -160,18 +173,36 @@ public sealed class SelectionVisuals
         // The helpers show the entity better than the bounds of its editor model
         if (!(hasHelpers && node.LayerName == HammerEntityVisuals.MarkerLayerName) && !node.IsPointMarker)
         {
-            BoxLines.AddWithSize(vertices, node.Transform * toWorld, node.LocalBoundingBox, Color32.White, camera, textRenderer);
+            if (ShowDimensions)
+            {
+                BoxLines.AddWithSize(vertices, node.Transform * toWorld, node.LocalBoundingBox, Color32.White, camera, textRenderer);
+            }
+            else
+            {
+                BoxLines.Add(vertices, node.Transform * toWorld, node.LocalBoundingBox, Color32.White);
+            }
         }
 
         AddLightingBindings(node, toWorld, bounds.Center);
 
+        AddNodeLabel(camera, textRenderer, node, nodeName, bounds);
+    }
+
+    /// <summary>Queues the label above a node's bounds in viewer world coordinates.</summary>
+    /// <param name="camera">The camera drawing the helpers.</param>
+    /// <param name="textRenderer">The renderer receiving the labels.</param>
+    /// <param name="node">The highlighted node.</param>
+    /// <param name="nodeName">The node or entity class name.</param>
+    /// <param name="bounds">The bounds in viewer world coordinates.</param>
+    protected virtual void AddNodeLabel(Camera camera, TextRenderer textRenderer, SceneNode node, string nodeName, AABB bounds)
+    {
         // draw node name above the bounding box
         var position = bounds.Center;
         position.Z = bounds.Max.Z;
 
         textRenderer.AddTextBillboard(position, new TextRenderer.TextRenderRequest
         {
-            Scale = 14f,
+            Scale = NodeLabelScale,
             Text = nodeName,
             CenterHorizontal = true,
             TextOffset = NodeNameOffset

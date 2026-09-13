@@ -283,6 +283,8 @@ public sealed class SceneViewState : IDisposable
     {
         ArgumentNullException.ThrowIfNull(camera);
 
+        using var selectionScope = Scene.SelectionSynchronization.EnterScope();
+
         foreach (var bucket in renderLists.Values)
         {
             bucket.Clear();

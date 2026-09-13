@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 
 namespace ValveResourceFormat.Renderer.Editor.Selection;
@@ -8,8 +9,10 @@ namespace ValveResourceFormat.Renderer.Editor.Selection;
 /// </summary>
 public sealed class SelectionSet
 {
-    private readonly Lock changeLock = new();
     private SceneNode[] nodes = [];
+
+    /// <summary>Occurs after the selected nodes change.</summary>
+    public event EventHandler? Changed;
 
     /// <summary>Gets the selected nodes, in the order they were selected.</summary>
     public IReadOnlyList<SceneNode> Nodes => Volatile.Read(ref nodes);
@@ -21,7 +24,7 @@ public sealed class SelectionSet
     /// <param name="node">The node to select, or <see langword="null"/> to clear the selection.</param>
     public void Select(SceneNode? node)
     {
-        using var _ = changeLock.EnterScope();
+        using var synchronization = Scene.SelectionSynchronization.EnterScope();
 
         foreach (var selected in nodes)
         {
@@ -31,11 +34,14 @@ public sealed class SelectionSet
         if (node == null)
         {
             Volatile.Write(ref nodes, []);
-            return;
+        }
+        else
+        {
+            node.IsSelected = true;
+            Volatile.Write(ref nodes, [node]);
         }
 
-        node.IsSelected = true;
-        Volatile.Write(ref nodes, [node]);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Clears the selection.</summary>
@@ -47,7 +53,7 @@ public sealed class SelectionSet
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        using var _ = changeLock.EnterScope();
+        using var synchronization = Scene.SelectionSynchronization.EnterScope();
 
         var index = Array.IndexOf(nodes, node);
 
@@ -55,10 +61,44 @@ public sealed class SelectionSet
         {
             node.IsSelected = false;
             Volatile.Write(ref nodes, [.. nodes.AsSpan(0, index), .. nodes.AsSpan(index + 1)]);
+        }
+        else
+        {
+            node.IsSelected = true;
+            Volatile.Write(ref nodes, [.. nodes, node]);
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Replaces the selection with the given nodes, preserving their order.</summary>
+    /// <param name="newNodes">The nodes to select.</param>
+    public void Replace(IEnumerable<SceneNode> newNodes)
+    {
+        ArgumentNullException.ThrowIfNull(newNodes);
+
+        var replacement = newNodes
+            .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+            .ToArray();
+
+        using var synchronization = Scene.SelectionSynchronization.EnterScope();
+
+        if (nodes.SequenceEqual(replacement))
+        {
             return;
         }
 
-        node.IsSelected = true;
-        Volatile.Write(ref nodes, [.. nodes, node]);
+        foreach (var selected in nodes)
+        {
+            selected.IsSelected = false;
+        }
+
+        foreach (var node in replacement)
+        {
+            node.IsSelected = true;
+        }
+
+        Volatile.Write(ref nodes, replacement);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }

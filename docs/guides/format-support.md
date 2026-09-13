@@ -58,7 +58,7 @@ in the Dump column.
 | vdvn     | Dota Visual Novels         | text                          | generic | KV3 text                                                                                                     |
 | vents    | Entity Lump                | graph, text                   | yes     | entity dump; glTF/GLB; included in map exports                                                               |
 | vjs      | Panorama Script            | text                          | yes     | `.js` (byte-exact; see [Panorama](#choreo-captions-and-ui))                                                  |
-| vmap     | Map                        | 3D                            | yes     | `.vmap` (Hammer); glTF/GLB                                                                                   |
+| vmap     | Map                        | 3D                            | yes     | `.vmap` (Hammer); glTF/GLB; [entity JSON export](./command-line.md#export-entities-from-a-map)                 |
 | vmat     | Material                   | 3D                            | yes     | `.vmat` + unpacked texture inputs                                                                            |
 | vmdl     | Model                      | 3D                            | yes     | `.vmdl` + DMX; glTF/GLB                                                                                      |
 | vmesh    | Mesh                       | 3D                            | yes     | glTF/GLB; also handled via vmdl                                                                              |
@@ -93,7 +93,7 @@ in the Dump column.
 | vvis     | World Visibility           | 3D                            | yes     | -                                                                                                            |
 | vwenvmap | World Environment Maps     | text                          | generic | - (legacy, only in older map compiles)                                                                       |
 | vwnod    | World Node                 | 3D                            | yes     | handled via vmap/glTF export                                                                                 |
-| vwrld    | World                      | 3D                            | yes     | `.vmap` (Hammer); glTF/GLB                                                                                   |
+| vwrld    | World                      | 3D                            | yes     | `.vmap` (Hammer); glTF/GLB; [entity JSON export](./command-line.md#export-entities-from-a-map)                 |
 | vwrlt    | World Lighting             | text                          | generic | - (legacy, only in older map compiles)                                                                       |
 | vxml     | Panorama Layout            | text                          | yes     | `.xml` (structural decompile)                                                                                |
 | econitem | Economy Item               | text                          | generic | KV3 text                                                                                                     |
@@ -211,6 +211,14 @@ Not implemented yet:
 | Clutter                      | Procedural scatter objects such as compiled detail props are not decompiled; the viewer thins them per instance by screen size on the GPU, and instances pop instead of fading.                                               |
 | Physics spheres and capsules | Only physics hulls and meshes are turned into Hammer geometry.                                                                                                                                                                |
 | 3D skybox bundling           | `skybox_reference` keeps its properties, but the referenced skybox map is not decompiled and bundled automatically (same for glTF export, [#967](https://github.com/ValveResourceFormat/ValveResourceFormat/issues/967)).     |
+
+### Entity JSON export
+
+See the [command-line guide](./command-line.md#export-entities-from-a-map) for usage.
+
+| What         | Limitation                                                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Entity data  | Static entity properties and available I/O connections; no template instance transforms, trigger geometry, scripts, or runtime state. |
 
 For glTF map exports, additionally: only `light_environment` is exported as a light (point
 and spot lights are not), entities carrying no model at all (logic, cameras, point

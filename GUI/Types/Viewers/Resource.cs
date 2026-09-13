@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GUI.Controls;
+using GUI.Forms;
 using GUI.Types.Audio;
 using GUI.Types.GLViewers;
 using GUI.Types.Graphs;
@@ -48,6 +49,7 @@ namespace GUI.Types.Viewers
         public GLBaseControl? GLViewer { get; private set; }
         private CodeTextBox? GLViewerError;
         private string? GLViewerTabName;
+        private EntityIOGraphWindow? entityIOGraphWindow;
 
         public static bool IsAccepted(uint magic)
         {
@@ -525,6 +527,8 @@ namespace GUI.Types.Viewers
                         {
                             worldViewerWithGraph.ShowEntityInGraph = entity => ShowEntityInGraph(entity, graph, tabPage);
                             worldViewerWithGraph.EntityHasGraphNode = entity => !graph.IsCompleted || (graph.Result as EntityIOGraphViewer)?.HasEntity(entity) == true;
+                            TabWindowMenu.Register(resTabs, tabPage,
+                                () => OpenEntityIOGraphWindow(worldViewerWithGraph));
                         }
                     }
                 }
@@ -545,6 +549,35 @@ namespace GUI.Types.Viewers
             resTabs.TabPages.Add(tabPage);
 
             return (tabPage, LoadGraphViewerAsync(create, tabPage, loadingFile));
+        }
+
+        private void OpenEntityIOGraphWindow(GLWorldViewer worldViewer)
+        {
+            if (entityIOGraphWindow != null)
+            {
+                entityIOGraphWindow.Activate();
+                return;
+            }
+
+            if (worldViewer.LoadedWorld == null)
+            {
+                return;
+            }
+
+            var window = new EntityIOGraphWindow(vrfGuiContext, worldViewer);
+            window.Closed += OnEntityIOGraphWindowClosed;
+            entityIOGraphWindow = window;
+            window.Show();
+        }
+
+        private void OnEntityIOGraphWindowClosed(object? sender, EventArgs e)
+        {
+            if (sender is EntityIOGraphWindow window)
+            {
+                window.Closed -= OnEntityIOGraphWindowClosed;
+            }
+
+            entityIOGraphWindow = null;
         }
 
         // Built and loaded off the UI thread, each in its own renderer context as the viewers share no GL objects
@@ -1344,6 +1377,8 @@ namespace GUI.Types.Viewers
         public void Dispose()
         {
             // Order matters: a resource must not be disposed while any thread may still be reading it.
+            entityIOGraphWindow?.Dispose();
+            entityIOGraphWindow = null;
             GLViewer?.Dispose();
             rendererContext?.Dispose();
             resource?.Dispose();

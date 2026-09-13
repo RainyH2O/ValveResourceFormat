@@ -36,6 +36,8 @@ namespace ValveResourceFormat.Renderer.SceneNodes
 
         // Line index pairs that follow the triangle indices, drawn instead of a wireframe
         private int lineIndexCount;
+        private int vboHandle;
+        private int iboHandle;
 
         /// <summary>Gets the vertex array state for this shape.</summary>
         protected int vao { get; private set; }
@@ -131,10 +133,21 @@ namespace ValveResourceFormat.Renderer.SceneNodes
             indexCount = inds.Count;
 
             var label = GetType().Name;
-            var vboHandle = GraphicsDevice.CreateBuffer<SimpleVertexNormal>(label, CollectionsMarshal.AsSpan(verts), BufferUsage.Static);
-            var iboHandle = GraphicsDevice.CreateBuffer<int>(label, CollectionsMarshal.AsSpan(inds), BufferUsage.Static);
+            vboHandle = GraphicsDevice.CreateBuffer<SimpleVertexNormal>(label, CollectionsMarshal.AsSpan(verts), BufferUsage.Static);
+            iboHandle = GraphicsDevice.CreateBuffer<int>(label, CollectionsMarshal.AsSpan(inds), BufferUsage.Static);
 
             vao = SimpleVertexNormal.InputLayout.CreateVertexArray(nameof(ShapeSceneNode), vboHandle, iboHandle);
+        }
+
+        /// <inheritdoc/>
+        public override void Delete()
+        {
+            VertexArray.Delete(vao);
+            GL.DeleteBuffer(vboHandle);
+            GL.DeleteBuffer(iboHandle);
+            vao = 0;
+            vboHandle = 0;
+            iboHandle = 0;
         }
 
         /// <summary>Appends capsule geometry (two hemispheres and a cylinder band) to the given vertex and index lists.</summary>

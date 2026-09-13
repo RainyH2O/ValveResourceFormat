@@ -2075,6 +2075,8 @@ public class Renderer : ISpawnGroupHost
         var pvsPosition = LockedCullPosition ?? updateContext.Camera.Location;
         var pvsEnabled = !DisableAllCulling && Scene.EnablePvsCulling;
 
+        using var selectionScope = Scene.SelectionSynchronization.EnterScope();
+
         foreach (var view in views)
         {
             // Sky views cull from the main eye mapped into sky space; an eye outside the sky visibility culls nothing

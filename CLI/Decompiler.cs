@@ -153,8 +153,10 @@ namespace CLI
         /// <param name="test_gltf">When using --test, also test glTF export code path for every supported file.</param>
         /// <param name="test_shaders">When using --test, also decompile a few variants of every shader program and reconstruct each shader once.</param>
         /// <param name="test_entity_keys">When using --test, save all unknown entity key hashes to unknown_keys.txt.</param>
+        /// <param name="export_entities">Export a Map or World resource's entities to a JSON file.</param>
+        /// <param name="export_entities_map">Find a Counter-Strike 2 map by name and export its entities to JSON.</param>
         private int HandleArguments(
-            string input,
+            string? input = default,
             bool recursive = false,
             bool recursive_vpk = false,
             [HideDefaultValue] string? vpk_extensions = default,
@@ -199,18 +201,20 @@ namespace CLI
             bool test_vertex_attributes = false,
             bool test_gltf = false,
             bool test_shaders = false,
-            bool test_entity_keys = false
+            bool test_entity_keys = false,
+            bool export_entities = false,
+            [HideDefaultValue] string? export_entities_map = default
         )
         {
             // When you modify the arguments, don't forget to update the command-line.md documentation file too.
-            if (string.IsNullOrWhiteSpace(input))
+            if (string.IsNullOrWhiteSpace(input) && export_entities_map == null)
             {
                 Console.Error.WriteLine("--input is empty.");
                 return 1;
             }
 
             // A "vpk:" link copied from Source 2 Viewer, which can point to a file or folder inside of the package
-            if (VpkLink.IsVpkLink(input))
+            if (!string.IsNullOrWhiteSpace(input) && VpkLink.IsVpkLink(input))
             {
                 var (packagePaths, linkedPath) = VpkLink.Parse(input);
 
@@ -243,18 +247,21 @@ namespace CLI
             }
 
             // Paths can be relative to a Steam app, such as "steam:730/game/csgo"
-            var inputs = input.Split(',');
-
-            for (var i = 0; i < inputs.Length; i++)
+            if (!string.IsNullOrWhiteSpace(input))
             {
-                if (!GameFolderLocator.TryResolveSteamAppPath(inputs[i].Trim(), out inputs[i], out var inputError))
-                {
-                    Console.Error.WriteLine(inputError);
-                    return 1;
-                }
-            }
+                var inputs = input.Split(',');
 
-            input = string.Join(',', inputs);
+                for (var i = 0; i < inputs.Length; i++)
+                {
+                    if (!GameFolderLocator.TryResolveSteamAppPath(inputs[i].Trim(), out inputs[i], out var inputError))
+                    {
+                        Console.Error.WriteLine(inputError);
+                        return 1;
+                    }
+                }
+
+                input = string.Join(',', inputs);
+            }
 
             if (game != null && !GameFolderLocator.TryResolveSteamAppPath(game, out game, out var gameError))
             {
@@ -268,10 +275,10 @@ namespace CLI
             gltf_export_animations |= gltf_animation_list != null;
             gltf_export_materials |= gltf_textures_adapt;
 
-            var isSteamInput = input.Equals("steam", StringComparison.OrdinalIgnoreCase) && !Path.Exists(input);
+            var isSteamInput = input?.Equals("steam", StringComparison.OrdinalIgnoreCase) == true && !Path.Exists(input);
             var hasFilters = vpk_extensions != null || vpk_filepath != null || LinkedFilePath != null;
 
-            InputFile = isSteamInput ? "steam" : Path.GetFullPath(input);
+            InputFile = isSteamInput ? "steam" : string.IsNullOrWhiteSpace(input) ? string.Empty : Path.GetFullPath(input);
             OutputFile = output;
             Decompile = decompile;
             ExtractOptions = new FileExtractOptions { ReconstructSoftbody = !skip_softbody_reconstruction };
@@ -531,7 +538,24 @@ namespace CLI
 
             FileLoaderLogger = new StderrLogger(Quiet ? LogLevel.Warning : LogLevel.Information);
 
-            return Execute();
+            if (export_entities && export_entities_map != null)
+            {
+                Console.Error.WriteLine("Use either --export_entities or --export_entities_map, not both.");
+                return 1;
+            }
+
+            if (export_entities_map != null)
+            {
+                return ExecuteEntityExportMap(export_entities_map);
+            }
+
+            if (InputFile.Length == 0)
+            {
+                Console.Error.WriteLine("--input is required unless --export_entities_map is used.");
+                return 1;
+            }
+
+            return export_entities ? ExecuteEntityExport() : Execute();
         }
 
         private int Execute()

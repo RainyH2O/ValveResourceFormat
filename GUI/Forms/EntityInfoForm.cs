@@ -15,8 +15,8 @@ namespace GUI.Forms
 
         public EntityInfoForm()
         {
-            Width = 800;
-            Height = 450;
+            ClientSize = new System.Drawing.Size(1120, 640);
+            MinimumSize = new System.Drawing.Size(640, 360);
             Text = "EntityInfoForm";
 
             EntityInfoControl = new()
@@ -58,6 +58,14 @@ namespace GUI.Forms
             if (SavedWindowPlacement is { } placement)
             {
                 PInvoke.SetWindowPlacement((Windows.Win32.Foundation.HWND)Handle, placement);
+            }
+            else
+            {
+                var area = Screen.FromControl(this).WorkingArea;
+                var size = LogicalToDeviceUnits(new System.Drawing.Size(1120, 640));
+                ClientSize = new System.Drawing.Size(Math.Min(size.Width, area.Width * 9 / 10), Math.Min(size.Height, area.Height * 9 / 10));
+                Location = new System.Drawing.Point(Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - Width)),
+                    Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - Height)));
             }
         }
 

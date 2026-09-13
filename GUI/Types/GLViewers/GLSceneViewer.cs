@@ -100,6 +100,12 @@ namespace GUI.Types.GLViewers
         private InfiniteGrid? baseGrid;
         private SelectionVisuals? selectionVisuals;
 
+        /// <summary>Gets whether this viewer uses the standard editor selection helpers.</summary>
+        protected virtual bool UseSelectionVisuals => true;
+
+        /// <summary>Gets the highlight manager used by viewers with custom selection visuals.</summary>
+        protected SelectedNodeRenderer? SelectedNodeRenderer { get; private set; }
+
         static readonly TimeSpan FpsUpdateTimeSpan = TimeSpan.FromSeconds(0.1);
 
         private readonly float[] frameTimes = new float[30];
@@ -149,6 +155,9 @@ namespace GUI.Types.GLViewers
 
             QuadOverdrawRenderer?.Dispose();
             QuadOverdrawRenderer = null;
+
+            SelectedNodeRenderer?.Delete();
+            SelectedNodeRenderer = null;
 
             Renderer?.Dispose();
 
@@ -515,7 +524,8 @@ namespace GUI.Types.GLViewers
             Renderer.Postprocess.ExposureCompensation = -0.4f; // eyeballed
 
             baseGrid = new InfiniteGrid(Scene);
-            selectionVisuals = new(Scene.RendererContext, Selection);
+            selectionVisuals = UseSelectionVisuals ? new(Scene.RendererContext, Selection) : null;
+            SelectedNodeRenderer = UseSelectionVisuals ? null : new(Scene.RendererContext, Selection);
             Picker = new(Scene.RendererContext, OnPicked);
 
             QuadOverdrawRenderer = new(Scene.RendererContext);
@@ -789,6 +799,11 @@ namespace GUI.Types.GLViewers
             {
                 selectionVisuals.Render(Renderer.ResolvedSceneDepth);
             }
+
+            if (SelectedNodeRenderer != null && Renderer.ResolvedSceneDepth != null)
+            {
+                SelectedNodeRenderer.Render(Renderer.ResolvedSceneDepth);
+            }
         }
 
         protected override void OnBufferSwapped(double blockedMs, double framePeriodMs)
@@ -800,7 +815,7 @@ namespace GUI.Types.GLViewers
         {
             Debug.Assert(MainFramebuffer != null);
             Debug.Assert(Picker != null);
-            Debug.Assert(selectionVisuals != null);
+            Debug.Assert(selectionVisuals != null || SelectedNodeRenderer != null);
 
             Renderer.PerfStats.Capture = perfDisplay == PerfDisplay.Stats || CaptureStats;
             Renderer.PerfStats.Timings.Capture = perfDisplay == PerfDisplay.Timings || CaptureStats;
@@ -834,6 +849,8 @@ namespace GUI.Types.GLViewers
                     Camera = Renderer.Camera,
                 };
 
+                using var selectionScope = Scene.SelectionSynchronization.EnterScope();
+                SelectedNodeRenderer?.UpdateLightingHighlights();
                 Renderer.Update(updateContext);
 
                 Input.LateUpdate(Renderer.Camera);
@@ -849,14 +866,14 @@ namespace GUI.Types.GLViewers
                     }, Renderer.Camera);
                 }
 
-                selectionVisuals.Update(renderContext, updateContext);
+                selectionVisuals?.Update(renderContext, updateContext);
+                SelectedNodeRenderer?.Update(renderContext, updateContext);
+                Renderer.ForceResolveSceneDepth = ShowBaseGrid || !Selection.IsEmpty || SelectedNodeRenderer?.HasSelectedNodes == true;
             }
 
             // After the update, so the listener is placed with this frame's camera vectors rather than
             // this frame's position and last frame's facing
             UpdateSoundPlayer();
-
-            Renderer.ForceResolveSceneDepth = ShowBaseGrid || !Selection.IsEmpty;
 
             var quadOverdrawThisFrame = false;
 
@@ -1262,7 +1279,7 @@ namespace GUI.Types.GLViewers
         private void SetRenderMode(string renderMode)
         {
             Debug.Assert(Picker != null);
-            Debug.Assert(selectionVisuals != null);
+            Debug.Assert(selectionVisuals != null || SelectedNodeRenderer != null);
 
             Renderer.ViewBuffer!.Data!.RenderMode = RenderModes.GetShaderId(renderMode);
 
@@ -1283,12 +1300,17 @@ namespace GUI.Types.GLViewers
 
             ApplyCubemapColors();
 
-            selectionVisuals.LightingBindings = renderMode switch
+            if (selectionVisuals != null)
             {
-                "Cubemaps" => LightingBindingDisplay.EnvMaps,
-                "Irradiance" or "Illumination" => LightingBindingDisplay.LightProbe,
-                _ => LightingBindingDisplay.None,
-            };
+                selectionVisuals.LightingBindings = renderMode switch
+                {
+                    "Cubemaps" => LightingBindingDisplay.EnvMaps,
+                    "Irradiance" or "Illumination" => LightingBindingDisplay.LightProbe,
+                    _ => LightingBindingDisplay.None,
+                };
+            }
+
+            SelectedNodeRenderer?.SetRenderMode(renderMode);
 
             currentRenderMode = renderMode;
             ApplyRenderModeToNodes();
