@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
 
 namespace ValveResourceFormat.ResourceTypes
@@ -302,7 +303,9 @@ namespace ValveResourceFormat.ResourceTypes
         /// <remarks>
         /// Callers with a meaningful default need this rather than <see cref="ParseVector3"/>, whose zero
         /// is indistinguishable from a genuine "0 0 0" - a malformed "scales" falling back to zero rather
-        /// than to one collapses the thing being scaled.
+        /// than to one collapses the thing being scaled. Whitespace is the standard separator; punctuation
+        /// and symbols can also separate or surround components, except for signs and decimal points. Only
+        /// finite values are accepted.
         /// </remarks>
         /// <param name="input">The input string.</param>
         /// <param name="value">The parsed vector, or zero if the input is not three numbers.</param>
@@ -316,12 +319,20 @@ namespace ValveResourceFormat.ResourceTypes
                 return false;
             }
 
-            var split = input.Split(' ');
+            var normalizedInput = string.Concat(input.Select(static character =>
+                (char.IsWhiteSpace(character) || char.IsPunctuation(character) || char.IsSymbol(character))
+                    && character is not '+' and not '-' and not '.'
+                    ? ' '
+                    : character));
+            var split = normalizedInput.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
             if (split.Length != 3
                 || !float.TryParse(split[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
                 || !float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y)
-                || !float.TryParse(split[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var z))
+                || !float.TryParse(split[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var z)
+                || !float.IsFinite(x)
+                || !float.IsFinite(y)
+                || !float.IsFinite(z))
             {
                 return false;
             }

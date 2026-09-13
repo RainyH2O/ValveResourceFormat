@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using ValveResourceFormat.Renderer.SceneEnvironment;
 using ValveResourceFormat.Renderer.SceneNodes;
 using ValveResourceFormat.Renderer.World;
@@ -17,49 +18,259 @@ namespace ValveResourceFormat.Renderer
         private bool debugCubeMaps;
         private bool debugLightProbes;
         private readonly List<SceneNode> selectedNodes = new(1);
+        private readonly List<SceneNode> pinnedNodes = [];
+        private HashSet<SceneNode> pinnedNodeSet = new(ReferenceEqualityComparer.Instance);
         private readonly List<SimpleVertex> vertices = new(48);
+        private readonly Lock selectionLock = new();
+        private readonly RendererContext rendererContext;
+        private SelectionScreenMarkerRenderer? screenMarkerRenderer;
 
+        private const float SelectedLabelScale = 20f;
+        private const float SelectedLabelLineHeight = 1.32f;
+        private const float SelectedLabelPadding = 8f;
         private readonly Vector2 SelectedNodeNameOffset = new(0, -20);
 
         /// <summary>Gets or sets optional debug text rendered in the top-left corner of the viewport.</summary>
         public string ScreenDebugText { get; set; } = string.Empty;
 
         /// <summary>Gets a value indicating whether any node is currently selected.</summary>
-        public bool HasSelectedNodes => selectedNodes.Count > 0;
+        public bool HasSelectedNodes
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return selectedNodes.Count > 0;
+            }
+        }
+
+        /// <summary>Gets the primary selected node, or <see langword="null"/> if nothing is selected.</summary>
+        public SceneNode? SelectedNode
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return selectedNodes.Count > 0 ? selectedNodes[0] : null;
+            }
+        }
+
+        /// <summary>Gets the currently selected scene nodes.</summary>
+        public IReadOnlyList<SceneNode> SelectedNodes
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return [.. selectedNodes];
+            }
+        }
+
+        /// <summary>Gets the scene nodes whose highlight is pinned independently of ordinary selection.</summary>
+        public IReadOnlyList<SceneNode> PinnedNodes
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return [.. pinnedNodes];
+            }
+        }
+
+        /// <summary>Occurs when the selected scene-node collection changes.</summary>
+        public event EventHandler? SelectionChanged;
 
         /// <summary>Initializes the selected node renderer and creates GPU resources.</summary>
         /// <param name="rendererContext">Renderer context for loading shaders.</param>
         public SelectedNodeRenderer(RendererContext rendererContext)
             : base(rendererContext, nameof(SelectedNodeRenderer))
         {
+            this.rendererContext = rendererContext;
         }
+
+        /// <summary>Gets or sets the visual settings used for selected nodes.</summary>
+        public SelectionHighlightSettings HighlightSettings { get; set; } = SelectionHighlightSettings.Default;
 
         /// <summary>Toggles selection of the given node, adding it if not selected or removing it if already selected.</summary>
         /// <param name="node">The scene node to toggle.</param>
         public void ToggleNode(SceneNode node)
         {
-            var selectedNode = selectedNodes.IndexOf(node);
-
-            if (selectedNode >= 0)
+            using (Scene.SelectionSynchronization.EnterScope())
+            using (selectionLock.EnterScope())
             {
-                selectedNodes.RemoveAt(selectedNode);
-                node.IsSelected = false;
+                var selectedNode = selectedNodes.IndexOf(node);
 
-                if (node.LightProbeBinding is { } probe)
+                if (selectedNode >= 0)
                 {
-                    var probeStillInUse = selectedNodes.Any(n => n.LightProbeBinding == probe);
+                    selectedNodes.RemoveAt(selectedNode);
+                    node.IsSelected = pinnedNodeSet.Contains(node);
 
-                    if (!probeStillInUse)
+                    if (node.LightProbeBinding is { } probe)
                     {
-                        probe.RemoveDebugGridSpheres();
+                        var probeStillInUse = selectedNodes.Concat(pinnedNodes).Any(n => n.LightProbeBinding == probe);
+
+                        if (!probeStillInUse)
+                        {
+                            probe.RemoveDebugGridSpheres();
+                        }
                     }
                 }
+                else
+                {
+                    selectedNodes.Add(node);
+                    node.IsSelected = true;
+                }
             }
-            else
+
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Replaces the ordinary selection with the given scene nodes.</summary>
+        /// <param name="nodes">The scene nodes to select, in primary-selection order.</param>
+        /// <param name="forceDisableDepth">When <see langword="true"/>, the selection overlay is drawn without depth testing.</param>
+        public void SetSelectedNodes(IEnumerable<SceneNode> nodes, bool forceDisableDepth = false)
+        {
+            var newNodes = nodes
+                .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+                .ToArray();
+            bool selectionChanged;
+
+            using (Scene.SelectionSynchronization.EnterScope())
+            using (selectionLock.EnterScope())
             {
-                selectedNodes.Add(node);
-                node.IsSelected = true;
+                selectionChanged = !selectedNodes.SequenceEqual(newNodes, ReferenceEqualityComparer.Instance);
+
+                RemoveAllLightProbeDebugGrid(selectedNodes.Where(n => !pinnedNodes.Any(pinned => pinned.LightProbeBinding == n.LightProbeBinding)));
+
+                selectedNodes.ForEach(n => n.IsSelected = pinnedNodeSet.Contains(n));
+                selectedNodes.Clear();
+
+                foreach (var node in newNodes)
+                {
+                    selectedNodes.Add(node);
+                    node.IsSelected = true;
+                }
+
+                if (forceDisableDepth && newNodes.Length > 0)
+                {
+                    disableDepth = true;
+                }
             }
+
+            if (newNodes.Length == 0)
+            {
+                Clear();
+            }
+
+            if (selectionChanged)
+            {
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Adds scene nodes to the independently pinned highlight collection.</summary>
+        public void AddPinnedNodes(IEnumerable<SceneNode> nodes)
+        {
+            var nodesToAdd = nodes
+                .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+                .ToArray();
+
+            using (Scene.SelectionSynchronization.EnterScope())
+            using (selectionLock.EnterScope())
+            {
+                var newPinnedNodes = nodesToAdd
+                    .Where(node => !pinnedNodeSet.Contains(node))
+                    .ToArray();
+
+                if (newPinnedNodes.Length == 0)
+                {
+                    return;
+                }
+
+                var updatedPinnedNodeSet = new HashSet<SceneNode>(pinnedNodeSet, ReferenceEqualityComparer.Instance);
+                updatedPinnedNodeSet.UnionWith(newPinnedNodes);
+                pinnedNodeSet = updatedPinnedNodeSet;
+
+                foreach (var node in newPinnedNodes)
+                {
+                    pinnedNodes.Add(node);
+                    node.IsSelected = true;
+                }
+            }
+        }
+
+        /// <summary>Removes scene nodes from the independently pinned highlight collection.</summary>
+        public void RemovePinnedNodes(IEnumerable<SceneNode> nodes)
+        {
+            var nodesToRemove = nodes
+                .Distinct<SceneNode>(ReferenceEqualityComparer.Instance)
+                .ToArray();
+
+            using (Scene.SelectionSynchronization.EnterScope())
+            using (selectionLock.EnterScope())
+            {
+                var pinnedNodesToRemove = nodesToRemove
+                    .Where(pinnedNodeSet.Contains)
+                    .ToArray();
+
+                if (pinnedNodesToRemove.Length == 0)
+                {
+                    return;
+                }
+
+                var updatedPinnedNodeSet = new HashSet<SceneNode>(pinnedNodeSet, ReferenceEqualityComparer.Instance);
+                updatedPinnedNodeSet.ExceptWith(pinnedNodesToRemove);
+                pinnedNodeSet = updatedPinnedNodeSet;
+
+                foreach (var node in pinnedNodesToRemove)
+                {
+                    pinnedNodes.Remove(node);
+                    if (!selectedNodes.Contains(node))
+                    {
+                        node.IsSelected = false;
+                    }
+                    RemoveUnusedPinnedProbe(node);
+                }
+            }
+        }
+
+        /// <summary>Clears all independently pinned highlights.</summary>
+        public void ClearPinnedNodes()
+        {
+            using (Scene.SelectionSynchronization.EnterScope())
+            using (selectionLock.EnterScope())
+            {
+                var removedNodes = pinnedNodes.ToArray();
+                pinnedNodes.Clear();
+                pinnedNodeSet = new(ReferenceEqualityComparer.Instance);
+                foreach (var node in removedNodes)
+                {
+                    if (!selectedNodes.Contains(node))
+                    {
+                        node.IsSelected = false;
+                    }
+                    RemoveUnusedPinnedProbe(node);
+                }
+            }
+        }
+
+        private void RemoveUnusedPinnedProbe(SceneNode node)
+        {
+            if (node.LightProbeBinding is { } probe
+                && !selectedNodes.Concat(pinnedNodes).Any(candidate => candidate.LightProbeBinding == probe))
+            {
+                probe.RemoveDebugGridSpheres();
+            }
+        }
+
+        private List<SceneNode> GetHighlightedNodes()
+        {
+            using var _ = selectionLock.EnterScope();
+            return selectedNodes.Concat(pinnedNodes).Distinct().ToList();
+        }
+
+        private (List<SceneNode> Nodes, HashSet<SceneNode> PinnedNodes) GetHighlightSnapshot()
+        {
+            using var _ = selectionLock.EnterScope();
+            return (
+                selectedNodes.Concat(pinnedNodes).Distinct<SceneNode>(ReferenceEqualityComparer.Instance).ToList(),
+                pinnedNodeSet);
         }
 
         /// <summary>Clears the selection and selects a single node, optionally disabling depth testing for its overlay.</summary>
@@ -67,30 +278,13 @@ namespace ValveResourceFormat.Renderer
         /// <param name="forceDisableDepth">When <see langword="true"/>, the selection overlay is drawn without depth testing.</param>
         public void SelectNode(SceneNode? node, bool forceDisableDepth = false)
         {
-            RemoveAllLightProbeDebugGrid();
-
-            selectedNodes.ForEach(static n => n.IsSelected = false);
-            selectedNodes.Clear();
-
-            if (node == null)
-            {
-                Clear();
-                return;
-            }
-
-            selectedNodes.Add(node);
-            node.IsSelected = true;
-
-            if (forceDisableDepth)
-            {
-                disableDepth = true;
-            }
+            SetSelectedNodes(node == null ? [] : [node], forceDisableDepth);
         }
 
         /// <summary>Toggles the layer-enabled state of all currently selected nodes.</summary>
         public void DisableSelectedNodes()
         {
-            foreach (var node in selectedNodes)
+            foreach (var node in SelectedNodes)
             {
                 node.LayerEnabled = !node.LayerEnabled;
             }
@@ -115,6 +309,23 @@ namespace ValveResourceFormat.Renderer
             }
 
             return closestIndex;
+        }
+
+        private static float GetSelectedLabelScale(Vector3 position, Camera camera)
+        {
+            var screenPosition = Vector4.Transform(new Vector4(position, 1f), camera.ViewProjectionMatrix);
+            if (screenPosition.W == 0f)
+            {
+                return 0f;
+            }
+
+            var screenDepth = screenPosition.Z / screenPosition.W;
+            return SelectedLabelScale * MathF.Max(screenDepth, 0f) * 100f;
+        }
+
+        private static float GetSelectedLabelGap(float textScale)
+        {
+            return textScale * SelectedLabelLineHeight + SelectedLabelPadding;
         }
 
         private static void AddBox(Camera camera, TextRenderer textRenderer, List<SimpleVertex> vertices, in Matrix4x4 transform, in AABB box, Color32 color, bool showSize = false)
@@ -184,7 +395,9 @@ namespace ValveResourceFormat.Renderer
         /// <param name="updateContext">Update context providing the text renderer.</param>
         public void Update(Scene.RenderContext renderContext, Scene.UpdateContext updateContext)
         {
-            disableDepth = selectedNodes.Count > 1;
+            var (highlightedNodesSnapshot, pinnedNodesSnapshot) = GetHighlightSnapshot();
+            var highlightSettings = HighlightSettings;
+            disableDepth = highlightedNodesSnapshot.Count > 1;
 
             // Draw the debug text even when nothing is selected
             if (ScreenDebugText.Length > 0)
@@ -198,20 +411,21 @@ namespace ValveResourceFormat.Renderer
                 }, renderContext.Camera);
             }
 
-            if (selectedNodes.Count == 0)
+            if (highlightedNodesSnapshot.Count == 0)
             {
                 // We don't need to reupload an empty array
                 Clear();
+                screenMarkerRenderer?.Update(renderContext.Camera, [], highlightSettings);
                 return;
             }
 
-            foreach (var node in selectedNodes)
+            foreach (var node in highlightedNodesSnapshot)
             {
                 var nodeName = node.Name ?? node.GetType().Name;
 
                 if (node is not SimpleBoxSceneNode and not SpriteSceneNode)
                 {
-                    AddBox(renderContext.Camera, updateContext.TextRenderer, vertices, node.Transform, node.LocalBoundingBox, Color32.White, showSize: true);
+                    AddBox(renderContext.Camera, updateContext.TextRenderer, vertices, node.Transform, node.LocalBoundingBox, Color32.White, showSize: highlightSettings.ShowDimensions);
                 }
 
                 if (debugCubeMaps)
@@ -321,21 +535,46 @@ namespace ValveResourceFormat.Renderer
 
                 updateContext.TextRenderer.AddTextBillboard(position, new TextRenderer.TextRenderRequest
                 {
-                    Scale = 20f,
+                    Scale = SelectedLabelScale,
                     Text = nodeName,
                     CenterHorizontal = true,
                     TextOffset = SelectedNodeNameOffset
                 }, renderContext.Camera, fixedScale: false);
+
+                if (pinnedNodesSnapshot.Contains(node)
+                    && node.EntityData?.TargetName is { } targetName
+                    && !string.IsNullOrWhiteSpace(targetName))
+                {
+                    var labelGap = GetSelectedLabelGap(GetSelectedLabelScale(position, renderContext.Camera));
+
+                    updateContext.TextRenderer.AddTextBillboard(position, new TextRenderer.TextRenderRequest
+                    {
+                        Scale = SelectedLabelScale,
+                        Text = targetName,
+                        CenterHorizontal = true,
+                        TextOffset = new(0, SelectedNodeNameOffset.Y - labelGap),
+                    }, renderContext.Camera, fixedScale: false);
+                }
             }
 
             Upload(vertices);
 
             vertices.Clear();
+
+            if (highlightSettings.ShowDistantMarkers)
+            {
+                screenMarkerRenderer ??= new(rendererContext);
+                screenMarkerRenderer.Update(renderContext.Camera, highlightedNodesSnapshot, highlightSettings);
+            }
+            else
+            {
+                screenMarkerRenderer?.Update(renderContext.Camera, [], highlightSettings);
+            }
         }
 
-        private void RemoveAllLightProbeDebugGrid()
+        private static void RemoveAllLightProbeDebugGrid(IEnumerable<SceneNode> nodes)
         {
-            foreach (var node in selectedNodes)
+            foreach (var node in nodes)
             {
                 node.LightProbeBinding?.RemoveDebugGridSpheres();
             }
@@ -345,6 +584,14 @@ namespace ValveResourceFormat.Renderer
         public void Render()
         {
             RenderLines(disableDepth);
+            screenMarkerRenderer?.Render();
+        }
+
+        /// <summary>Deletes the GL objects owned by the selection renderers.</summary>
+        public new void Delete()
+        {
+            base.Delete();
+            screenMarkerRenderer?.Delete();
         }
 
         /// <summary>Updates which debug overlays (cubemaps, light probes) are drawn based on the active render mode.</summary>
@@ -356,7 +603,7 @@ namespace ValveResourceFormat.Renderer
 
             if (!debugLightProbes)
             {
-                RemoveAllLightProbeDebugGrid();
+                RemoveAllLightProbeDebugGrid(GetHighlightedNodes());
             }
         }
     }

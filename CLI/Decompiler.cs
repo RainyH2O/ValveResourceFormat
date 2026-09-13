@@ -128,8 +128,10 @@ namespace CLI
         /// <param name="stats_vbib">When using --stats, collect vertex attributes.</param>
         /// <param name="gltf_test">When using --stats, also test glTF export code path for every supported file.</param>
         /// <param name="dump_unknown_entity_keys">When using --stats, save all unknown entity key hashes to unknown_keys.txt.</param>
+        /// <param name="export_entities">Export a Map or World resource's entities to a JSON file.</param>
+        /// <param name="export_entities_map">Find a Counter-Strike 2 map by name and export its entities to JSON.</param>
         private int HandleArguments(
-            string input,
+            string? input = default,
             string? output = default,
             bool decompile = false,
             string texture_decode_flags = nameof(TextureCodec.Auto),
@@ -163,11 +165,13 @@ namespace CLI
             bool stats_particles = false,
             bool stats_vbib = false,
             bool gltf_test = false,
-            bool dump_unknown_entity_keys = false
+            bool dump_unknown_entity_keys = false,
+            bool export_entities = false,
+            string? export_entities_map = default
         )
         {
             // When you modify the arguments, don't forget to update the command-line.md documentation file too.
-            InputFile = stats && input.Equals("steam", StringComparison.OrdinalIgnoreCase) ? "steam" : Path.GetFullPath(input);
+            InputFile = input == null ? string.Empty : stats && input.Equals("steam", StringComparison.OrdinalIgnoreCase) ? "steam" : Path.GetFullPath(input);
             OutputFile = output;
             Decompile = decompile;
             TextureDecodeFlags = Enum.Parse<TextureCodec>(texture_decode_flags, true);
@@ -273,7 +277,24 @@ namespace CLI
                 return 1;
             }
 
-            return Execute();
+            if (export_entities && export_entities_map != null)
+            {
+                Console.Error.WriteLine("Use either --export_entities or --export_entities_map, not both.");
+                return 1;
+            }
+
+            if (export_entities_map != null)
+            {
+                return ExecuteEntityExportMap(export_entities_map);
+            }
+
+            if (InputFile.Length == 0)
+            {
+                Console.Error.WriteLine("--input is required unless --export_entities_map is used.");
+                return 1;
+            }
+
+            return export_entities ? ExecuteEntityExport() : Execute();
         }
 
         private int Execute()

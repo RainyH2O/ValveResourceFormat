@@ -198,7 +198,7 @@ namespace GUI.Controls
             ClearUndo();
         }
 
-        private static TextBox CreateBasicTextBox(string text)
+        internal static TextBox CreateBasicTextBox(string text)
         {
             var textBox = new TextBox
             {

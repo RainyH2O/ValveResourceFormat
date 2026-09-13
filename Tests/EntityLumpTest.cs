@@ -54,9 +54,10 @@ namespace Tests
             using var resource = new Resource();
             var lump = LoadLump(resource, "graphics_settings_ents.vents_c");
             var entities = lump.GetEntities().ToList();
+            var resolver = new EntityIOTargetResolver(entities);
 
             var inputs = entities
-                .Select(e => (Entity: e, Inputs: e.GetInputConnections(entities)))
+                .Select(e => (Entity: e, Inputs: resolver.GetInputConnections(e)))
                 .Where(pair => pair.Inputs.Count > 0)
                 .ToList();
 

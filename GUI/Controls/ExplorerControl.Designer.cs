@@ -36,8 +36,10 @@ namespace GUI.Controls
             addToFavoritesToolStripMenuItem = new ThemedToolStripMenuItem();
             removeFromFavoritesToolStripMenuItem = new ThemedToolStripMenuItem();
             removeFromRecentToolStripMenuItem = new ThemedToolStripMenuItem();
+            refreshExplorerToolStripMenuItem = new ThemedToolStripMenuItem();
             recentFilesContextMenuStrip = new ThemedContextMenuStrip(components);
             clearRecentFilesToolStripMenuItem = new ThemedToolStripMenuItem();
+            refreshRecentFilesToolStripMenuItem = new ThemedToolStripMenuItem();
             tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             fileContextMenuStrip.SuspendLayout();
             recentFilesContextMenuStrip.SuspendLayout();
@@ -75,9 +77,9 @@ namespace GUI.Controls
             // 
             fileContextMenuStrip.BackColor = System.Drawing.Color.FromArgb(244, 244, 244);
             fileContextMenuStrip.ImageScalingSize = new System.Drawing.Size(24, 24);
-            fileContextMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { revealInFileExplorerToolStripMenuItem, addToFavoritesToolStripMenuItem, removeFromFavoritesToolStripMenuItem, removeFromRecentToolStripMenuItem });
+            fileContextMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { revealInFileExplorerToolStripMenuItem, addToFavoritesToolStripMenuItem, removeFromFavoritesToolStripMenuItem, removeFromRecentToolStripMenuItem, refreshExplorerToolStripMenuItem });
             fileContextMenuStrip.Name = "fileContextMenuStrip";
-            fileContextMenuStrip.Size = new System.Drawing.Size(217, 124);
+            fileContextMenuStrip.Size = new System.Drawing.Size(217, 154);
             // 
             // revealInFileExplorerToolStripMenuItem
             // 
@@ -110,14 +112,21 @@ namespace GUI.Controls
             removeFromRecentToolStripMenuItem.SVGImageResourceName = "GUI.Icons.HistoryRemove.svg";
             removeFromRecentToolStripMenuItem.Text = "&Remove from Recent";
             removeFromRecentToolStripMenuItem.Click += OnRemoveFromRecentClick;
+            //
+            // refreshExplorerToolStripMenuItem
+            //
+            refreshExplorerToolStripMenuItem.Name = "refreshExplorerToolStripMenuItem";
+            refreshExplorerToolStripMenuItem.Size = new System.Drawing.Size(216, 30);
+            refreshExplorerToolStripMenuItem.Text = "&Refresh";
+            refreshExplorerToolStripMenuItem.Click += OnRefreshExplorerClick;
             // 
             // recentFilesContextMenuStrip
             // 
             recentFilesContextMenuStrip.BackColor = System.Drawing.Color.FromArgb(244, 244, 244);
             recentFilesContextMenuStrip.ImageScalingSize = new System.Drawing.Size(24, 24);
-            recentFilesContextMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { clearRecentFilesToolStripMenuItem });
+            recentFilesContextMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { clearRecentFilesToolStripMenuItem, refreshRecentFilesToolStripMenuItem });
             recentFilesContextMenuStrip.Name = "recentFilesContextMenuStrip";
-            recentFilesContextMenuStrip.Size = new System.Drawing.Size(170, 34);
+            recentFilesContextMenuStrip.Size = new System.Drawing.Size(170, 64);
             // 
             // clearRecentFilesToolStripMenuItem
             // 
@@ -126,6 +135,13 @@ namespace GUI.Controls
             clearRecentFilesToolStripMenuItem.SVGImageResourceName = "GUI.Icons.HistoryClear.svg";
             clearRecentFilesToolStripMenuItem.Text = "&Clear recent files";
             clearRecentFilesToolStripMenuItem.Click += OnClearRecentFilesClick;
+            //
+            // refreshRecentFilesToolStripMenuItem
+            //
+            refreshRecentFilesToolStripMenuItem.Name = "refreshRecentFilesToolStripMenuItem";
+            refreshRecentFilesToolStripMenuItem.Size = new System.Drawing.Size(169, 30);
+            refreshRecentFilesToolStripMenuItem.Text = "&Refresh";
+            refreshRecentFilesToolStripMenuItem.Click += OnRefreshExplorerClick;
             // 
             // tableLayoutPanel1
             // 
@@ -168,6 +184,8 @@ namespace GUI.Controls
         private ThemedToolStripMenuItem addToFavoritesToolStripMenuItem;
         private ThemedToolStripMenuItem removeFromFavoritesToolStripMenuItem;
         private ThemedToolStripMenuItem removeFromRecentToolStripMenuItem;
+        private ThemedToolStripMenuItem refreshExplorerToolStripMenuItem;
+        private ThemedToolStripMenuItem refreshRecentFilesToolStripMenuItem;
         private ThemedContextMenuStrip fileContextMenuStrip;
         private ThemedContextMenuStrip recentFilesContextMenuStrip;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;

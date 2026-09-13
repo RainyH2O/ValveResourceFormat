@@ -49,6 +49,8 @@ namespace GUI
             Settings.Load();
             Themer.InitializeTheme();
             InitializeComponent();
+            InitializeEntitySimulationOpenMenu();
+            InitializeMapOpenMenu();
             LoadIcons();
 
             // Let the explorer start scanning games before the window even spawns
@@ -576,6 +578,7 @@ namespace GUI
                 toolStripSeparator5.Visible = canExport || tabIndex == 0;
                 exportAsIsToolStripMenuItem.Visible = canExport;
                 decompileExportToolStripMenuItem.Visible = canExport;
+                exportEntitiesTabToolStripMenuItem.Visible = canExport;
 
                 clearConsoleToolStripMenuItem.Visible = tabIndex == 0;
 

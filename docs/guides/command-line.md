@@ -33,6 +33,8 @@ The binary name is `Source2Viewer-CLI`.
 | `--gltf_textures_adapt`      | Whether to perform any glTF spec adaptations on textures (e.g. split metallic map).                                                                             |
 | `--gltf_export_extras`       | Export additional Mesh properties into glTF extras                                                                                                              |
 | `--tools_asset_info_short`   | Whether to print only file paths for tools_asset_info files.                                                                                                    |
+| `--export_entities`          | Export entities from one Map or World resource to a JSON file.                                                                                                  |
+| `--export_entities_map`      | Find a Counter-Strike 2 map by name and export its entities to a JSON file.                                                                                    |
 | **Other**                    |                                                                                                                                                                 |
 | `--threads`                  | If higher than 1, files will be processed concurrently.                                                                                                         |
 | `--game`                     | Path to a `gameinfo.gi` file to load game search paths from. Useful when the input file is not located inside a game folder.                                    |
@@ -90,6 +92,32 @@ Print resource blocks for a specific file (similar to resourceinfo.exe in Source
 ```powershell
 ./Source2Viewer-CLI.exe -i "file.vtex_c" -o exported.png
 ```
+
+### Export entities from a map
+
+Entity export writes the existing JSON entity array, including every exported property and connection. It requires one Map or World resource and an output JSON file. For a VPK, use one exact `--vpk_filepath` ending in `.vmap_c` or `.vwrld_c`.
+
+```powershell
+./Source2Viewer-CLI.exe -i "maps/example.vpk" --export_entities -f "maps/example.vmap_c" -o "exports/example_entities.json"
+```
+
+For a loose compiled map, the input is the map or world resource itself. Use `--game` with a `gameinfo.gi` file when its dependencies are not discoverable from the input path.
+
+```powershell
+./Source2Viewer-CLI.exe -i "game/csgo/maps/example.vmap_c" --export_entities --game "game/csgo/gameinfo.gi" -o "exports/example_entities.json"
+```
+
+The command only accepts one map/world resource and cannot be combined with recursive extraction, stats, VPK listing, glTF export, or other processing modes. It returns nonzero if the requested resource or an entity lump cannot be loaded, or if JSON cannot be written. An existing output file is replaced only after extraction and serialization succeed. The export reflects static map resources; template instance transforms, trigger geometry, scripts, and runtime state are not added.
+
+### Export entities by Counter-Strike 2 map name
+
+When Counter-Strike 2 is installed through Steam, provide only its map name. The CLI finds the game installation, then reuses its normal game search paths; it also checks installed Workshop map packages only when those paths do not contain the requested map. It does not build or retain a separate map catalog.
+
+```powershell
+./Source2Viewer-CLI.exe --export_entities_map "de_example" -o "exports/de_example_entities.json"
+```
+
+Use `--game "game/csgo/gameinfo.gi"` to select a specific installation. Map names cannot contain path separators. This mode exports `maps/MAP.vmap_c`, so it is intended for maps rather than a World resource.
 
 ### Export a model to glTF with specific animations
 

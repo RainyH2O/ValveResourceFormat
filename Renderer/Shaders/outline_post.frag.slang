@@ -7,6 +7,8 @@ uniform int g_nNumSamplesMSAA = 1;
 uniform float g_flOutlineSize = 1;
 uniform float g_flOutlineSoftness = 0.8;
 uniform float g_flOutlineIntensity = 2.25;
+uniform float g_flOutlineFillAlpha = 0;
+uniform vec3 g_vOutlineColor = vec3(1.0, 1.0, 0.2);
 
 layout (binding = 0) uniform sampler2DMS g_tOutlineMask;
 
@@ -36,8 +38,13 @@ vec4 DrawOutline()
 
     if (insideCountCenter >= float(g_nNumSamplesMSAA))
     {
-        // do not draw outline inside the object
-        discard;
+        if (g_flOutlineFillAlpha <= 0.0)
+        {
+            // do not draw outline inside the object
+            discard;
+        }
+
+        return vec4(g_vOutlineColor, g_flOutlineFillAlpha);
     }
 
     float insideCount = insideCountCenter;
@@ -96,7 +103,7 @@ vec4 DrawOutline()
     // Edge strength: how much of the kernel is inside while the center is not.
     float edgeStrength = clamp(covNeighborhood - covCenter, 0.0, 1.0);
     // widen the smoothstep so weaker edges still contribute
-    edgeStrength = smoothstep(0.001, 0.85 * g_flOutlineSoftness, edgeStrength);
+    edgeStrength = smoothstep(0.001, max(0.002, 0.85 * g_flOutlineSoftness), edgeStrength);
 
     // Compute a smooth exterior falloff based on distance (in pixels) to the nearest inside sample
     float distPixels = sqrt(minDistSq);
@@ -108,7 +115,7 @@ vec4 DrawOutline()
     // Ensure a small visible floor so very thin silhouettes remain noticeable
     outlineAlpha = max(outlineAlpha, 0.06 * edgeStrength * g_flOutlineIntensity);
 
-    return vec4(vec3(1.0, 1.0, 0.2), outlineAlpha);
+    return vec4(g_vOutlineColor, outlineAlpha);
 }
 
 out vec4 outputColor;

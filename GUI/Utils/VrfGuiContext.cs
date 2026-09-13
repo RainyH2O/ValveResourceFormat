@@ -20,6 +20,8 @@ namespace GUI.Utils
 
         public string FileName { get; }
 
+        internal bool DisableEntitySimulationOnOpen { get; init; }
+
         public new Package? CurrentPackage
         {
             get
