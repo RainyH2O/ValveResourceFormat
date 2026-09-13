@@ -46,6 +46,7 @@ public sealed class PropDynamic : BaseModelEntity
         // than not blocking at all
         hasCollision = Solid != SolidType.SOLID_NONE && EntityScale == Vector3.One;
         IsSolid = hasCollision && !HasSpawnFlags(SpawnFlag.StartCollisionDisabled);
+        IsDrawn = !KeyValues.GetBooleanProperty("startdisabled");
 
         // HL:A only
         if (KeyValues.GetInt32Property("setbodygroup") is > 0 and var bodyGroupChoice)
@@ -130,6 +131,10 @@ public sealed class PropDynamic : BaseModelEntity
     [EntityInput("TurnOn")] private void InputTurnOn(EntityInputData data) => IsDrawn = true;
 
     [EntityInput("TurnOff")] private void InputTurnOff(EntityInputData data) => IsDrawn = false;
+
+    [EntityInput("Enable")] private void InputEnable(EntityInputData data) => IsDrawn = true;
+
+    [EntityInput("Disable")] private void InputDisable(EntityInputData data) => IsDrawn = false;
 
     [EntityInput("EnableCollision")] private void InputEnableCollision(EntityInputData data) => IsSolid = hasCollision;
 
