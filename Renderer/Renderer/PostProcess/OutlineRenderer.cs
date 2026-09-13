@@ -10,6 +10,9 @@ public class OutlineRenderer(RendererContext rendererContext)
 {
     private Shader? outlineEdge;
 
+    /// <summary>Gets or sets the visual settings used for selection outlines.</summary>
+    public SelectionHighlightSettings Settings { get; set; } = SelectionHighlightSettings.Default;
+
     /// <summary>Loads the outline edge detection shader.</summary>
     public void Load()
     {
@@ -27,6 +30,13 @@ public class OutlineRenderer(RendererContext rendererContext)
 
         outlineEdge.SetUniform("g_bFlipY", flipY);
         outlineEdge.SetUniform("g_nNumSamplesMSAA", numSamples);
+
+        var settings = Settings;
+        outlineEdge.SetUniform("g_flOutlineSize", settings.OutlineWidth / 2.5f);
+        outlineEdge.SetUniform("g_flOutlineSoftness", settings.OutlineSoftness);
+        outlineEdge.SetUniform("g_flOutlineIntensity", settings.OutlineIntensity);
+        outlineEdge.SetUniform("g_flOutlineFillAlpha", settings.FillAlpha);
+        outlineEdge.SetUniform("g_vOutlineColor", new Vector3(settings.Color.R, settings.Color.G, settings.Color.B) / 255f);
 
         outlineEdge.SetTexture(0, "g_tOutlineMask", outlineMask);
 

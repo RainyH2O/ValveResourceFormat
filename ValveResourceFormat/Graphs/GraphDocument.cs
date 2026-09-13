@@ -194,6 +194,19 @@ internal sealed class GraphDocument
         }
     }
 
+    /// <summary>Toggles one explicitly selected node without clearing the other selected nodes.</summary>
+    /// <param name="node">The node to toggle.</param>
+    public void ToggleNodeSelection(GraphNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        Selection.ToggleNode(node);
+        BringNodeToFront(node);
+    }
+
+    /// <summary>Replaces the explicit node selection.</summary>
+    /// <param name="selectedNodes">Nodes to select.</param>
+    public void SelectNodes(IEnumerable<GraphNode> selectedNodes) => Selection.SetSelectedNodes(selectedNodes);
+
     /// <summary>Selects a wire, or clears it when that wire is already selected.</summary>
     /// <param name="wire">The wire to toggle.</param>
     public void SelectWire(GraphWire wire) => Selection.SelectWire(wire);

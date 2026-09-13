@@ -31,6 +31,9 @@ namespace ValveResourceFormat.Renderer.SceneNodes
         /// <summary>Gets the display name of the collision group represented by this node.</summary>
         public required string PhysGroupName { get; init; }
 
+        /// <summary>Gets whether this node represents the default world collision group.</summary>
+        public bool IsDefaultGroup { get; init; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="PhysSceneNode"/> class from pre-built vertex and index lists.
         /// </summary>
@@ -268,6 +271,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 var attributes = phys.CollisionAttributes[collisionAttributeIndex];
                 var tags = attributes.GetArray<string>("m_InteractAsStrings") ?? attributes.GetArray<string>("m_PhysicsTagStrings");
                 var group = attributes.GetStringProperty("m_CollisionGroupString");
+                var isDefaultGroup = classname == null && group?.Equals("default", StringComparison.OrdinalIgnoreCase) == true;
 
                 var tooltexture = MapExtract.GetToolTextureShortenedName_ForInteractStrings([.. tags]);
 
@@ -281,7 +285,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 {
                     if (group != null)
                     {
-                        if (group.Equals("default", StringComparison.OrdinalIgnoreCase))
+                        if (isDefaultGroup)
                         {
                             physName = $"- default";
                         }
@@ -305,6 +309,7 @@ namespace ValveResourceFormat.Renderer.SceneNodes
                 var physSceneNode = new PhysSceneNode(scene, verts, inds)
                 {
                     PhysGroupName = physName,
+                    IsDefaultGroup = isDefaultGroup,
                     Name = fileName,
                     LocalBoundingBox = boundingBox,
                     OverlayRenderOrder = collisionAttributeIndex,

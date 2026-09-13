@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace ValveResourceFormat.Graphs;
 
 /// <summary>
@@ -10,6 +12,9 @@ internal sealed class GraphSelection
     public GraphNode? PrimaryNode { get; private set; }
     /// <summary>The selected wire, if a wire is selected instead of a node.</summary>
     public GraphWire? Wire { get; private set; }
+
+    /// <summary>Nodes explicitly selected by the user, including the primary node.</summary>
+    public HashSet<GraphNode> SelectedNodes { get; } = [];
 
     /// <summary>Transitive upstream and downstream chain of the primary node, including it.</summary>
     public HashSet<GraphNode> Connected { get; } = [];
@@ -24,7 +29,7 @@ internal sealed class GraphSelection
     public HashSet<GraphNode> DirectOut { get; } = [];
 
     /// <summary>Whether nothing is selected.</summary>
-    public bool IsEmpty => PrimaryNode == null && Wire == null;
+    public bool IsEmpty => SelectedNodes.Count == 0 && Wire == null;
 
     // Clicking a wire focuses just its two endpoint nodes; clicking it again deselects.
     /// <summary>Selects a wire, or clears it when that wire is already selected.</summary>
@@ -32,6 +37,7 @@ internal sealed class GraphSelection
     public void SelectWire(GraphWire wire)
     {
         PrimaryNode = null;
+        SelectedNodes.Clear();
         Connected.Clear();
         ClearDirect();
         Wire = Wire == wire ? null : wire;
@@ -40,6 +46,59 @@ internal sealed class GraphSelection
     /// <summary>Makes a node the primary selection and recomputes its chain and neighbours.</summary>
     /// <param name="node">The node to select.</param>
     public void SetPrimary(GraphNode node)
+    {
+        SelectedNodes.Clear();
+        SelectedNodes.Add(node);
+        SetPrimaryDetails(node);
+    }
+
+    /// <summary>Toggles a node in the explicit selection and makes an added node primary.</summary>
+    /// <param name="node">The node to toggle.</param>
+    public void ToggleNode(GraphNode node)
+    {
+        Wire = null;
+
+        if (!SelectedNodes.Remove(node))
+        {
+            SelectedNodes.Add(node);
+            SetPrimaryDetails(node);
+            return;
+        }
+
+        var nextPrimary = SelectedNodes.FirstOrDefault();
+        if (nextPrimary == null)
+        {
+            PrimaryNode = null;
+            Connected.Clear();
+            ClearDirect();
+            return;
+        }
+
+        SetPrimaryDetails(nextPrimary);
+    }
+
+    /// <summary>Replaces the explicit selection with the supplied nodes.</summary>
+    /// <param name="nodes">Nodes to select.</param>
+    public void SetSelectedNodes(IEnumerable<GraphNode> nodes)
+    {
+        SelectedNodes.Clear();
+
+        foreach (var node in nodes)
+        {
+            SelectedNodes.Add(node);
+        }
+
+        var primary = SelectedNodes.FirstOrDefault();
+        if (primary == null)
+        {
+            Clear();
+            return;
+        }
+
+        SetPrimaryDetails(primary);
+    }
+
+    private void SetPrimaryDetails(GraphNode node)
     {
         PrimaryNode = node;
         Wire = null;
@@ -52,6 +111,7 @@ internal sealed class GraphSelection
     {
         PrimaryNode = null;
         Wire = null;
+        SelectedNodes.Clear();
         Connected.Clear();
         ClearDirect();
     }

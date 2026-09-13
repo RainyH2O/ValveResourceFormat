@@ -371,6 +371,19 @@ namespace Tests
             await Assert.That(EntityTransformHelper.TryParseVector2("1 2 3", out _)).IsFalse();
         }
 
+        [Test]
+        public async Task TryParseVector3AcceptsPunctuationSeparators()
+        {
+            await Assert.That(EntityTransformHelper.TryParseVector3("(1, 2, 3)", out var vector3)).IsTrue();
+            await Assert.That(vector3).IsEqualTo(new Vector3(1f, 2f, 3f));
+
+            await Assert.That(EntityTransformHelper.TryParseVector3("+1.5\t-2.25 3e2", out vector3)).IsTrue();
+            await Assert.That(vector3).IsEqualTo(new Vector3(1.5f, -2.25f, 300f));
+
+            await Assert.That(EntityTransformHelper.TryParseVector3("NaN 2 3", out _)).IsFalse();
+            await Assert.That(EntityTransformHelper.TryParseVector3("Infinity 2 3", out _)).IsFalse();
+        }
+
         /// <summary>
         /// A malformed value has to fall back to what the caller asked for, not to zero: "scales" defaults
         /// to one, and collapsing it to zero would make the entity vanish.

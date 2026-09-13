@@ -126,6 +126,9 @@ namespace GUI.Types.GLViewers
             QuadOverdrawRenderer?.Dispose();
             QuadOverdrawRenderer = null;
 
+            SelectedNodeRenderer?.Delete();
+            SelectedNodeRenderer = null;
+
             Renderer?.Dispose();
 
             base.Dispose();

@@ -49,14 +49,31 @@ namespace ValveResourceFormat.Renderer
             get;
             set
             {
-                var valueChanged = value != field;
+                var wasVisible = IsVisibleInViewer;
                 field = value;
-                if (valueChanged)
+                if (wasVisible != IsVisibleInViewer)
                 {
                     Scene.MarkParentOctreeDirty(this);
                 }
             }
         } = true;
+
+        /// <summary>Gets whether this node is visible after applying layer and viewer visibility controls.</summary>
+        public bool IsVisibleInViewer => LayerEnabled && !ViewerHidden;
+
+        internal bool ViewerHidden
+        {
+            get;
+            set
+            {
+                var wasVisible = IsVisibleInViewer;
+                field = value;
+                if (wasVisible != IsVisibleInViewer)
+                {
+                    Scene.MarkParentOctreeDirty(this);
+                }
+            }
+        }
 
         /// <summary>
         /// Gets or sets whether the node itself wants to be drawn, independently of its layer.

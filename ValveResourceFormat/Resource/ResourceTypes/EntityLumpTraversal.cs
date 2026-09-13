@@ -1,3 +1,4 @@
+using System.Linq;
 using ValveResourceFormat.IO;
 using ValveResourceFormat.Serialization.KeyValues;
 using static ValveResourceFormat.ResourceTypes.EntityLump;
@@ -23,14 +24,57 @@ namespace ValveResourceFormat.ResourceTypes
         /// <param name="fileLoader">Loads referenced child lumps by name.</param>
         /// <param name="rootTransform">Transform applied to top-level entities.</param>
         /// <param name="onMissingChildLump">Called with the lump name when a referenced child lump can't be resolved.</param>
+        /// <param name="includeUnreferencedChildLumps">Whether child lumps not referenced by a point template are also enumerated.</param>
         /// <returns>Each entity with its parent transform.</returns>
         public static IEnumerable<TraversedEntity> EnumerateEntities(
             VEntityLump lump,
             IFileLoader fileLoader,
             Matrix4x4 rootTransform,
-            Action<string>? onMissingChildLump = null)
+            Action<string>? onMissingChildLump = null,
+            bool includeUnreferencedChildLumps = false)
         {
-            return Traverse(lump, fileLoader, rootTransform, fromTemplate: false, [], [], onMissingChildLump);
+            return EnumerateEntitiesIterator(lump, fileLoader, rootTransform, onMissingChildLump, includeUnreferencedChildLumps);
+        }
+
+        private static IEnumerable<TraversedEntity> EnumerateEntitiesIterator(
+            VEntityLump lump,
+            IFileLoader fileLoader,
+            Matrix4x4 rootTransform,
+            Action<string>? onMissingChildLump,
+            bool includeUnreferencedChildLumps)
+        {
+            var childLumps = new Dictionary<string, VEntityLump>();
+            var visited = new HashSet<string>();
+            if (!string.IsNullOrEmpty(lump.Name))
+            {
+                visited.Add(lump.Name);
+            }
+
+            foreach (var entity in Traverse(lump, fileLoader, rootTransform, fromTemplate: false, childLumps, visited, onMissingChildLump))
+            {
+                yield return entity;
+            }
+
+            if (!includeUnreferencedChildLumps)
+            {
+                yield break;
+            }
+
+            while (true)
+            {
+                var unreferenced = childLumps.FirstOrDefault(pair => !visited.Contains(pair.Key));
+                if (string.IsNullOrEmpty(unreferenced.Key))
+                {
+                    yield break;
+                }
+
+                visited.Add(unreferenced.Key);
+
+                foreach (var entity in Traverse(unreferenced.Value, fileLoader, rootTransform, fromTemplate: false, childLumps, visited, onMissingChildLump))
+                {
+                    yield return entity;
+                }
+            }
         }
 
         // Lazily mutates childLumps/visited during enumeration; safe because both consumers materialize the result.
@@ -45,7 +89,8 @@ namespace ValveResourceFormat.ResourceTypes
         {
             foreach (var childLumpName in lump.GetChildEntityNames())
             {
-                var childLump = fileLoader.LoadFileCompiled(childLumpName)?.DataBlock as VEntityLump;
+                using var childResource = fileLoader.LoadFileCompiled(childLumpName);
+                var childLump = childResource?.DataBlock as VEntityLump;
 
                 if (childLump != null)
                 {

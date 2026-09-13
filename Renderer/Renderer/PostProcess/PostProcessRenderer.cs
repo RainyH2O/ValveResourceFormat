@@ -21,6 +21,13 @@ namespace ValveResourceFormat.Renderer.PostProcess
             ["g_tColorCorrection0", "g_tColorCorrection1", "g_tColorCorrection2", "g_tColorCorrection3"];
         private readonly OutlineRenderer Outline;
 
+        /// <summary>Gets or sets the visual settings used for selection highlights.</summary>
+        public SelectionHighlightSettings SelectionHighlightSettings
+        {
+            get => Outline.Settings;
+            set => Outline.Settings = value;
+        }
+
         /// <summary>Gets or sets the blue noise texture used for dithering in the tonemap pass.</summary>
         public RenderTexture? BlueNoise { get; set; }
         private readonly Random random = new();

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using ValveResourceFormat.Renderer.SceneEnvironment;
 using ValveResourceFormat.Renderer.SceneNodes;
 using ValveResourceFormat.Renderer.World;
@@ -18,6 +19,9 @@ namespace ValveResourceFormat.Renderer
         private bool debugLightProbes;
         private readonly List<SceneNode> selectedNodes = new(1);
         private readonly List<SimpleVertex> vertices = new(48);
+        private readonly Lock selectionLock = new();
+        private readonly RendererContext rendererContext;
+        private SelectionScreenMarkerRenderer? screenMarkerRenderer;
 
         private readonly Vector2 SelectedNodeNameOffset = new(0, -20);
 
@@ -25,41 +29,80 @@ namespace ValveResourceFormat.Renderer
         public string ScreenDebugText { get; set; } = string.Empty;
 
         /// <summary>Gets a value indicating whether any node is currently selected.</summary>
-        public bool HasSelectedNodes => selectedNodes.Count > 0;
+        public bool HasSelectedNodes
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return selectedNodes.Count > 0;
+            }
+        }
+
+        /// <summary>Gets the primary selected node, or <see langword="null"/> if nothing is selected.</summary>
+        public SceneNode? SelectedNode
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return selectedNodes.Count > 0 ? selectedNodes[0] : null;
+            }
+        }
+
+        /// <summary>Gets the currently selected scene nodes.</summary>
+        public IReadOnlyList<SceneNode> SelectedNodes
+        {
+            get
+            {
+                using var _ = selectionLock.EnterScope();
+                return [.. selectedNodes];
+            }
+        }
+
+        /// <summary>Occurs when the selected scene-node collection changes.</summary>
+        public event EventHandler? SelectionChanged;
 
         /// <summary>Initializes the selected node renderer and creates GPU resources.</summary>
         /// <param name="rendererContext">Renderer context for loading shaders.</param>
         public SelectedNodeRenderer(RendererContext rendererContext)
             : base(rendererContext, nameof(SelectedNodeRenderer))
         {
+            this.rendererContext = rendererContext;
         }
+
+        /// <summary>Gets or sets the visual settings used for selected nodes.</summary>
+        public SelectionHighlightSettings HighlightSettings { get; set; } = SelectionHighlightSettings.Default;
 
         /// <summary>Toggles selection of the given node, adding it if not selected or removing it if already selected.</summary>
         /// <param name="node">The scene node to toggle.</param>
         public void ToggleNode(SceneNode node)
         {
-            var selectedNode = selectedNodes.IndexOf(node);
-
-            if (selectedNode >= 0)
+            using (selectionLock.EnterScope())
             {
-                selectedNodes.RemoveAt(selectedNode);
-                node.IsSelected = false;
+                var selectedNode = selectedNodes.IndexOf(node);
 
-                if (node.LightProbeBinding is { } probe)
+                if (selectedNode >= 0)
                 {
-                    var probeStillInUse = selectedNodes.Any(n => n.LightProbeBinding == probe);
+                    selectedNodes.RemoveAt(selectedNode);
+                    node.IsSelected = false;
 
-                    if (!probeStillInUse)
+                    if (node.LightProbeBinding is { } probe)
                     {
-                        probe.RemoveDebugGridSpheres();
+                        var probeStillInUse = selectedNodes.Any(n => n.LightProbeBinding == probe);
+
+                        if (!probeStillInUse)
+                        {
+                            probe.RemoveDebugGridSpheres();
+                        }
                     }
                 }
+                else
+                {
+                    selectedNodes.Add(node);
+                    node.IsSelected = true;
+                }
             }
-            else
-            {
-                selectedNodes.Add(node);
-                node.IsSelected = true;
-            }
+
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>Clears the selection and selects a single node, optionally disabling depth testing for its overlay.</summary>
@@ -67,30 +110,40 @@ namespace ValveResourceFormat.Renderer
         /// <param name="forceDisableDepth">When <see langword="true"/>, the selection overlay is drawn without depth testing.</param>
         public void SelectNode(SceneNode? node, bool forceDisableDepth = false)
         {
-            RemoveAllLightProbeDebugGrid();
+            bool selectionChanged;
 
-            selectedNodes.ForEach(static n => n.IsSelected = false);
-            selectedNodes.Clear();
-
-            if (node == null)
+            using (selectionLock.EnterScope())
             {
-                Clear();
-                return;
+                selectionChanged = selectedNodes.Count != (node == null ? 0 : 1)
+                    || (node != null && selectedNodes[0] != node);
+
+                RemoveAllLightProbeDebugGrid(selectedNodes);
+
+                selectedNodes.ForEach(static n => n.IsSelected = false);
+                selectedNodes.Clear();
+
+                if (node != null)
+                {
+                    selectedNodes.Add(node);
+                    node.IsSelected = true;
+
+                    if (forceDisableDepth)
+                    {
+                        disableDepth = true;
+                    }
+                }
             }
 
-            selectedNodes.Add(node);
-            node.IsSelected = true;
-
-            if (forceDisableDepth)
+            if (selectionChanged)
             {
-                disableDepth = true;
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
         /// <summary>Toggles the layer-enabled state of all currently selected nodes.</summary>
         public void DisableSelectedNodes()
         {
-            foreach (var node in selectedNodes)
+            foreach (var node in SelectedNodes)
             {
                 node.LayerEnabled = !node.LayerEnabled;
             }
@@ -184,7 +237,9 @@ namespace ValveResourceFormat.Renderer
         /// <param name="updateContext">Update context providing the text renderer.</param>
         public void Update(Scene.RenderContext renderContext, Scene.UpdateContext updateContext)
         {
-            disableDepth = selectedNodes.Count > 1;
+            var selectedNodesSnapshot = SelectedNodes;
+            var highlightSettings = HighlightSettings;
+            disableDepth = selectedNodesSnapshot.Count > 1;
 
             // Draw the debug text even when nothing is selected
             if (ScreenDebugText.Length > 0)
@@ -198,20 +253,21 @@ namespace ValveResourceFormat.Renderer
                 }, renderContext.Camera);
             }
 
-            if (selectedNodes.Count == 0)
+            if (selectedNodesSnapshot.Count == 0)
             {
                 // We don't need to reupload an empty array
                 Clear();
+                screenMarkerRenderer?.Update(renderContext.Camera, [], highlightSettings);
                 return;
             }
 
-            foreach (var node in selectedNodes)
+            foreach (var node in selectedNodesSnapshot)
             {
                 var nodeName = node.Name ?? node.GetType().Name;
 
                 if (node is not SimpleBoxSceneNode and not SpriteSceneNode)
                 {
-                    AddBox(renderContext.Camera, updateContext.TextRenderer, vertices, node.Transform, node.LocalBoundingBox, Color32.White, showSize: true);
+                    AddBox(renderContext.Camera, updateContext.TextRenderer, vertices, node.Transform, node.LocalBoundingBox, Color32.White, showSize: highlightSettings.ShowDimensions);
                 }
 
                 if (debugCubeMaps)
@@ -331,11 +387,21 @@ namespace ValveResourceFormat.Renderer
             Upload(vertices);
 
             vertices.Clear();
+
+            if (highlightSettings.ShowDistantMarkers)
+            {
+                screenMarkerRenderer ??= new(rendererContext);
+                screenMarkerRenderer.Update(renderContext.Camera, selectedNodesSnapshot, highlightSettings);
+            }
+            else
+            {
+                screenMarkerRenderer?.Update(renderContext.Camera, [], highlightSettings);
+            }
         }
 
-        private void RemoveAllLightProbeDebugGrid()
+        private static void RemoveAllLightProbeDebugGrid(IEnumerable<SceneNode> nodes)
         {
-            foreach (var node in selectedNodes)
+            foreach (var node in nodes)
             {
                 node.LightProbeBinding?.RemoveDebugGridSpheres();
             }
@@ -345,6 +411,14 @@ namespace ValveResourceFormat.Renderer
         public void Render()
         {
             RenderLines(disableDepth);
+            screenMarkerRenderer?.Render();
+        }
+
+        /// <summary>Deletes the GL objects owned by the selection renderers.</summary>
+        public new void Delete()
+        {
+            base.Delete();
+            screenMarkerRenderer?.Delete();
         }
 
         /// <summary>Updates which debug overlays (cubemaps, light probes) are drawn based on the active render mode.</summary>
@@ -356,7 +430,7 @@ namespace ValveResourceFormat.Renderer
 
             if (!debugLightProbes)
             {
-                RemoveAllLightProbeDebugGrid();
+                RemoveAllLightProbeDebugGrid(SelectedNodes);
             }
         }
     }
